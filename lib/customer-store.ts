@@ -17,9 +17,21 @@ export type CreditLedgerItem = {
   referenceId?: string | null
 }
 
+export type PurchaseHistoryItem = {
+  id: string
+  createdAt: string
+  provider: string
+  planId: string
+  amount: number
+  currency: string
+  status: string
+  credits: number
+}
+
 const memory = globalThis as unknown as {
   reviewIntelCustomers?: Customer[]
   reviewIntelCreditTransactions?: Array<CreditLedgerItem & { customerId: string }>
+  reviewIntelCustomerPurchases?: Array<PurchaseHistoryItem & { customerId: string }>
 }
 
 function memoryCustomers() {
@@ -38,6 +50,11 @@ function memoryCustomers() {
 function memoryTransactions() {
   memory.reviewIntelCreditTransactions ||= []
   return memory.reviewIntelCreditTransactions
+}
+
+function memoryPurchases() {
+  memory.reviewIntelCustomerPurchases ||= []
+  return memory.reviewIntelCustomerPurchases
 }
 
 function toCustomer(record: { id: string; email: string; credits: number; createdAt: Date | string }): Customer {
@@ -209,6 +226,32 @@ export async function getCustomerCreditLedger(customerId: string, limit = 10): P
   }
 
   return memoryTransactions()
+    .filter((item) => item.customerId === customerId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit)
+    .map(({ customerId: _customerId, ...item }) => item)
+}
+
+export async function getCustomerPurchases(customerId: string, limit = 8): Promise<PurchaseHistoryItem[]> {
+  if (hasRealDatabaseUrl()) {
+    const rows = await getDb().customerPurchase.findMany({
+      where: { customerId },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    })
+    return rows.map((row) => ({
+      id: row.id,
+      provider: row.provider,
+      planId: row.planId,
+      amount: row.amount,
+      currency: row.currency,
+      status: row.status,
+      credits: row.credits,
+      createdAt: row.createdAt.toISOString()
+    }))
+  }
+
+  return memoryPurchases()
     .filter((item) => item.customerId === customerId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit)
