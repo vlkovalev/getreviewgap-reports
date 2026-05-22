@@ -67,7 +67,13 @@ function buildApifyInputs(input: ReviewInput) {
 
   const asin = extractAmazonAsin(input.productUrl)
   const common = { maxItems: 500, maxReviews: 500, reviewsCount: 500, proxyConfiguration: { useApifyProxy: true } }
+  const reviewCommon = { scrapeMode: "AUTO", sortReview: "Most recent", maxReviewResults: 500, additionalReviewProperties: true, proxyConfiguration: { useApifyProxy: true } }
   const inputs: Array<Record<string, unknown> | null> = [
+    { reviewDetailsUrls: [input.productUrl], ...reviewCommon },
+    { reviewDetailsUrls: [{ url: input.productUrl }], ...reviewCommon },
+    { reviewListingUrls: [input.productUrl], ...reviewCommon },
+    { reviewListingUrls: [{ url: input.productUrl }], ...reviewCommon },
+    asin ? { keywordReviews: asin, marketplacesReviews: ["Amazon"], ...reviewCommon } : null,
     { startUrls: [{ url: input.productUrl }], ...common },
     { startUrls: [input.productUrl], ...common },
     { productUrls: [input.productUrl], ...common },
