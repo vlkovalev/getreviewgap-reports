@@ -20,14 +20,18 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
     }
   }
 
-  if (!process.env.APIFY_TOKEN || !process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID) {
+  const apifyToken = cleanEnv(process.env.APIFY_TOKEN)
+  const actorId = cleanEnv(process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID)
+
+  if (!apifyToken || !actorId) {
     return { reviews: demoReviews, source: "demo" }
   }
 
-  const runResponse = await fetch(`https://api.apify.com/v2/acts/${process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID}/run-sync-get-dataset-items?token=${process.env.APIFY_TOKEN}`, {
+  const actorInput = buildApifyInput(input)
+  const runResponse = await fetch(`https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ productUrl: input.productUrl, maxItems: 500 })
+    body: JSON.stringify(actorInput)
   })
 
   if (!runResponse.ok) {
@@ -36,12 +40,44 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
 
   const items = await runResponse.json() as Array<Record<string, unknown>>
   const reviews = items
-    .map((item) => String(item.reviewText || item.text || item.content || ""))
+    .map((item) => String(item.reviewText || item.review_text || item.text || item.content || item.body || item.comment || ""))
     .map((text) => text.trim())
     .filter(Boolean)
     .slice(0, 500)
 
   return { reviews: reviews.length ? reviews : demoReviews, source: reviews.length ? "apify" : "demo" }
+}
+
+function buildApifyInput(input: ReviewInput) {
+  if (process.env.APIFY_INPUT_TEMPLATE) {
+    try {
+      const template = JSON.parse(process.env.APIFY_INPUT_TEMPLATE) as Record<string, unknown>
+      return replaceTemplateValues(template, input.productUrl)
+    } catch {
+      return { productUrl: input.productUrl, maxItems: 500 }
+    }
+  }
+
+  return {
+    productUrl: input.productUrl,
+    productUrls: [input.productUrl],
+    startUrls: [{ url: input.productUrl }],
+    maxItems: 500,
+    maxReviews: 500
+  }
+}
+
+function replaceTemplateValues(value: unknown, productUrl: string): unknown {
+  if (typeof value === "string") return value.replaceAll("{{PRODUCT_URL}}", productUrl)
+  if (Array.isArray(value)) return value.map((item) => replaceTemplateValues(item, productUrl))
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replaceTemplateValues(item, productUrl)]))
+  }
+  return value
+}
+
+function cleanEnv(value: string | undefined) {
+  return value?.trim().replace(/^["']|["']$/g, "")
 }
 
 export async function generateReviewInsight(input: ReviewInput, reviews: string[]): Promise<{ insight: ReviewInsight; provider: string; model: string }> {

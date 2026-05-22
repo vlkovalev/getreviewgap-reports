@@ -61,10 +61,15 @@ OPENAI_API_KEY=""
 OPENAI_MODEL="gpt-4o-mini"
 APIFY_TOKEN=""
 APIFY_AMAZON_REVIEWS_ACTOR_ID=""
+APIFY_INPUT_TEMPLATE=""
 PAYPAL_MODE="sandbox"
 PAYPAL_CLIENT_ID=""
 PAYPAL_CLIENT_SECRET=""
 STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+NEXT_PUBLIC_GA_MEASUREMENT_ID=""
+NEXT_PUBLIC_META_PIXEL_ID=""
+NEXT_PUBLIC_LINKEDIN_PARTNER_ID=""
 ```
 
 Do not commit real secrets. Create a local `.env` file from `.env.example` and paste your rotated API keys there only.
@@ -72,11 +77,11 @@ Do not commit real secrets. Create a local `.env` file from `.env.example` and p
 ## Setup Checklist
 
 - OpenAI: create or rotate an API key, then set `OPENAI_API_KEY`.
-- Apify: choose an Amazon reviews actor, then set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID`.
+- Apify: choose an Amazon reviews actor, then set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID`. If the actor needs custom input, set `APIFY_INPUT_TEMPLATE` with `{{PRODUCT_URL}}`.
 - Database: create a Supabase or Neon Postgres database and set `DATABASE_URL`.
 - Admin: set `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 - Email: configure Resend later with `RESEND_API_KEY`, `EMAIL_FROM`, and `OWNER_EMAIL`.
-- Payments: PayPal checkout and Stripe card checkout are implemented. Add sandbox/test credentials before taking payments.
+- Payments: PayPal checkout and Stripe card checkout are implemented. Add sandbox/test credentials before taking payments. Stripe webhook support is implemented at `/api/stripe/webhook`.
 - Auth: user auth is intentionally not implemented yet; add Supabase Auth or Clerk before multi-user accounts.
 
 ## Local Setup
@@ -140,7 +145,7 @@ The older `supabase/migrations` files are kept as reference SQL for the original
 - `POST /api/scraper/jobs/[id]/run` runs a safe demo scrape job.
 - `GET /api/scraper/runs` lists scrape run history.
 - `GET /api/scraper/products` lists product intelligence records.
-- `GET/POST /api/scraper/reports` lists and generates e-commerce intelligence reports.
+- `GET/POST /api/scraper/reports` lists and generates e-commerce intelligence reports. For `REVIEW_RATING` and `EXECUTIVE_SUMMARY`, include `productUrl`, `productName`, `competitorName`, or `pastedReviews` to run live review intelligence when configured.
 - `GET/POST /api/scraper/reports/[id]` views or regenerates a report.
 - `GET /api/scraper/reports/[id]/export?format=csv|json|pdf` exports reports.
 - `POST /api/leads` stores leads.
@@ -192,6 +197,8 @@ CSV, JSON, and PDF exports are implemented and tested for generated reports.
 - Add real authentication if user accounts are required.
 - Add PayPal REST API credentials before taking PayPal payments.
 - Add `STRIPE_SECRET_KEY` before taking card payments through Stripe Checkout.
-- Recurring subscription automation is not active yet; current PayPal checkout captures the selected plan payment and records it when `DATABASE_URL` is configured.
+- Add `STRIPE_WEBHOOK_SECRET` before real subscriptions. The webhook listens for `checkout.session.completed` and `invoice.paid`.
 - Add email/domain verification for Resend.
 - Replace demo content with real sample reports.
+- Add a custom domain in Vercel, set `NEXT_PUBLIC_SITE_URL` to the HTTPS domain, and redeploy.
+- Add analytics IDs only after privacy/legal text is final.

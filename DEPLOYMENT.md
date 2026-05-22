@@ -31,11 +31,15 @@ OPENAI_API_KEY
 OPENAI_MODEL
 APIFY_TOKEN
 APIFY_AMAZON_REVIEWS_ACTOR_ID
+APIFY_INPUT_TEMPLATE
 PAYPAL_MODE
 PAYPAL_CLIENT_ID
 PAYPAL_CLIENT_SECRET
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
+NEXT_PUBLIC_GA_MEASUREMENT_ID
+NEXT_PUBLIC_META_PIXEL_ID
+NEXT_PUBLIC_LINKEDIN_PARTNER_ID
 RESEND_API_KEY
 EMAIL_FROM
 OWNER_EMAIL
@@ -61,9 +65,43 @@ https://yourdomain.com/api/stripe/webhook
 
 ```txt
 checkout.session.completed
+invoice.paid
 ```
 
 5. Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+The webhook grants credits idempotently. The checkout success page also grants credits as a fallback, but both paths use the same checkout-session reference so customers should not receive duplicate credits for the same Stripe session.
+
+## 3.1 Apify Amazon Review Actor
+
+Set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID`. If your selected actor does not accept the default `productUrl`, `productUrls`, or `startUrls` input, add an input template like this:
+
+```json
+{"startUrls":[{"url":"{{PRODUCT_URL}}"}],"maxItems":500}
+```
+
+Paste that JSON into `APIFY_INPUT_TEMPLATE` in Vercel. The app replaces `{{PRODUCT_URL}}` at runtime.
+
+## 3.2 Custom Domain
+
+1. In Vercel, open the `reviewintel-reports` project.
+2. Go to Domains.
+3. Add your domain.
+4. Follow Vercel's DNS instructions at your domain registrar.
+5. Update `NEXT_PUBLIC_SITE_URL` to the HTTPS domain.
+6. Redeploy and test `/pricing`, checkout success/cancel URLs, and report links.
+
+## 3.3 Analytics
+
+Optional environment variables:
+
+```txt
+NEXT_PUBLIC_GA_MEASUREMENT_ID
+NEXT_PUBLIC_META_PIXEL_ID
+NEXT_PUBLIC_LINKEDIN_PARTNER_ID
+```
+
+The app also records lightweight internal events in `AuditEvent` when the database is configured: `analytics.page_view` and `analytics.checkout_started`.
 
 ## 4. PayPal
 
@@ -107,7 +145,9 @@ After deployment, test:
 - Stripe webhook grants credits after payment.
 - PayPal checkout opens.
 - Report generation consumes 1 credit.
-- Report export works for CSV and JSON.
+- Report export works for CSV, JSON, and PDF.
+- Stripe webhook event delivery succeeds in the Stripe dashboard.
+- Analytics events appear in the database or provider dashboard when configured.
 - Admin login works.
 - Admin readiness panel shows expected statuses.
 

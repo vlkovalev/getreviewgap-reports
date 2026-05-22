@@ -110,6 +110,10 @@ export type ReportFilters = {
   sourceId?: string
   dateFrom?: string
   dateTo?: string
+  productUrl?: string
+  productName?: string
+  competitorName?: string
+  pastedReviews?: string
 }
 
 export type ScrapeResult = {

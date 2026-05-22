@@ -8,6 +8,11 @@ export function CardCheckoutButton({ planId }: { planId: PlanId }) {
 
   async function startCheckout() {
     setStatus("Opening secure card checkout...")
+    void fetch("/api/analytics", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "checkout_started", properties: { provider: "stripe", planId } })
+    })
     const response = await fetch("/api/stripe/create-checkout-session", {
       method: "POST",
       headers: { "content-type": "application/json" },

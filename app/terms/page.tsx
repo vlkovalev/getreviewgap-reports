@@ -12,6 +12,12 @@ export default function TermsPage() {
         <h2 className="mt-10 text-2xl font-black text-white">Lawful-use boundaries</h2>
         <p className="mt-4">The product is designed for derived analysis of public review content where collection is permitted. Users are responsible for complying with marketplace terms, robots policies, privacy laws, and applicable local rules.</p>
         <p className="mt-4">ReviewIntel does not provide login bypassing, CAPTCHA circumvention, paywall bypassing, access-control evasion, seller contact-data resale, cross-border personal-data harvesting, or raw competitor price scraping as a resale service.</p>
+        <h2 className="mt-10 text-2xl font-black text-white">No marketplace affiliation</h2>
+        <p className="mt-4">ReviewIntel Reports is an independent product and is not affiliated with, endorsed by, or sponsored by Amazon, Shopify, Stripe, PayPal, Apify, OpenAI, or any marketplace named in reports.</p>
+        <h2 className="mt-10 text-2xl font-black text-white">Refunds and credits</h2>
+        <p className="mt-4">One report credit is consumed when a report is generated. If report generation fails after a credit is consumed, the system is designed to return that credit automatically. Paid purchases are generally final after credits are used, but you can contact support for billing errors, duplicate charges, or failed access.</p>
+        <h2 className="mt-10 text-2xl font-black text-white">AI output limitations</h2>
+        <p className="mt-4">AI-generated summaries can be incomplete or wrong. Users should review outputs before making product, legal, financial, advertising, or inventory decisions. Reports are research aids, not professional advice.</p>
       </div>
     </main>
   )

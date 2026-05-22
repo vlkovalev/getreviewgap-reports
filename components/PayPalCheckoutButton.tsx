@@ -8,6 +8,11 @@ export function PayPalCheckoutButton({ planId }: { planId: PlanId }) {
 
   async function startCheckout() {
     setStatus("Opening PayPal...")
+    void fetch("/api/analytics", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "checkout_started", properties: { provider: "paypal", planId } })
+    })
     const response = await fetch("/api/paypal/create-order", {
       method: "POST",
       headers: { "content-type": "application/json" },

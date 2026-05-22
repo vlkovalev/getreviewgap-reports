@@ -33,6 +33,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   }
   const rows = reportRowsForExport(report)
   const headers = Object.keys(rows[0] ?? {})
+  const insight = report.data?.insight as ReviewInsightLike | undefined
 
   return (
     <DashboardShell title={report.title} description="Full report view with summary, tabular output, and CSV/JSON/PDF export links.">
@@ -45,9 +46,30 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">Export PDF</a>
           </div>
         </div>
-        <pre className="mt-5 overflow-x-auto rounded-xl border border-white/10 bg-black/40 p-4 text-xs text-white/75">{JSON.stringify(report.summary, null, 2)}</pre>
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
+          <Metric label="Source" value={String(report.summary?.source ?? report.summary?.sourceFilter ?? "Demo")} />
+          <Metric label="Reviews" value={String(report.summary?.reviewCount ?? "-")} />
+          <Metric label="Provider" value={String(report.summary?.provider ?? "Report engine")} />
+          <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
+        </div>
+        <div className="mt-5 rounded-2xl border border-lime/20 bg-lime/10 p-5">
+          <p className="text-sm font-black uppercase text-lime">Executive summary</p>
+          <p className="mt-3 text-lg text-white/82">{String(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
+        </div>
       </section>
+      {insight ? (
+        <section className="mt-6 grid gap-4 lg:grid-cols-2">
+          <InsightList title="Top complaints" items={insight.topComplaints?.map((item) => `${item.theme}: ${item.productImplication}`) ?? []} tone="coral" />
+          <InsightList title="Top compliments" items={insight.topCompliments?.map((item) => `${item.theme}: ${item.marketingImplication}`) ?? []} tone="lime" />
+          <InsightList title="Buyer language" items={insight.buyerLanguage ?? []} tone="cyan" />
+          <InsightList title="Product ideas" items={insight.productImprovementIdeas?.map((item) => `${item.idea}: ${item.whyItMatters}`) ?? []} tone="yellow" />
+        </section>
+      ) : null}
       <section className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-black">Report rows</h2>
+          <p className="text-sm text-white/50">{rows.length} rows</p>
+        </div>
         <table className="w-full text-left text-sm">
           <thead className="text-white/50"><tr>{headers.map((header) => <th key={header} className="min-w-32 py-2">{header}</th>)}</tr></thead>
           <tbody>
@@ -61,6 +83,45 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       </section>
     </DashboardShell>
   )
+}
+
+type ReviewInsightLike = {
+  topComplaints?: Array<{ theme: string; productImplication: string }>
+  topCompliments?: Array<{ theme: string; marketingImplication: string }>
+  buyerLanguage?: string[]
+  productImprovementIdeas?: Array<{ idea: string; whyItMatters: string }>
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <p className="text-xs font-black uppercase text-white/40">{label}</p>
+      <p className="mt-2 break-words font-bold text-white">{value}</p>
+    </div>
+  )
+}
+
+function InsightList({ title, items, tone }: { title: string; items: string[]; tone: "coral" | "lime" | "cyan" | "yellow" }) {
+  const color = tone === "coral" ? "text-coral" : tone === "lime" ? "text-lime" : tone === "cyan" ? "text-cyan" : "text-yellow-300"
+  return (
+    <article className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+      <h2 className={`text-xl font-black ${color}`}>{title}</h2>
+      <ul className="mt-4 grid gap-2 text-sm text-white/70">
+        {items.length ? items.slice(0, 6).map((item) => <li key={item} className="rounded-xl bg-black/25 p-3">{item}</li>) : <li className="rounded-xl border border-dashed border-white/15 p-3">No items in this section.</li>}
+      </ul>
+    </article>
+  )
+}
+
+function summarizeObject(value: unknown) {
+  if (!value || typeof value !== "object") return "This report is ready for review."
+  return Object.entries(value as Record<string, unknown>).slice(0, 4).map(([key, item]) => `${key}: ${renderPlain(item)}`).join(" | ")
+}
+
+function renderPlain(value: unknown) {
+  if (Array.isArray(value)) return `${value.length} items`
+  if (value && typeof value === "object") return "available"
+  return String(value ?? "-")
 }
 
 function renderCell(value: unknown) {

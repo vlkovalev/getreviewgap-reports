@@ -53,7 +53,7 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="text-2xl font-black">Next action</h2>
           <p className="mt-3 text-white/65">Generate an executive summary report from the seeded demo data. It supports PDF, JSON, and CSV export.</p>
-          <Link href="/dashboard/reports" className="mt-5 inline-flex rounded-full bg-white px-5 py-3 font-black text-black">Generate free report</Link>
+          <Link href="/dashboard/reports" className="mt-5 inline-flex rounded-full bg-white px-5 py-3 font-black text-black">Generate report</Link>
           <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-white/60">
             Last analysis: {lastRun ? <StatusBadge status={lastRun.status} /> : "No runs yet"}
           </div>

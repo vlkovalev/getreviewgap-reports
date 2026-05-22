@@ -15,6 +15,10 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
   const [creditCount, setCreditCount] = useState(credits)
   const [reportType, setReportType] = useState<ReportType>("REVIEW_RATING")
   const [sourceId, setSourceId] = useState("")
+  const [productUrl, setProductUrl] = useState("")
+  const [productName, setProductName] = useState("")
+  const [competitorName, setCompetitorName] = useState("")
+  const [pastedReviews, setPastedReviews] = useState("")
   const [status, setStatus] = useState("")
   const canGenerate = signedIn && creditCount > 0
 
@@ -31,7 +35,14 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
     const response = await fetch("/api/scraper/reports", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ reportType, sourceId: sourceId || undefined })
+      body: JSON.stringify({
+        reportType,
+        sourceId: sourceId || undefined,
+        productUrl: productUrl || undefined,
+        productName: productName || undefined,
+        competitorName: competitorName || undefined,
+        pastedReviews: pastedReviews || undefined
+      })
     })
     const payload = await response.json()
     if (!response.ok) {
@@ -66,6 +77,25 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
           <select value={reportType} onChange={(event) => setReportType(event.target.value as ReportType)} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white">
             {reportTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
           </select>
+        </label>
+        <label className="mt-4 grid gap-2 text-sm">
+          <span className="text-white/70">Amazon product URL, optional</span>
+          <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder="https://www.amazon.com/dp/..." className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          <span className="text-xs text-white/45">Add a URL for live Apify/OpenAI review intelligence. Leave blank to use the demo dataset.</span>
+        </label>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm">
+            <span className="text-white/70">Product name, optional</span>
+            <input value={productName} onChange={(event) => setProductName(event.target.value)} placeholder="Vitamin C serum" className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          </label>
+          <label className="grid gap-2 text-sm">
+            <span className="text-white/70">Competitor, optional</span>
+            <input value={competitorName} onChange={(event) => setCompetitorName(event.target.value)} placeholder="Competitor brand" className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          </label>
+        </div>
+        <label className="mt-4 grid gap-2 text-sm">
+          <span className="text-white/70">Paste reviews, optional</span>
+          <textarea value={pastedReviews} onChange={(event) => setPastedReviews(event.target.value)} rows={4} placeholder="Paste one review per line to test with real text." className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
         </label>
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">Source filter</span>

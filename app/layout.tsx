@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { Header } from "@/components/Header"
 import { Footer } from "@/components/Footer"
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon"
+import { TrackingScripts } from "@/components/TrackingScripts"
 import { site } from "@/lib/content"
 
 export const metadata: Metadata = {
@@ -22,6 +24,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <Header />
+        <AnalyticsBeacon />
+        <TrackingScripts />
         {children}
         <Footer />
       </body>

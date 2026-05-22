@@ -2,6 +2,7 @@ import { average, isValidHttpUrl, percent, toCsv } from "@/lib/scrapers/parser-u
 import { addReport, getStore } from "@/lib/scrapers/store"
 import type { IntelligenceReport, ProductRecord, ProductSnapshot, ReportFilters, ReportType } from "@/lib/scrapers/types"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
+import { fetchAmazonReviews, generateReviewInsight } from "@/lib/ai/service"
 
 const reportLabels: Record<ReportType, string> = {
   PRICE_MONITORING: "Price Monitoring Report",
@@ -24,6 +25,10 @@ export function listReportTypes() {
 }
 
 export async function generateReport(type: ReportType, filters: ReportFilters = {}, customerId?: string) {
+  if ((type === "REVIEW_RATING" || type === "EXECUTIVE_SUMMARY") && (filters.productUrl || filters.pastedReviews)) {
+    return generateReviewIntelligenceReport(type, filters, customerId)
+  }
+
   const products = getFilteredProducts(filters)
   const payload = buildReportPayload(type, products, filters)
   const reportInput = {
@@ -37,6 +42,88 @@ export async function generateReport(type: ReportType, filters: ReportFilters = 
 
   if (hasRealDatabaseUrl()) {
     const now = new Date()
+    const report = await getDb().intelligenceReport.create({
+      data: {
+        customerId,
+        reportType: type,
+        title: reportInput.title,
+        status: "COMPLETED",
+        filters,
+        summary: reportInput.summary,
+        data: reportInput.data,
+        generatedAt: now
+      }
+    })
+    return {
+      id: report.id,
+      customerId: report.customerId ?? undefined,
+      reportType: type,
+      title: report.title,
+      status: report.status,
+      filters: (report.filters as ReportFilters) ?? {},
+      summary: (report.summary as Record<string, unknown>) ?? {},
+      data: (report.data as Record<string, unknown>) ?? {},
+      generatedAt: report.generatedAt?.toISOString(),
+      createdAt: report.createdAt.toISOString(),
+      updatedAt: report.updatedAt.toISOString()
+    } satisfies IntelligenceReport
+  }
+
+  return addReport(reportInput)
+}
+
+async function generateReviewIntelligenceReport(type: ReportType, filters: ReportFilters, customerId?: string) {
+  const productUrl = filters.productUrl || "https://www.amazon.com/dp/demo"
+  const productName = filters.productName || "Amazon product"
+  const reviewResult = await fetchAmazonReviews({
+    productUrl,
+    productName,
+    competitorName: filters.competitorName,
+    pastedReviews: filters.pastedReviews,
+    marketplace: "amazon.com"
+  })
+  const { insight, provider, model } = await generateReviewInsight({
+    productUrl,
+    productName,
+    competitorName: filters.competitorName,
+    pastedReviews: filters.pastedReviews,
+    marketplace: "amazon.com"
+  }, reviewResult.reviews)
+  const now = new Date()
+  const rows = [
+    ...insight.topComplaints.map((item) => ({ section: "Top complaint", theme: item.theme, evidence: item.evidence, severity: item.severity, recommendation: item.productImplication })),
+    ...insight.topCompliments.map((item) => ({ section: "Top compliment", theme: item.theme, evidence: item.evidence, severity: "", recommendation: item.marketingImplication })),
+    ...insight.productImprovementIdeas.map((item) => ({ section: "Product idea", theme: item.idea, evidence: item.whyItMatters, severity: item.confidence, recommendation: item.whyItMatters })),
+    ...insight.adHooks.map((hook) => ({ section: "Ad hook", theme: hook, evidence: "", severity: "", recommendation: hook }))
+  ]
+  const reportInput = {
+    reportType: type,
+    customerId,
+    title: `${type === "EXECUTIVE_SUMMARY" ? "Executive Review Intelligence" : "Review and Rating Report"} - ${productName}`,
+    filters,
+    summary: {
+      productName,
+      productUrl,
+      competitorName: filters.competitorName ?? "",
+      source: reviewResult.source,
+      provider,
+      model,
+      reviewCount: reviewResult.reviews.length,
+      executiveSummary: insight.executiveSummary,
+      topComplaints: insight.topComplaints.slice(0, 5),
+      topCompliments: insight.topCompliments.slice(0, 5),
+      buyerLanguage: insight.buyerLanguage.slice(0, 12),
+      assumptions: insight.assumptions,
+      dataQuality: insight.dataQuality
+    },
+    data: {
+      rows,
+      insight,
+      source: reviewResult.source
+    }
+  }
+
+  if (hasRealDatabaseUrl()) {
     const report = await getDb().intelligenceReport.create({
       data: {
         customerId,

@@ -16,6 +16,15 @@ type StripeCheckoutSessionCompleted = {
   } | null
 }
 
+type StripeInvoicePaid = {
+  id: string
+  amount_paid?: number | null
+  currency?: string | null
+  parent?: { subscription_details?: { metadata?: { plan_id?: string; customer_id?: string } | null } | null } | null
+  subscription_details?: { metadata?: { plan_id?: string; customer_id?: string } | null } | null
+  metadata?: { plan_id?: string; customer_id?: string } | null
+}
+
 type StripeEvent = {
   id: string
   type: string
@@ -41,6 +50,9 @@ export async function POST(request: Request) {
     if (event.type === "checkout.session.completed") {
       await handleCheckoutSessionCompleted(event.data?.object as StripeCheckoutSessionCompleted)
     }
+    if (event.type === "invoice.paid") {
+      await handleInvoicePaid(event.data?.object as StripeInvoicePaid)
+    }
 
     return NextResponse.json({ received: true })
   } catch (error) {
@@ -58,7 +70,7 @@ async function handleCheckoutSessionCompleted(session: StripeCheckoutSessionComp
   if (!customer) return
 
   const credits = getPlanCredits(plan.id)
-  await addCreditsOnce(customer.id, credits, "stripe_webhook", session.id)
+  await addCreditsOnce(customer.id, credits, "stripe_checkout", session.id)
 
   if (hasRealDatabaseUrl()) {
     const db = getDb()
@@ -75,6 +87,40 @@ async function handleCheckoutSessionCompleted(session: StripeCheckoutSessionComp
           status: "completed",
           credits,
           raw: session
+        }
+      })
+    }
+  }
+}
+
+async function handleInvoicePaid(invoice: StripeInvoicePaid | undefined) {
+  if (!invoice?.id) return
+  const metadata = invoice.parent?.subscription_details?.metadata ?? invoice.subscription_details?.metadata ?? invoice.metadata
+  const plan = getPaidPlan(metadata?.plan_id)
+  const customerId = metadata?.customer_id
+  if (!plan || !customerId) return
+
+  const customer = await findCustomerById(customerId)
+  if (!customer) return
+
+  const credits = getPlanCredits(plan.id)
+  await addCreditsOnce(customer.id, credits, "stripe_subscription_renewal", invoice.id)
+
+  if (hasRealDatabaseUrl()) {
+    const db = getDb()
+    const existingPurchase = await db.customerPurchase.findFirst({ where: { provider: "stripe_invoice", providerId: invoice.id } })
+    if (!existingPurchase) {
+      await db.customerPurchase.create({
+        data: {
+          customerId: customer.id,
+          provider: "stripe_invoice",
+          providerId: invoice.id,
+          planId: plan.id,
+          amount: invoice.amount_paid ?? plan.price * 100,
+          currency: invoice.currency ?? "usd",
+          status: "completed",
+          credits,
+          raw: invoice
         }
       })
     }
