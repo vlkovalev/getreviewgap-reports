@@ -47,7 +47,7 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
     })
     const payload = await response.json()
     if (!response.ok) {
-      setStatus(payload.error ?? "Report failed")
+      setStatus(payload.details ? `${payload.error ?? "Report failed"}: ${payload.details}` : payload.error ?? "Report failed")
       trackClientEvent("report_generation_failed", { reportType, status: response.status })
       return
     }

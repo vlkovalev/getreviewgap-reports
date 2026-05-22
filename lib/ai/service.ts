@@ -27,45 +27,56 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
     return { reviews: demoReviews, source: "demo" }
   }
 
-  const actorInput = buildApifyInput(input)
   const apiActorId = normalizeApifyActorId(actorId)
-  const runResponse = await fetch(`https://api.apify.com/v2/acts/${apiActorId}/run-sync-get-dataset-items?token=${apifyToken}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(actorInput)
-  })
+  let lastError = ""
+  for (const actorInput of buildApifyInputs(input)) {
+    const runResponse = await fetch(`https://api.apify.com/v2/acts/${apiActorId}/run-sync-get-dataset-items?token=${apifyToken}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(actorInput)
+    })
 
-  if (!runResponse.ok) {
-    throw new Error(apifyStatusMessage(runResponse.status))
+    if (!runResponse.ok) {
+      lastError = `${apifyStatusMessage(runResponse.status)} ${await apifyErrorDetail(runResponse)}`
+      if (runResponse.status === 400) continue
+      throw new Error(lastError.trim())
+    }
+
+    const items = await runResponse.json() as Array<Record<string, unknown>>
+    const reviews = items
+      .map((item) => String(item.reviewText || item.review_text || item.review || item.reviewTitle || item.text || item.content || item.body || item.comment || item.description || ""))
+      .map((text) => text.trim())
+      .filter(Boolean)
+      .slice(0, 500)
+
+    return { reviews: reviews.length ? reviews : demoReviews, source: reviews.length ? "apify" : "demo" }
   }
 
-  const items = await runResponse.json() as Array<Record<string, unknown>>
-  const reviews = items
-    .map((item) => String(item.reviewText || item.review_text || item.text || item.content || item.body || item.comment || ""))
-    .map((text) => text.trim())
-    .filter(Boolean)
-    .slice(0, 500)
-
-  return { reviews: reviews.length ? reviews : demoReviews, source: reviews.length ? "apify" : "demo" }
+  throw new Error(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
 }
 
-function buildApifyInput(input: ReviewInput) {
+function buildApifyInputs(input: ReviewInput) {
   if (process.env.APIFY_INPUT_TEMPLATE) {
     try {
       const template = JSON.parse(process.env.APIFY_INPUT_TEMPLATE) as Record<string, unknown>
-      return replaceTemplateValues(template, input.productUrl)
+      return [replaceTemplateValues(template, input.productUrl)]
     } catch {
-      return { productUrl: input.productUrl, maxItems: 500 }
+      return [{ productUrl: input.productUrl, maxItems: 500 }]
     }
   }
 
-  return {
-    productUrl: input.productUrl,
-    productUrls: [input.productUrl],
-    startUrls: [{ url: input.productUrl }],
-    maxItems: 500,
-    maxReviews: 500
-  }
+  const asin = extractAmazonAsin(input.productUrl)
+  const common = { maxItems: 500, maxReviews: 500, reviewsCount: 500, proxyConfiguration: { useApifyProxy: true } }
+  const inputs: Array<Record<string, unknown> | null> = [
+    { startUrls: [{ url: input.productUrl }], ...common },
+    { productUrls: [input.productUrl], ...common },
+    { urls: [input.productUrl], ...common },
+    { url: input.productUrl, ...common },
+    { productUrl: input.productUrl, ...common },
+    asin ? { asins: [asin], ...common } : null,
+    asin ? { asin, ...common } : null
+  ]
+  return inputs.filter((item): item is Record<string, unknown> => Boolean(item))
 }
 
 function replaceTemplateValues(value: unknown, productUrl: string): unknown {
@@ -86,11 +97,27 @@ function normalizeApifyActorId(actorId: string) {
 }
 
 function apifyStatusMessage(status: number) {
+  if (status === 400) return "Apify actor rejected the input format."
   if (status === 401) return "Apify authentication failed. Check APIFY_TOKEN in Vercel and local .env."
   if (status === 403) return "Apify access denied. Check that your token can run the selected Amazon reviews actor."
   if (status === 404) return "Apify actor not found. Check APIFY_AMAZON_REVIEWS_ACTOR_ID and use the actor's exact id."
   if (status === 429) return "Apify rate limit reached. Try again later or increase Apify capacity."
   return `Apify request failed with status ${status}`
+}
+
+async function apifyErrorDetail(response: Response) {
+  const text = await response.text().catch(() => "")
+  if (!text) return ""
+  try {
+    const data = JSON.parse(text) as { error?: { message?: string }; message?: string }
+    return (data.error?.message || data.message || "").slice(0, 240)
+  } catch {
+    return text.slice(0, 240)
+  }
+}
+
+function extractAmazonAsin(url: string) {
+  return url.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase()
 }
 
 export async function generateReviewInsight(input: ReviewInput, reviews: string[]): Promise<{ insight: ReviewInsight; provider: string; model: string }> {
