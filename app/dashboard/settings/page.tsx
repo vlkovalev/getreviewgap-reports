@@ -34,8 +34,8 @@ export default async function SettingsPage() {
           </div>
           <div className="card p-6">
             <p className="text-sm font-black uppercase text-coral">Default export</p>
-            <h2 className="mt-3 text-3xl font-black">CSV + JSON</h2>
-            <p className="mt-2 text-white/65">Reports can be exported for spreadsheets, docs, and team handoff.</p>
+            <h2 className="mt-3 text-3xl font-black">CSV + JSON + PDF</h2>
+            <p className="mt-2 text-white/65">Reports can be exported for spreadsheets, docs, PDFs, and team handoff.</p>
           </div>
           <div className="card p-6">
             <p className="text-sm font-black uppercase text-lime">Marketplace</p>
