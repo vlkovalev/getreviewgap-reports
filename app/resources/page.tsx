@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { resources } from "@/lib/content"
 
-export const metadata: Metadata = { title: "Resources", description: "Tutorials for AI-powered PowerPoint presentation design." }
+export const metadata: Metadata = { title: "Resources", description: "Guides for Amazon review intelligence, product research, and buyer-language analysis." }
 
 export default function ResourcesPage() {
   return (

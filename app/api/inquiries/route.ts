@@ -37,14 +37,14 @@ export async function POST(request: NextRequest) {
 
     await sendEmail({
       to: inquiry.email,
-      subject: "We received your AI Presentation Lab inquiry",
+      subject: "We received your ReviewIntel inquiry",
       html: inquiryConfirmationHtml(inquiry.name)
     })
 
     if (process.env.OWNER_EMAIL) {
       await sendEmail({
         to: process.env.OWNER_EMAIL,
-        subject: "New inquiry: AI Presentation Lab",
+        subject: "New inquiry: ReviewIntel Reports",
         html: `<p>${inquiry.name} (${inquiry.email}) asked about ${inquiry.serviceInterest}.</p><p>${inquiry.message}</p>`
       })
     }

@@ -1,6 +1,6 @@
-# E-commerce Scraping Tool MVP
+# ReviewIntel Reports MVP
 
-E-commerce Scraping Tool is a full-stack MVP for the validated business idea: **AI-powered competitor review intelligence for Shopify brands and Amazon sellers**.
+ReviewIntel Reports is a full-stack MVP for the validated business idea: **AI-powered competitor review intelligence for Shopify brands and Amazon sellers**.
 
 ## Product Assumptions
 
@@ -13,7 +13,7 @@ E-commerce Scraping Tool is a full-stack MVP for the validated business idea: **
 
 ## What Is Implemented
 
-- Marketing homepage for E-commerce Scraping Tool.
+- Marketing homepage for ReviewIntel Reports.
 - Dashboard with source management, scrape jobs, run history, product table, and report-generation workflow.
 - API routes for sources, jobs, manual runs, products, report creation, report detail, regeneration, and CSV/JSON export.
 - Seven operational report types: price monitoring, availability, competitor assortment, discount/promotion, review/rating, data quality, and executive summary.
@@ -55,7 +55,7 @@ NEXT_PUBLIC_SITE_URL="http://localhost:3000"
 ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="change-this-password"
 RESEND_API_KEY=""
-EMAIL_FROM="E-commerce Scraping Tool <hello@example.com>"
+EMAIL_FROM="ReviewIntel Reports <hello@example.com>"
 OWNER_EMAIL="owner@example.com"
 OPENAI_API_KEY=""
 OPENAI_MODEL="gpt-4o-mini"
@@ -142,7 +142,7 @@ The older `supabase/migrations` files are kept as reference SQL for the original
 - `GET /api/scraper/products` lists product intelligence records.
 - `GET/POST /api/scraper/reports` lists and generates e-commerce intelligence reports.
 - `GET/POST /api/scraper/reports/[id]` views or regenerates a report.
-- `GET /api/scraper/reports/[id]/export?format=csv|json` exports reports.
+- `GET /api/scraper/reports/[id]/export?format=csv|json|pdf` exports reports.
 - `POST /api/leads` stores leads.
 - `POST /api/inquiries` stores inquiries.
 - `POST /api/admin/login` logs into starter admin.
@@ -183,7 +183,7 @@ npm run typecheck
 npm run build
 ```
 
-PDF export is not implemented in this MVP to avoid adding heavy rendering dependencies before the report layout is finalized. CSV and JSON export are implemented and tested; PDF can be added later from `reportRowsForExport()`.
+CSV, JSON, and PDF exports are implemented and tested for generated reports.
 
 ## Manual Setup Still Needed
 
