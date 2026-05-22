@@ -8,7 +8,7 @@ import { site } from "@/lib/content"
 
 export const metadata: Metadata = {
   title: {
-    default: `${site.name} | AI E-commerce Research`,
+    default: `${site.name} | AI Review Reports`,
     template: `%s | ${site.name}`
   },
   description: site.description,

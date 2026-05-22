@@ -38,7 +38,7 @@ function memoryCustomers() {
   memory.reviewIntelCustomers ||= [
     {
       id: "cust-demo",
-      email: "demo@reviewintel.test",
+      email: "demo@reviewgap.test",
       password: "demo1234",
       credits: 3,
       createdAt: new Date().toISOString()

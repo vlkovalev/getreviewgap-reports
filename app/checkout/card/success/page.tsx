@@ -36,7 +36,7 @@ export default async function CardSuccessPage({ searchParams }: { searchParams: 
     <main className="px-5 py-20">
       <div className="mx-auto max-w-2xl rounded-3xl border border-white/10 bg-white/[0.04] p-8">
         <p className="font-black uppercase text-lime">Payment received</p>
-        <h1 className="mt-4 text-5xl font-black">Thanks for buying {plan?.name ?? "ReviewIntel"}.</h1>
+        <h1 className="mt-4 text-5xl font-black">Thanks for buying {plan?.name ?? "ReviewGap"}.</h1>
         <p className="mt-4 text-white/65">Stripe confirmed checkout and added the report credits to your account. You can generate reports now or review your credit balance in Billing.</p>
         <p className="mt-4 font-mono text-xs text-white/40">{params.session_id}</p>
         <Link href="/dashboard/reports" className="btn-primary mt-8">Go to reports</Link>

@@ -1,4 +1,4 @@
-# ReviewIntel Reports Deployment Checklist
+# ReviewGap Deployment Checklist
 
 Use this checklist when moving from local testing to a public deployment.
 
@@ -48,7 +48,7 @@ OWNER_EMAIL
 For production, `NEXT_PUBLIC_SITE_URL` must be your HTTPS domain, for example:
 
 ```txt
-https://reviewintel-reports.com
+https://getreviewgap.com
 ```
 
 ## 3. Stripe
@@ -86,7 +86,7 @@ If live reports fail with `Apify authentication failed`, the token is missing, e
 
 ## 3.2 Custom Domain
 
-1. In Vercel, open the `reviewintel-reports` project.
+1. In Vercel, open the `reviewgap` project.
 2. Go to Domains.
 3. Add your domain.
 4. Follow Vercel's DNS instructions at your domain registrar.

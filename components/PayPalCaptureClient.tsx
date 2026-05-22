@@ -26,7 +26,7 @@ export function PayPalCaptureClient({ orderId, planId }: { orderId?: string; pla
         return
       }
       setOk(true)
-      setStatus(`Payment confirmed. Your ${payload.plan?.name ?? "ReviewIntel"} credits were added to your account.`)
+      setStatus(`Payment confirmed. Your ${payload.plan?.name ?? "ReviewGap"} credits were added to your account.`)
     }
     capture()
     return () => {

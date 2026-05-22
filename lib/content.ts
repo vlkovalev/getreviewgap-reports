@@ -1,6 +1,6 @@
 export const site = {
-  name: "ReviewIntel Reports",
-  description: "Affordable AI reviews, ratings, and sentiment intelligence for Shopify brands and Amazon sellers."
+  name: "ReviewGap",
+  description: "Find what customers wish competitors fixed."
 }
 
 export const faqs = [

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { getCurrentCustomer } from "@/lib/customer-session"
 
-export const metadata: Metadata = { title: "Welcome", description: "Start your first ReviewIntel report." }
+export const metadata: Metadata = { title: "Welcome", description: "Start your first ReviewGap report." }
 
 export default async function OnboardingPage() {
   const customer = await getCurrentCustomer()

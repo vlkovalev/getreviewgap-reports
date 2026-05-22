@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = { title: "Sign in", description: "Sign in to ReviewIntel Reports." }
+export const metadata: Metadata = { title: "Sign in", description: "Sign in to ReviewGap." }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; signedIn?: string }> }) {
   const params = await searchParams
@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h1 className="mt-4 text-5xl font-black md:text-7xl">Welcome back.</h1>
           <p className="mt-5 text-lg text-white/70">Sign in to open your reports, credits, and billing page.</p>
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/65">
-            Demo account: <span className="font-bold text-white">demo@reviewintel.test</span> / <span className="font-bold text-white">demo1234</span>
+            Demo account: <span className="font-bold text-white">demo@reviewgap.test</span> / <span className="font-bold text-white">demo1234</span>
           </div>
         </div>
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-7">

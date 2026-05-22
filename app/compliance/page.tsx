@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: "Compliance",
-  description: "Lawful-use and data handling commitments for ReviewIntel Reports."
+  description: "Lawful-use and data handling commitments for ReviewGap."
 }
 
 const commitments = [
@@ -28,7 +28,7 @@ export default function CompliancePage() {
         <p className="font-black uppercase text-lime">Compliance</p>
         <h1 className="mt-4 text-5xl font-black leading-none md:text-7xl">Built for lawful review intelligence.</h1>
         <p className="mt-6 max-w-3xl text-lg text-white/70">
-          ReviewIntel Reports is designed to summarize and transform permitted review data into private research reports. It is not designed for access-control evasion, raw data resale, or broad competitor scraping.
+          ReviewGap is designed to summarize and transform permitted review data into private research reports. It is not designed for access-control evasion, raw data resale, or broad competitor scraping.
         </p>
 
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.04] p-6">

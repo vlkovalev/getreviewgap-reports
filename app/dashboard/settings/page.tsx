@@ -4,7 +4,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell"
 import { SignOutButton } from "@/components/SignOutButton"
 import { getCurrentCustomer } from "@/lib/customer-session"
 
-export const metadata: Metadata = { title: "Settings", description: "ReviewIntel account settings." }
+export const metadata: Metadata = { title: "Settings", description: "ReviewGap account settings." }
 
 export default async function SettingsPage() {
   const customer = await getCurrentCustomer()

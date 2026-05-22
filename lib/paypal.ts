@@ -46,14 +46,14 @@ export async function createPayPalOrder(planId: string) {
     headers: {
       authorization: `Bearer ${token}`,
       "content-type": "application/json",
-      "paypal-request-id": `reviewintel-${plan.id}-${crypto.randomUUID()}`
+      "paypal-request-id": `reviewgap-${plan.id}-${crypto.randomUUID()}`
     },
     body: JSON.stringify({
       intent: "CAPTURE",
       purchase_units: [
         {
           reference_id: plan.id,
-          description: `${plan.name} - ReviewIntel Reports credits`,
+          description: `${plan.name} - ReviewGap credits`,
           custom_id: plan.id,
           amount: {
             currency_code: "USD",
@@ -64,7 +64,7 @@ export async function createPayPalOrder(planId: string) {
       payment_source: {
         paypal: {
           experience_context: {
-            brand_name: "ReviewIntel Reports",
+            brand_name: "ReviewGap",
             landing_page: "LOGIN",
             user_action: "PAY_NOW",
             return_url: `${siteUrl}/checkout/paypal/success?plan=${plan.id}`,
@@ -87,7 +87,7 @@ export async function capturePayPalOrder(orderId: string) {
     headers: {
       authorization: `Bearer ${token}`,
       "content-type": "application/json",
-      "paypal-request-id": `reviewintel-capture-${orderId}`
+      "paypal-request-id": `reviewgap-capture-${orderId}`
     },
     cache: "no-store"
   })

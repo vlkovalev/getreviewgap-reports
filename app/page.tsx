@@ -37,10 +37,10 @@ export default function HomePage() {
           <div>
             <p className="font-black uppercase text-lime">Reviews, ratings, and sentiment intelligence</p>
             <h1 className="mt-5 max-w-4xl text-5xl font-black leading-[.95] md:text-7xl">
-              Affordable AI review reports for Shopify brands and Amazon sellers.
+              Find what customers wish competitors fixed.
             </h1>
             <p className="mt-6 max-w-2xl text-xl text-white/72">
-              ReviewIntel Reports turns authorized review sources or pasted customer feedback into sentiment summaries, product gaps, rating signals, and buyer-language insights for sellers with 10-500 SKUs.
+              ReviewGap turns authorized review sources or pasted customer feedback into affordable AI reports for Shopify brands, Amazon sellers, and agencies.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/dashboard/reports" className="btn-primary">Run a sample report</Link>
@@ -72,7 +72,7 @@ export default function HomePage() {
             <p className="font-black uppercase text-cyan">Why it matters</p>
             <h2 className="mt-3 text-4xl font-black md:text-6xl">The best product research is already in customer reviews.</h2>
             <p className="mt-5 text-lg text-white/70">
-              Reading hundreds of reviews manually is slow. ReviewIntel turns public customer feedback into clear product, listing, and marketing insights so small teams can move faster.
+              Reading hundreds of reviews manually is slow. ReviewGap turns authorized customer feedback into clear product, listing, and marketing insights so small teams can move faster.
             </p>
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-4">

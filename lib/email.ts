@@ -13,7 +13,7 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
   if (!client) return { skipped: true }
 
   await client.emails.send({
-    from: process.env.EMAIL_FROM || "ReviewIntel Reports <hello@example.com>",
+    from: process.env.EMAIL_FROM || "ReviewGap <hello@example.com>",
     ...input
   })
 
@@ -21,9 +21,9 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
 }
 
 export function leadConfirmationHtml(name: string) {
-  return `<p>Hi ${name},</p><p>Thanks for requesting the ReviewIntel sample report. We will send the resource and next steps shortly.</p>`
+  return `<p>Hi ${name},</p><p>Thanks for requesting the ReviewGap sample report. We will send the resource and next steps shortly.</p>`
 }
 
 export function inquiryConfirmationHtml(name: string) {
-  return `<p>Hi ${name},</p><p>Thanks for contacting ReviewIntel Reports. We received your inquiry and will reply soon.</p>`
+  return `<p>Hi ${name},</p><p>Thanks for contacting ReviewGap. We received your inquiry and will reply soon.</p>`
 }

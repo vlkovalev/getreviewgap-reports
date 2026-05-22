@@ -1,6 +1,6 @@
-# ReviewIntel Reports MVP
+# ReviewGap MVP
 
-ReviewIntel Reports is a full-stack MVP for the validated business idea: **AI-powered competitor review intelligence for Shopify brands and Amazon sellers**.
+ReviewGap is a full-stack MVP for the validated business idea: **AI-powered competitor review intelligence for Shopify brands and Amazon sellers**.
 
 ## Product Assumptions
 
@@ -13,7 +13,7 @@ ReviewIntel Reports is a full-stack MVP for the validated business idea: **AI-po
 
 ## What Is Implemented
 
-- Marketing homepage for ReviewIntel Reports.
+- Marketing homepage for ReviewGap.
 - Dashboard with source management, scrape jobs, run history, product table, and report-generation workflow.
 - API routes for sources, jobs, manual runs, products, report creation, report detail, regeneration, and CSV/JSON export.
 - Seven operational report types: price monitoring, availability, competitor assortment, discount/promotion, review/rating, data quality, and executive summary.
@@ -50,12 +50,12 @@ The current scraper/report MVP uses deterministic report functions instead of a 
 ## Environment Variables
 
 ```bash
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/reviewintel?schema=public"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/reviewgap?schema=public"
 NEXT_PUBLIC_SITE_URL="http://localhost:3000"
 ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="change-this-password"
 RESEND_API_KEY=""
-EMAIL_FROM="ReviewIntel Reports <hello@example.com>"
+EMAIL_FROM="ReviewGap <hello@example.com>"
 OWNER_EMAIL="owner@example.com"
 OPENAI_API_KEY=""
 OPENAI_MODEL="gpt-4o-mini"

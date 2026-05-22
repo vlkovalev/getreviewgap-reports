@@ -6,7 +6,7 @@ export function DashboardShell({ title, description, children }: { title: string
       <div className="mx-auto max-w-7xl">
         <DashboardNav />
         <div className="mb-8">
-          <p className="font-black uppercase text-lime">ReviewIntel Reports</p>
+          <p className="font-black uppercase text-lime">ReviewGap</p>
           <h1 className="mt-3 text-4xl font-black md:text-6xl">{title}</h1>
           <p className="mt-4 max-w-3xl text-white/70">{description}</p>
         </div>

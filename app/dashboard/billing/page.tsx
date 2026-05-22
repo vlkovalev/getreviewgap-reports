@@ -5,7 +5,7 @@ import { getCurrentCustomer } from "@/lib/customer-session"
 import { getCustomerCreditLedger, getCustomerPurchases } from "@/lib/customer-store"
 import { getPaidPlan } from "@/lib/plans"
 
-export const metadata: Metadata = { title: "Billing", description: "ReviewIntel billing and plan settings." }
+export const metadata: Metadata = { title: "Billing", description: "ReviewGap billing and plan settings." }
 
 export default async function BillingPage() {
   const customer = await getCurrentCustomer()

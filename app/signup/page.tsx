@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = { title: "Sign up", description: "Create a ReviewIntel Reports account." }
+export const metadata: Metadata = { title: "Sign up", description: "Create a ReviewGap account." }
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ error?: string; created?: string }> }) {
   const params = await searchParams

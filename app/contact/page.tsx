@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { ContactForm } from "@/components/ContactForm"
 
-export const metadata: Metadata = { title: "Contact", description: "Contact ReviewIntel for product research and report automation." }
+export const metadata: Metadata = { title: "Contact", description: "Contact ReviewGap for product research and report automation." }
 
 export default function ContactPage() {
   return (

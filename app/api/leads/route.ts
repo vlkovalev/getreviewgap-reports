@@ -34,14 +34,14 @@ export async function POST(request: NextRequest) {
 
     await sendEmail({
       to: lead.email,
-      subject: "Your ReviewIntel sample report request",
+      subject: "Your ReviewGap sample report request",
       html: leadConfirmationHtml(lead.name)
     })
 
     if (process.env.OWNER_EMAIL) {
       await sendEmail({
         to: process.env.OWNER_EMAIL,
-        subject: "New lead: ReviewIntel Reports",
+        subject: "New lead: ReviewGap",
         html: `<p>${lead.name} (${lead.email}) requested the sample report.</p>`
       })
     }

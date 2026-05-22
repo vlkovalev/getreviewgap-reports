@@ -4,7 +4,7 @@ import { DashboardShell, StatusBadge } from "@/components/dashboard/DashboardShe
 import { getStore } from "@/lib/scrapers/store"
 
 export const metadata: Metadata = {
-  title: "Dashboard | ReviewIntel Reports",
+  title: "Dashboard | ReviewGap",
   description: "Monitor review sources, analysis runs, products, and Amazon review intelligence reports."
 }
 

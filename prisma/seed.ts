@@ -7,7 +7,7 @@ async function main() {
   await prisma.fAQ.createMany({
     skipDuplicates: true,
     data: [
-      { question: "Does ReviewIntel scrape live Amazon reviews?", answer: "Yes when an Apify Amazon review actor is configured. Without API keys, the MVP uses demo data or pasted reviews.", order: 1 },
+      { question: "Does ReviewGap scrape live Amazon reviews?", answer: "Yes when an Apify Amazon review actor is configured. Without API keys, the MVP uses demo data or pasted reviews.", order: 1 },
       { question: "Can I use my own review text?", answer: "Yes. Paste one review per line in the dashboard to test the analysis workflow without live scraping.", order: 2 },
       { question: "Are payments active?", answer: "No. Pricing is shown for validation, but Stripe checkout is intentionally left for the next build step.", order: 3 }
     ]

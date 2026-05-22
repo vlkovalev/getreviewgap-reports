@@ -20,7 +20,7 @@ export async function createStripeCheckoutSession(planId: string, customerId?: s
   params.set("line_items[0][quantity]", "1")
   params.set("line_items[0][price_data][currency]", "usd")
   params.set("line_items[0][price_data][unit_amount]", String(plan.price * 100))
-  params.set("line_items[0][price_data][product_data][name]", `ReviewIntel ${plan.name}`)
+  params.set("line_items[0][price_data][product_data][name]", `ReviewGap ${plan.name}`)
   if (isMonthlyPlan(plan.id)) {
     params.set("line_items[0][price_data][recurring][interval]", "month")
     params.set("subscription_data[metadata][plan_id]", plan.id)

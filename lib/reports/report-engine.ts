@@ -239,7 +239,7 @@ function buildPdfLines(report: IntelligenceReport) {
   const rows = reportRowsForExport(report).slice(0, 20)
   const summaryEntries = Object.entries(report.summary ?? {}).slice(0, 12)
   return [
-    "ReviewIntel Reports",
+    "ReviewGap",
     report.title,
     `Type: ${report.reportType}`,
     `Status: ${report.status}`,
