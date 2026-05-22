@@ -37,7 +37,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
     })
 
     if (!runResponse.ok) {
-      lastError = `${apifyStatusMessage(runResponse.status)} ${await apifyErrorDetail(runResponse)}`
+      lastError = `${apifyStatusMessage(runResponse.status)} ${await apifyErrorDetail(runResponse, apifyToken)}`
       if (runResponse.status === 400) continue
       throw new Error(lastError.trim())
     }
@@ -97,7 +97,7 @@ function normalizeApifyActorId(actorId: string) {
 }
 
 function apifyStatusMessage(status: number) {
-  if (status === 400) return "Apify actor rejected the input format."
+  if (status === 400) return "Apify actor could not complete the run."
   if (status === 401) return "Apify authentication failed. Check APIFY_TOKEN in Vercel and local .env."
   if (status === 403) return "Apify access denied. Check that your token can run the selected Amazon reviews actor."
   if (status === 404) return "Apify actor not found. Check APIFY_AMAZON_REVIEWS_ACTOR_ID and use the actor's exact id."
@@ -105,19 +105,35 @@ function apifyStatusMessage(status: number) {
   return `Apify request failed with status ${status}`
 }
 
-async function apifyErrorDetail(response: Response) {
+async function apifyErrorDetail(response: Response, token: string) {
   const text = await response.text().catch(() => "")
   if (!text) return ""
+  const runId = text.match(/run ID:\s*([A-Za-z0-9_-]+)/i)?.[1]
+  const logTail = runId ? await apifyRunLogTail(runId, token) : ""
   try {
     const data = JSON.parse(text) as { error?: { message?: string }; message?: string }
-    return (data.error?.message || data.message || "").slice(0, 240)
+    return `${data.error?.message || data.message || ""}${logTail ? ` Log tail: ${logTail}` : ""}`.slice(0, 900)
   } catch {
-    return text.slice(0, 240)
+    return `${text}${logTail ? ` Log tail: ${logTail}` : ""}`.slice(0, 900)
   }
 }
 
 function extractAmazonAsin(url: string) {
   return url.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase()
+}
+
+async function apifyRunLogTail(runId: string, token: string) {
+  const response = await fetch(`https://api.apify.com/v2/logs/${runId}?token=${token}`).catch(() => null)
+  if (!response?.ok) return ""
+  const log = await response.text().catch(() => "")
+  return log
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-8)
+    .join(" | ")
+    .replace(/[A-Za-z0-9_-]{32,}/g, "[redacted]")
+    .slice(0, 600)
 }
 
 export async function generateReviewInsight(input: ReviewInput, reviews: string[]): Promise<{ insight: ReviewInsight; provider: string; model: string }> {
