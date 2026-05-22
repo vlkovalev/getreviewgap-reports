@@ -1,0 +1,197 @@
+# E-commerce Scraping Tool MVP
+
+E-commerce Scraping Tool is a full-stack MVP for the validated business idea: **AI-powered competitor review intelligence for Shopify brands and Amazon sellers**.
+
+## Product Assumptions
+
+- Target users: Shopify brands, Amazon sellers, and agencies serving those sellers.
+- Core problem: teams need to monitor competitor product data, prices, stock, discounts, ratings, and buyer language before launching or improving products.
+- Business model: one-off reports first, then monthly report credits. PayPal checkout is implemented for paid plan payments.
+- AI: useful and included. A simple deterministic prompt workflow is used instead of a complex multi-agent system.
+- Scraping: safe demo adapters are implemented now. Live source adapters should use official APIs, Apify actors, or permitted public pages with rate limits.
+- Deployment: Vercel + Supabase/Neon Postgres.
+
+## What Is Implemented
+
+- Marketing homepage for E-commerce Scraping Tool.
+- Dashboard with source management, scrape jobs, run history, product table, and report-generation workflow.
+- API routes for sources, jobs, manual runs, products, report creation, report detail, regeneration, and CSV/JSON export.
+- Seven operational report types: price monitoring, availability, competitor assortment, discount/promotion, review/rating, data quality, and executive summary.
+- Modular scraper architecture in `lib/scrapers`.
+- Deterministic report engine in `lib/reports/report-engine.ts`.
+- Report tests covering all report types and CSV/JSON export.
+- AI service with production-oriented prompt template and JSON validation.
+- Apify integration scaffold for Amazon review scraping.
+- Demo fallback when `OPENAI_API_KEY` or Apify keys are missing.
+- Prisma schema for users, profiles, review reports, agent runs, subscriptions, audit events, leads, and inquiries.
+- Supabase SQL migrations with UUID primary keys, status fields, indexes, foreign keys, and RLS policies.
+- Admin dashboard for report review queue, scraper health, failed runs, and metrics.
+- Settings placeholder.
+- Contact and resources pages adapted to the new product.
+
+## Agent Design
+
+The current scraper/report MVP uses deterministic report functions instead of a complex agent system. The existing review-intelligence AI workflow remains available at `/api/reports` for competitor review analysis when OpenAI and Apify are configured.
+
+### Agent: Review Intelligence Analyst
+
+- Purpose: Convert competitor review text into a structured product and marketing report.
+- Trigger: `POST /api/reports`.
+- Inputs: Amazon product URL, optional product name, optional competitor name, optional pasted reviews.
+- Outputs: JSON report with complaints, compliments, buyer language, product ideas, ad hooks, assumptions, and data quality notes.
+- Tools/APIs: Apify actor for review extraction, OpenAI chat completions for analysis.
+- Prompt file: `lib/ai/prompts.ts`.
+- Output schema: `lib/ai/schemas.ts`.
+- Data stored: `ReviewReport` and `AgentRun` when `DATABASE_URL` is configured.
+- Human approval: reports using demo fallback are marked `NEEDS_REVIEW`.
+- Failure handling: API returns explicit errors and logs failed agent runs when DB is configured.
+- Cost control: max 500 reviews, low temperature, compact JSON schema, no multi-agent loops.
+
+## Environment Variables
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/reviewintel?schema=public"
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+ADMIN_EMAIL="admin@example.com"
+ADMIN_PASSWORD="change-this-password"
+RESEND_API_KEY=""
+EMAIL_FROM="E-commerce Scraping Tool <hello@example.com>"
+OWNER_EMAIL="owner@example.com"
+OPENAI_API_KEY=""
+OPENAI_MODEL="gpt-4o-mini"
+APIFY_TOKEN=""
+APIFY_AMAZON_REVIEWS_ACTOR_ID=""
+PAYPAL_MODE="sandbox"
+PAYPAL_CLIENT_ID=""
+PAYPAL_CLIENT_SECRET=""
+STRIPE_SECRET_KEY=""
+```
+
+Do not commit real secrets. Create a local `.env` file from `.env.example` and paste your rotated API keys there only.
+
+## Setup Checklist
+
+- OpenAI: create or rotate an API key, then set `OPENAI_API_KEY`.
+- Apify: choose an Amazon reviews actor, then set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID`.
+- Database: create a Supabase or Neon Postgres database and set `DATABASE_URL`.
+- Admin: set `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+- Email: configure Resend later with `RESEND_API_KEY`, `EMAIL_FROM`, and `OWNER_EMAIL`.
+- Payments: PayPal checkout and Stripe card checkout are implemented. Add sandbox/test credentials before taking payments.
+- Auth: user auth is intentionally not implemented yet; add Supabase Auth or Clerk before multi-user accounts.
+
+## Local Setup
+
+```bash
+npm install
+npm run dev
+```
+
+Open:
+
+```txt
+http://127.0.0.1:3000
+```
+
+The dashboard works in demo mode without API keys:
+
+```txt
+http://127.0.0.1:3000/dashboard
+http://127.0.0.1:3000/dashboard/reports
+```
+
+## Database Setup
+
+Use Prisma as the source of truth for the production database. The app expects the Prisma schema and migration tables created by `prisma/migrations`.
+
+### Recommended Hosted Postgres
+
+1. Create a Postgres database in Neon, Supabase, Railway, or another hosted Postgres provider.
+2. Copy the pooled connection string.
+3. Set `DATABASE_URL` in `.env` locally and in Vercel environment variables.
+4. Generate the client and apply migrations:
+
+```bash
+npx prisma generate
+npm run prisma:deploy
+```
+
+For local schema changes during development, use:
+
+```bash
+npm run prisma:migrate
+```
+
+Then seed optional demo content:
+
+```bash
+npm run prisma:seed
+```
+
+### Supabase SQL Notes
+
+The older `supabase/migrations` files are kept as reference SQL for the original prototype. Do not mix those SQL migrations with Prisma migrations on the same fresh production database unless you intentionally reconcile the table names first. For this app, use Prisma migrations for deployment.
+
+## API Routes
+
+- `GET /api/reports` lists recent reports.
+- `POST /api/reports` creates a review intelligence report.
+- `GET/POST /api/scraper/sources` lists and creates scraper sources.
+- `GET/POST /api/scraper/jobs` lists and creates scrape jobs.
+- `POST /api/scraper/jobs/[id]/run` runs a safe demo scrape job.
+- `GET /api/scraper/runs` lists scrape run history.
+- `GET /api/scraper/products` lists product intelligence records.
+- `GET/POST /api/scraper/reports` lists and generates e-commerce intelligence reports.
+- `GET/POST /api/scraper/reports/[id]` views or regenerates a report.
+- `GET /api/scraper/reports/[id]/export?format=csv|json` exports reports.
+- `POST /api/leads` stores leads.
+- `POST /api/inquiries` stores inquiries.
+- `POST /api/admin/login` logs into starter admin.
+- `GET/POST /api/admin/faqs`, `/api/admin/resources`, `/api/admin/testimonials` are starter protected content APIs.
+
+## Prompt Requirements
+
+The production prompt specifies:
+
+- Role
+- Objective
+- Input format
+- Output schema
+- Quality rules
+- Refusal/error behavior
+- No hallucinated facts
+- Clear assumptions when data is missing
+
+See `lib/ai/prompts.ts`.
+
+## Deployment
+
+1. Push the project to GitHub.
+2. Create a Vercel project.
+3. Add a Supabase or Neon Postgres database.
+4. Add environment variables.
+5. Run Prisma migration with `npm run prisma:deploy`.
+6. Deploy.
+7. Test homepage, dashboard, report generation, admin login, and contact form.
+
+See `DEPLOYMENT.md` for the full production checklist.
+
+## Verification
+
+```bash
+npm run test
+npm run typecheck
+npm run build
+```
+
+PDF export is not implemented in this MVP to avoid adding heavy rendering dependencies before the report layout is finalized. CSV and JSON export are implemented and tested; PDF can be added later from `reportRowsForExport()`.
+
+## Manual Setup Still Needed
+
+- Choose the exact Apify Amazon review actor and set `APIFY_AMAZON_REVIEWS_ACTOR_ID`.
+- Add `OPENAI_API_KEY`.
+- Add real authentication if user accounts are required.
+- Add PayPal REST API credentials before taking PayPal payments.
+- Add `STRIPE_SECRET_KEY` before taking card payments through Stripe Checkout.
+- Recurring subscription automation is not active yet; current PayPal checkout captures the selected plan payment and records it when `DATABASE_URL` is configured.
+- Add email/domain verification for Resend.
+- Replace demo content with real sample reports.

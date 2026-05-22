@@ -1,0 +1,1054 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PowerPoint + AI Presentation Studio</title>
+  <style>
+    :root {
+      --ink: #151515;
+      --muted: #686868;
+      --paper: #f7f4ee;
+      --panel: #ffffff;
+      --lime: #b9ee38;
+      --moss: #314421;
+      --rose: #ef9aa8;
+      --aqua: #72d8d0;
+      --violet: #6f5edb;
+      --line: rgba(21, 21, 21, 0.16);
+      --shadow: 0 22px 60px rgba(21, 21, 21, 0.13);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 14px clamp(18px, 4vw, 48px);
+      background: rgba(247, 244, 238, 0.88);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: var(--moss);
+      background: var(--lime);
+      box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    nav a {
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+
+    nav a:hover {
+      background: rgba(21, 21, 21, 0.08);
+    }
+
+    .hero {
+      min-height: calc(100svh - 58px);
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(420px, 1.18fr);
+      align-items: center;
+      gap: clamp(28px, 5vw, 76px);
+      padding: clamp(34px, 5vw, 72px) clamp(18px, 4vw, 48px) 42px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero-copy {
+      max-width: 650px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 18px;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--moss);
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 34px;
+      height: 3px;
+      background: var(--lime);
+      border-radius: 999px;
+    }
+
+    h1 {
+      max-width: 10ch;
+      margin: 0;
+      font-size: clamp(54px, 8.5vw, 126px);
+      line-height: 0.88;
+      letter-spacing: 0;
+    }
+
+    .hero-copy p {
+      max-width: 560px;
+      margin: 24px 0 0;
+      color: #3f3f3f;
+      font-size: clamp(18px, 2vw, 23px);
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 12px 16px;
+      border: 1px solid var(--ink);
+      border-radius: 8px;
+      background: var(--ink);
+      color: white;
+      text-decoration: none;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .btn.secondary {
+      background: transparent;
+      color: var(--ink);
+    }
+
+    .stage-wrap {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .stage {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border: 1px solid rgba(21, 21, 21, 0.22);
+      border-radius: 8px;
+      background:
+        linear-gradient(140deg, rgba(185, 238, 56, 0.16), transparent 32%),
+        linear-gradient(320deg, rgba(239, 154, 168, 0.24), transparent 36%),
+        #d8d6cf;
+      box-shadow: var(--shadow);
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: -12%;
+      background:
+        radial-gradient(circle at 19% 28%, rgba(185, 238, 56, 0.85) 0 4.8%, transparent 5.2%),
+        radial-gradient(circle at 35% 18%, rgba(185, 238, 56, 0.7) 0 3.4%, transparent 3.8%),
+        radial-gradient(circle at 54% 32%, rgba(185, 238, 56, 0.75) 0 4.2%, transparent 4.6%),
+        radial-gradient(circle at 67% 66%, rgba(185, 238, 56, 0.78) 0 5%, transparent 5.4%),
+        radial-gradient(circle at 27% 71%, rgba(185, 238, 56, 0.64) 0 4.6%, transparent 5%),
+        radial-gradient(circle at 80% 24%, rgba(185, 238, 56, 0.66) 0 3.7%, transparent 4.1%);
+      filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.18));
+      animation: drift 9s ease-in-out infinite alternate;
+    }
+
+    .stage::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0 48%, rgba(247, 244, 238, 0.78) 62%, rgba(247, 244, 238, 0.95));
+    }
+
+    .slide-ui {
+      position: absolute;
+      inset: 7%;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 0.92fr;
+      gap: 26px;
+      align-items: center;
+    }
+
+    .product-scene {
+      min-height: 64%;
+      position: relative;
+    }
+
+    .bottle {
+      position: absolute;
+      left: 21%;
+      top: 5%;
+      width: 28%;
+      height: 76%;
+      border-radius: 18px 18px 30px 30px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.7), transparent 18% 70%, rgba(0,0,0,0.16)),
+        linear-gradient(180deg, #f7fff2, #bfe7be 42%, #5f8f58);
+      border: 1px solid rgba(49, 68, 33, 0.35);
+      transform: rotate(-8deg);
+      box-shadow: 0 28px 42px rgba(49, 68, 33, 0.28);
+    }
+
+    .bottle::before {
+      content: "";
+      position: absolute;
+      left: 29%;
+      top: -14%;
+      width: 42%;
+      height: 18%;
+      border-radius: 8px 8px 3px 3px;
+      background: #27361d;
+    }
+
+    .bottle::after {
+      content: "AI";
+      position: absolute;
+      left: 24%;
+      top: 38%;
+      width: 52%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--lime);
+      color: var(--moss);
+      font-weight: 900;
+    }
+
+    .slide-text {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+      color: var(--ink);
+    }
+
+    .pill {
+      width: fit-content;
+      max-width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid rgba(21, 21, 21, 0.13);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .slide-text h2 {
+      margin: 0;
+      font-size: clamp(28px, 4.2vw, 54px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .slide-text p {
+      margin: 0;
+      max-width: 32ch;
+      color: #424242;
+      font-size: clamp(14px, 1.4vw, 17px);
+    }
+
+    .progress-dots {
+      position: absolute;
+      left: 4%;
+      bottom: 6%;
+      z-index: 3;
+      display: grid;
+      gap: 9px;
+    }
+
+    .progress-dots span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(21,21,21,0.18);
+    }
+
+    .progress-dots span:first-child {
+      background: var(--lime);
+      border-color: var(--moss);
+    }
+
+    .ticker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .ticker div {
+      min-height: 68px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .ticker strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .ticker span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    section {
+      padding: clamp(48px, 7vw, 94px) clamp(18px, 4vw, 48px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    .section-head h2 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(32px, 5vw, 70px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .section-head p {
+      max-width: 420px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .step {
+      min-height: 238px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .step small {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--ink);
+      color: white;
+      font-weight: 900;
+    }
+
+    .step h3 {
+      margin: 24px 0 8px;
+      font-size: 21px;
+      line-height: 1.05;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .generator-grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 0.82fr) minmax(420px, 1.18fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .builder-panel,
+    .preview-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 16px 42px rgba(21, 21, 21, 0.08);
+    }
+
+    .builder-panel {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+      color: #4a4a4a;
+    }
+
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%;
+      border: 1px solid rgba(21, 21, 21, 0.22);
+      border-radius: 8px;
+      background: #fbfaf7;
+      color: var(--ink);
+      padding: 11px 12px;
+      outline: none;
+    }
+
+    .field textarea {
+      min-height: 122px;
+      resize: vertical;
+    }
+
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus {
+      border-color: var(--moss);
+      box-shadow: 0 0 0 3px rgba(185, 238, 56, 0.4);
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .preview-panel {
+      overflow: hidden;
+    }
+
+    .preview-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf7;
+    }
+
+    .preview-top strong {
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+
+    .mini-deck {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .mini-slide {
+      aspect-ratio: 16 / 9;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(21, 21, 21, 0.16);
+      border-radius: 8px;
+      background: #d9d7cf;
+    }
+
+    .mini-slide.title {
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 22% 24%, var(--lime) 0 7%, transparent 7.5%),
+        radial-gradient(circle at 70% 64%, var(--rose) 0 8%, transparent 8.5%),
+        radial-gradient(circle at 82% 25%, var(--aqua) 0 5.5%, transparent 6%),
+        #d9d7cf;
+    }
+
+    .mini-slide.title h3 {
+      margin: 0;
+      max-width: 12ch;
+      text-align: center;
+      font-size: clamp(24px, 4vw, 52px);
+      line-height: 0.95;
+    }
+
+    .mini-content {
+      position: absolute;
+      inset: 11%;
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 8%;
+      align-items: center;
+    }
+
+    .mini-product {
+      width: 72%;
+      aspect-ratio: 0.52;
+      border-radius: 14px 14px 24px 24px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.72), transparent 20% 70%, rgba(0,0,0,0.18)),
+        linear-gradient(180deg, #fff, var(--accent, #b9ee38));
+      border: 1px solid rgba(21, 21, 21, 0.18);
+      transform: rotate(-8deg);
+      margin: 0 auto;
+      box-shadow: 0 18px 28px rgba(21, 21, 21, 0.2);
+    }
+
+    .mini-copy h4 {
+      margin: 0 0 6px;
+      font-size: clamp(16px, 2.6vw, 34px);
+      line-height: 1;
+    }
+
+    .mini-copy p {
+      margin: 0;
+      color: #4d4d4d;
+      font-size: clamp(10px, 1.4vw, 15px);
+    }
+
+    .status-note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tool-card {
+      padding: 20px;
+      min-height: 210px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .tool-card h3 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 12px;
+      font-size: 24px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 5px 8px;
+      border-radius: 8px;
+      background: #eef1e8;
+      color: #394532;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .tool-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .prompt-lab {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .prompt-tabs {
+      display: grid;
+      gap: 10px;
+    }
+
+    .prompt-tab {
+      text-align: left;
+      min-height: 66px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .prompt-tab.active {
+      background: var(--lime);
+      border-color: var(--moss);
+    }
+
+    .prompt-output {
+      min-height: 360px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #151515;
+      color: #f7f4ee;
+      box-shadow: var(--shadow);
+    }
+
+    .prompt-output h3 {
+      margin: 0 0 16px;
+      font-size: 26px;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e8e8e8;
+      font-size: 15px;
+    }
+
+    .timing {
+      display: grid;
+      gap: 12px;
+    }
+
+    .timing-row {
+      display: grid;
+      grid-template-columns: 120px 1fr minmax(160px, 0.32fr);
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .time {
+      font-weight: 900;
+      color: var(--moss);
+    }
+
+    .bar {
+      height: 14px;
+      border-radius: 999px;
+      background: #ece8dd;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      width: var(--w);
+      background: linear-gradient(90deg, var(--lime), var(--aqua), var(--rose));
+      border-radius: inherit;
+    }
+
+    .timing-row strong {
+      font-size: 14px;
+    }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .check {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .check input {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--moss);
+      margin-top: 2px;
+      flex: 0 0 auto;
+    }
+
+    .check strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .check span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    footer {
+      padding: 32px clamp(18px, 4vw, 48px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @keyframes drift {
+      from { transform: translate3d(-2%, -1%, 0) rotate(-1deg); }
+      to { transform: translate3d(2%, 1%, 0) rotate(1deg); }
+    }
+
+    @media (max-width: 1050px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .stage-wrap {
+        max-width: 900px;
+      }
+
+      .workflow {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .tools-grid,
+      .prompt-lab {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      nav {
+        justify-content: flex-start;
+      }
+
+      .hero {
+        min-height: auto;
+      }
+
+      h1 {
+        max-width: 8ch;
+      }
+
+      .slide-ui {
+        inset: 6%;
+        gap: 12px;
+      }
+
+      .slide-text h2 {
+        font-size: 26px;
+      }
+
+      .slide-text p,
+      .pill {
+        font-size: 11px;
+      }
+
+      .ticker,
+      .workflow,
+      .checklist {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .section-head p {
+        margin-top: 14px;
+      }
+
+      .timing-row {
+        grid-template-columns: 1fr;
+      }
+
+      footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">P</span> PowerPoint + AI</div>
+    <nav aria-label="Main navigation">
+      <a href="#workflow">Workflow</a>
+      <a href="#generator">Generator</a>
+      <a href="#tools">Tools</a>
+      <a href="#prompts">Prompts</a>
+      <a href="#timing">Timing</a>
+      <a href="#checklist">Checklist</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">AI presentation production</p>
+        <h1>Make slides move like ads</h1>
+        <p>Build cinematic product presentations by generating key frames with AI, turning them into video transitions, then assembling everything in PowerPoint with clean layers and precise timing.</p>
+        <div class="hero-actions">
+          <a class="btn" href="#workflow">Start the workflow</a>
+          <a class="btn secondary" href="#prompts">Copy prompts</a>
+        </div>
+      </div>
+
+      <div class="stage-wrap" aria-label="Animated presentation preview">
+        <div class="stage">
+          <div class="slide-ui">
+            <div class="product-scene">
+              <div class="bottle"></div>
+            </div>
+            <div class="slide-text">
+              <div class="pill">Beauty launch / 16:9 frame</div>
+              <h2>Glass, glow, motion</h2>
+              <p>One generated background becomes a title slide, a product scene, and a transition video.</p>
+            </div>
+          </div>
+          <div class="progress-dots" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="ticker" aria-label="Project stats">
+          <div><strong>5</strong><span>core slides</span></div>
+          <div><strong>3.5s</strong><span>text delay</span></div>
+          <div><strong>16:9</strong><span>AI output</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <div class="section-head">
+        <h2>The whole build in five moves</h2>
+        <p>Keep the production simple: storyboard first, generate only the frames you need, and let PowerPoint handle the final choreography.</p>
+      </div>
+      <div class="workflow">
+        <article class="step">
+          <div>
+            <small>01</small>
+            <h3>Storyboard the frames</h3>
+            <p>Decide the title frame, product frame, text side, menu details, and every transition target before generating assets.</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <small>02</small>
+            <h3>Generate the visual world</h3>
+            <p>Create branded glass spheres, product backgrounds, and clean 16:9 compositions in an image model.</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <small>03</small>
+            <h3>Add brand marks</h3>
+            <p>Use the logo as a reference and ask AI to place small, realistic marks only on selected objects.</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <small>04</small>
+            <h3>Create transition video</h3>
+            <p>Set the first generated frame as the start image and the next product frame as the end image.</p>
+          </div>
+        </article>
+        <article class="step">
+          <div>
+            <small>05</small>
+            <h3>Animate in PowerPoint</h3>
+            <p>Place video behind text, auto-play it, then delay text entrance until the video lands on the product composition.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="tools">
+      <div class="section-head">
+        <h2>Production stack</h2>
+        <p>The method works with paid or free tools. The important part is controlling references, output ratio, and final timing.</p>
+      </div>
+      <div class="tools-grid">
+        <article class="tool-card">
+          <h3>PowerPoint <span class="tag">Assembly</span></h3>
+          <p>Layer the generated video on the back, keep text editable, and use simple entrance and exit animations for polish.</p>
+        </article>
+        <article class="tool-card">
+          <h3>Freepik <span class="tag">Images + video</span></h3>
+          <p>Useful for combining product photos, references, brand colors, and image-to-video transitions in one workflow.</p>
+        </article>
+        <article class="tool-card">
+          <h3>Luma Labs <span class="tag">Free option</span></h3>
+          <p>A practical alternate path for image and video generation when you want to test the idea before paying for tools.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="prompts">
+      <div class="section-head">
+        <h2>Prompt lab</h2>
+        <p>Use these as starting points. The best results usually come from short iterations, not one heroic prompt.</p>
+      </div>
+      <div class="prompt-lab">
+        <div class="prompt-tabs" role="tablist" aria-label="Prompt examples">
+          <button class="prompt-tab active" type="button" data-title="Glass Spheres" data-prompt="Create a 16:9 premium cosmetic advertising background with translucent lime-green glass spheres floating on a soft neutral gray studio backdrop. The spheres should feel glossy, layered, realistic, and spacious enough for a logo and product reveal. No text.">Glass spheres</button>
+          <button class="prompt-tab" type="button" data-title="Logo Placement" data-prompt="Use image 1 as the main composition and image 2 as the logo reference. Add the logo from image 2 to several selected glass spheres only. Keep the logo small, curved naturally with the sphere surface, and preserve realistic reflections.">Logo placement</button>
+          <button class="prompt-tab" type="button" data-title="Product Frame" data-prompt="Place the cosmetic product from image 1 into the premium reference scene from image 2. Keep the object on the left side of a 16:9 frame, with a clean neutral background and empty space on the right for editable presentation text.">Product frame</button>
+          <button class="prompt-tab" type="button" data-title="Video Transition" data-prompt="Animate a smooth commercial-style transition from the first image to the second image. The glass spheres drift apart, the brand color remains consistent, and the final product composition settles cleanly with space for text. Camera motion should be elegant and slow, not chaotic.">Video transition</button>
+        </div>
+        <div class="prompt-output" aria-live="polite">
+          <h3 id="promptTitle">Glass Spheres</h3>
+          <pre id="promptText">Create a 16:9 premium cosmetic advertising background with translucent lime-green glass spheres floating on a soft neutral gray studio backdrop. The spheres should feel glossy, layered, realistic, and spacious enough for a logo and product reveal. No text.</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="timing">
+      <div class="section-head">
+        <h2>PowerPoint timing map</h2>
+        <p>Most of the magic is just disciplined sequencing. Video starts immediately; text appears only when the generated motion reaches its final frame.</p>
+      </div>
+      <div class="timing">
+        <div class="timing-row">
+          <div class="time">0.0s</div>
+          <div class="bar"><span style="--w: 18%"></span></div>
+          <strong>Video starts automatically</strong>
+        </div>
+        <div class="timing-row">
+          <div class="time">2.0s</div>
+          <div class="bar"><span style="--w: 46%"></span></div>
+          <strong>Old text exits to the side</strong>
+        </div>
+        <div class="timing-row">
+          <div class="time">2.5s</div>
+          <div class="bar"><span style="--w: 58%"></span></div>
+          <strong>New text begins entrance</strong>
+        </div>
+        <div class="timing-row">
+          <div class="time">3.5s</div>
+          <div class="bar"><span style="--w: 78%"></span></div>
+          <strong>Product layout is readable</strong>
+        </div>
+        <div class="timing-row">
+          <div class="time">5.0s</div>
+          <div class="bar"><span style="--w: 100%"></span></div>
+          <strong>Slide is ready to advance</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="checklist">
+      <div class="section-head">
+        <h2>Before you present</h2>
+        <p>A compact quality pass for the final deck.</p>
+      </div>
+      <div class="checklist">
+        <label class="check">
+          <input type="checkbox">
+          <span><strong>Every AI asset is 16:9</strong> No square crops, no stretched background videos, no accidental black bars.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox">
+          <span><strong>Text remains editable</strong> Keep product names, prices, and details as PowerPoint text, not baked into video.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox">
+          <span><strong>Transitions have final frames</strong> Each video should end exactly where the next slide layout begins.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox">
+          <span><strong>Animations follow the motion</strong> If the product moves right, send exiting text right as well.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox">
+          <span><strong>Menu and social elements stay stable</strong> Reanimate only the content that needs to change.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox">
+          <span><strong>Loop through in slideshow mode</strong> Check the real playback, not only the animation pane.</span>
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>PowerPoint + AI Presentation Studio</span>
+    <span>Storyboard, generate, animate, repeat.</span>
+  </footer>
+
+  <script>
+    const tabs = document.querySelectorAll(".prompt-tab");
+    const title = document.querySelector("#promptTitle");
+    const text = document.querySelector("#promptText");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        title.textContent = tab.dataset.title;
+        text.textContent = tab.dataset.prompt;
+      });
+    });
+  </script>
+</body>
+</html>

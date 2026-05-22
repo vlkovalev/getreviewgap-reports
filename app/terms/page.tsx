@@ -1,0 +1,18 @@
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Terms", description: "Terms for ReviewIntel." }
+
+export default function TermsPage() {
+  return (
+    <main className="px-5 py-20">
+      <div className="mx-auto max-w-3xl text-white/72">
+        <h1 className="text-5xl font-black text-white">Terms</h1>
+        <p className="mt-6">Reports are generated for informational product research and marketing planning. They should be reviewed by a human before business decisions are made.</p>
+        <p className="mt-4">Third-party AI and scraping tools are not owned by ReviewIntel and may change pricing, features, terms, or availability.</p>
+        <h2 className="mt-10 text-2xl font-black text-white">Lawful-use boundaries</h2>
+        <p className="mt-4">The product is designed for derived analysis of public review content where collection is permitted. Users are responsible for complying with marketplace terms, robots policies, privacy laws, and applicable local rules.</p>
+        <p className="mt-4">ReviewIntel does not provide login bypassing, CAPTCHA circumvention, paywall bypassing, access-control evasion, seller contact-data resale, cross-border personal-data harvesting, or raw competitor price scraping as a resale service.</p>
+      </div>
+    </main>
+  )
+}

@@ -1,0 +1,13 @@
+.env
+.env*.local
+.next/
+node_modules/
+*.log
+dev.out.log
+dev.err.log
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+.vercel/
+coverage/
+dist/
+build/

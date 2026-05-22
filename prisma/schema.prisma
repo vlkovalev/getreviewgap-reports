@@ -1,0 +1,509 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InquiryStatus {
+  NEW
+  REVIEWED
+  WON
+  LOST
+}
+
+enum ResourceStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ReportStatus {
+  DRAFT
+  RUNNING
+  READY
+  FAILED
+  NEEDS_REVIEW
+}
+
+enum AgentRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum ScraperSourceStatus {
+  ACTIVE
+  DISABLED
+  BLOCKED
+}
+
+enum ScrapeJobStatus {
+  ACTIVE
+  PAUSED
+  RUNNING
+  FAILED
+}
+
+enum ScrapeRunStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+  BLOCKED
+}
+
+enum IntelligenceReportType {
+  PRICE_MONITORING
+  AVAILABILITY
+  COMPETITOR_ASSORTMENT
+  DISCOUNT_PROMOTION
+  REVIEW_RATING
+  DATA_QUALITY
+  EXECUTIVE_SUMMARY
+}
+
+enum IntelligenceReportStatus {
+  DRAFT
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum ExportFormat {
+  CSV
+  JSON
+  PDF
+}
+
+enum ExportStatus {
+  READY
+  FAILED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         String   @default("ADMIN")
+  profile      Profile?
+  reports      ReviewReport[]
+  agentRuns    AgentRun[]
+  subscriptions Subscription[]
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   String?
+  website   String?
+  role      String?
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  message   String?
+  source    String   @default("lead-magnet")
+}
+
+model Inquiry {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  name            String
+  email           String
+  company         String?
+  serviceInterest String
+  budgetRange     String?
+  message         String
+  consent         Boolean       @default(false)
+  status          InquiryStatus @default(NEW)
+}
+
+model Course {
+  id          String         @id @default(cuid())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  title       String
+  slug        String         @unique
+  description String
+  modules     CourseModule[]
+}
+
+model CourseModule {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  title       String
+  summary     String
+  order       Int      @default(0)
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+}
+
+model Lesson {
+  id        String       @id @default(cuid())
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  title     String
+  summary   String
+  order     Int          @default(0)
+  moduleId  String
+  module    CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  role      String?
+  quote     String
+  active    Boolean  @default(true)
+}
+
+model FAQ {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  question  String
+  answer    String
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+}
+
+model ResourcePost {
+  id          String         @id @default(cuid())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  title       String
+  slug        String         @unique
+  excerpt     String
+  content     String
+  tags        String[]
+  status      ResourceStatus @default(PUBLISHED)
+  publishedAt DateTime?
+}
+
+model ServicePackage {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  title       String
+  slug        String   @unique
+  description String
+  priceLabel  String
+  features    String[]
+  active      Boolean  @default(true)
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  email     String
+  amount    Int
+  currency  String   @default("usd")
+  status    String   @default("pending")
+  stripeId  String?
+}
+
+model CustomerAccount {
+  id           String              @id @default(cuid())
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  email        String              @unique
+  passwordHash String
+  credits      Int                 @default(0)
+  reports      IntelligenceReport[]
+  transactions CreditTransaction[]
+  purchases    CustomerPurchase[]
+
+  @@index([createdAt])
+}
+
+model CreditTransaction {
+  id          String          @id @default(cuid())
+  createdAt   DateTime        @default(now())
+  customerId  String
+  customer    CustomerAccount @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount      Int
+  reason      String
+  referenceId String?
+  metadata    Json?
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+model CustomerPurchase {
+  id          String          @id @default(cuid())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  customerId  String?
+  customer    CustomerAccount? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  provider    String
+  providerId  String?
+  planId      String
+  amount      Int
+  currency    String          @default("usd")
+  status      String          @default("pending")
+  credits     Int             @default(0)
+  raw          Json?
+
+  @@index([customerId])
+  @@index([provider])
+  @@index([providerId])
+  @@index([status])
+}
+
+model ReviewReport {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email          String?
+  productUrl     String
+  asin           String?
+  productName    String
+  competitorName String?
+  marketplace    String       @default("amazon.com")
+  status         ReportStatus @default(DRAFT)
+  reviewCount    Int          @default(0)
+  inputReviews   Json?
+  summary        Json?
+  errorMessage   String?
+  agentRuns      AgentRun[]
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AgentRun {
+  id           String         @id @default(cuid())
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  userId       String?
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reportId     String?
+  report       ReviewReport?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  name         String
+  status       AgentRunStatus @default(QUEUED)
+  input        Json
+  output       Json?
+  errorMessage String?
+  provider     String?
+  model        String?
+  tokenEstimate Int?
+
+  @@index([reportId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  userId           String?
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email            String
+  status           SubscriptionStatus @default(INCOMPLETE)
+  plan             String
+  stripeCustomerId String?
+  stripeSubId      String?
+  currentPeriodEnd DateTime?
+
+  @@index([email])
+  @@index([status])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+model ScraperSource {
+  id               String              @id @default(cuid())
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  userId           String?
+  name             String
+  baseUrl          String
+  sourceType       String
+  status           ScraperSourceStatus @default(ACTIVE)
+  rateLimitSeconds Int                 @default(10)
+  robotsNote       String?
+  notes            String?
+  jobs             ScrapeJob[]
+  runs             ScrapeRun[]
+  products         Product[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ScrapeJob {
+  id         String          @id @default(cuid())
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  userId     String?
+  sourceId   String
+  source     ScraperSource   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  name       String
+  targetUrls String[]
+  schedule   String?
+  status     ScrapeJobStatus @default(ACTIVE)
+  lastRunAt  DateTime?
+  runs       ScrapeRun[]
+
+  @@index([userId])
+  @@index([sourceId])
+  @@index([status])
+}
+
+model ScrapeRun {
+  id              String          @id @default(cuid())
+  createdAt       DateTime        @default(now())
+  jobId           String
+  job             ScrapeJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceId        String
+  source          ScraperSource   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  status          ScrapeRunStatus @default(QUEUED)
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  durationMs      Int?
+  productsFound   Int             @default(0)
+  productsCreated Int             @default(0)
+  productsUpdated Int             @default(0)
+  errorMessage    String?
+  log             Json?
+  snapshots       ProductSnapshot[]
+
+  @@index([jobId])
+  @@index([sourceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Product {
+  id                 String            @id @default(cuid())
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  sourceId           String
+  source             ScraperSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  externalId         String?
+  url                String
+  title              String?
+  brand              String?
+  category           String?
+  imageUrl           String?
+  currency           String            @default("USD")
+  currentPrice       Decimal?
+  originalPrice      Decimal?
+  discountAmount     Decimal?
+  discountPercentage Decimal?
+  availability       String?
+  rating             Decimal?
+  reviewCount        Int?
+  sellerName         String?
+  lastSeenAt         DateTime?
+  snapshots          ProductSnapshot[]
+
+  @@index([sourceId])
+  @@index([url])
+  @@index([brand])
+  @@index([category])
+  @@index([availability])
+}
+
+model ProductSnapshot {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  scrapeRunId   String
+  scrapeRun     ScrapeRun @relation(fields: [scrapeRunId], references: [id], onDelete: Cascade)
+  price         Decimal?
+  originalPrice Decimal?
+  currency      String    @default("USD")
+  availability  String?
+  rating        Decimal?
+  reviewCount   Int?
+  capturedAt    DateTime  @default(now())
+
+  @@index([productId])
+  @@index([scrapeRunId])
+  @@index([capturedAt])
+}
+
+model IntelligenceReport {
+  id           String                   @id @default(cuid())
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  userId       String?
+  customerId   String?
+  customer     CustomerAccount?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  reportType   IntelligenceReportType
+  title        String
+  status       IntelligenceReportStatus @default(DRAFT)
+  filters      Json?
+  summary      Json?
+  data         Json?
+  errorMessage String?
+  generatedAt  DateTime?
+  exports      ReportExport[]
+
+  @@index([userId])
+  @@index([customerId])
+  @@index([reportType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ReportExport {
+  id        String             @id @default(cuid())
+  createdAt DateTime           @default(now())
+  reportId  String
+  report    IntelligenceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  format    ExportFormat
+  fileUrl   String?
+  status    ExportStatus       @default(READY)
+
+  @@index([reportId])
+  @@index([format])
+}
