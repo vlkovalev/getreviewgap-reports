@@ -19,7 +19,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           {params.created ? <p className="mt-4 rounded-xl border border-lime/30 bg-lime/10 p-3 text-sm text-lime">Account created. You can now choose your next step.</p> : null}
           <form action="/api/auth/login" method="post" className="mt-6 grid gap-4">
             <input type="hidden" name="mode" value="signup" />
-            <input type="hidden" name="redirectTo" value="/signup?created=1" />
+            <input type="hidden" name="redirectTo" value="/onboarding" />
             <label className="grid gap-2 text-sm text-white/70">
               Email
               <input suppressHydrationWarning name="email" type="email" required placeholder="you@example.com" className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />

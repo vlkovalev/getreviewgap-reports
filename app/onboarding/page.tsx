@@ -18,7 +18,7 @@ export default async function OnboardingPage() {
           {[
             ["1", "Choose report type", "Start with Review and Rating for the clearest first output."],
             ["2", "Use demo data", "The MVP uses safe demo data until Apify/OpenAI keys are connected."],
-            ["3", "Export results", "Open the report and export CSV or JSON for sharing."]
+            ["3", "Export results", "Open the report and export CSV, JSON, or PDF for sharing."]
           ].map(([step, title, text]) => (
             <div key={step} className="card p-6">
               <p className="text-sm font-black text-lime">Step {step}</p>
