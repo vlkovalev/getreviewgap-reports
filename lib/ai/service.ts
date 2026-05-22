@@ -69,12 +69,25 @@ function buildApifyInputs(input: ReviewInput) {
   const common = { maxItems: 500, maxReviews: 500, reviewsCount: 500, proxyConfiguration: { useApifyProxy: true } }
   const inputs: Array<Record<string, unknown> | null> = [
     { startUrls: [{ url: input.productUrl }], ...common },
+    { startUrls: [input.productUrl], ...common },
     { productUrls: [input.productUrl], ...common },
+    { productUrls: [{ url: input.productUrl }], ...common },
+    { productURLs: [input.productUrl], ...common },
     { urls: [input.productUrl], ...common },
+    { urls: [{ url: input.productUrl }], ...common },
+    { reviewUrls: [input.productUrl], ...common },
+    { searchUrls: [input.productUrl], ...common },
+    { products: [input.productUrl], ...common },
     { url: input.productUrl, ...common },
     { productUrl: input.productUrl, ...common },
+    { productURL: input.productUrl, ...common },
+    { input: input.productUrl, ...common },
+    { input: [input.productUrl], ...common },
     asin ? { asins: [asin], ...common } : null,
-    asin ? { asin, ...common } : null
+    asin ? { asinList: [asin], ...common } : null,
+    asin ? { productAsins: [asin], ...common } : null,
+    asin ? { asin, ...common } : null,
+    asin ? { input: asin, ...common } : null
   ]
   return inputs.filter((item): item is Record<string, unknown> => Boolean(item))
 }
@@ -112,9 +125,9 @@ async function apifyErrorDetail(response: Response, token: string) {
   const logTail = runId ? await apifyRunLogTail(runId, token) : ""
   try {
     const data = JSON.parse(text) as { error?: { message?: string }; message?: string }
-    return `${data.error?.message || data.message || ""}${logTail ? ` Log tail: ${logTail}` : ""}`.slice(0, 900)
+    return `${data.error?.message || data.message || ""}${logTail ? ` Log tail: ${logTail}` : ""}`.slice(0, 2000)
   } catch {
-    return `${text}${logTail ? ` Log tail: ${logTail}` : ""}`.slice(0, 900)
+    return `${text}${logTail ? ` Log tail: ${logTail}` : ""}`.slice(0, 2000)
   }
 }
 
@@ -130,10 +143,10 @@ async function apifyRunLogTail(runId: string, token: string) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .slice(-8)
+    .slice(-16)
     .join(" | ")
     .replace(/[A-Za-z0-9_-]{32,}/g, "[redacted]")
-    .slice(0, 600)
+    .slice(0, 1400)
 }
 
 export async function generateReviewInsight(input: ReviewInput, reviews: string[]): Promise<{ insight: ReviewInsight; provider: string; model: string }> {
