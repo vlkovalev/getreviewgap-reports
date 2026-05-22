@@ -4,6 +4,7 @@ import { getCurrentCustomer } from "@/lib/customer-session"
 import { AccountMenu } from "@/components/AccountMenu"
 
 const links = [
+  ["Home", "/"],
   ["My reports", "/dashboard/reports"],
   ["Pricing", "/pricing"],
   ["Resources", "/resources"],
