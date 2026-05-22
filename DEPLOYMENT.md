@@ -82,6 +82,8 @@ Set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID`. If your selected actor do
 
 Paste that JSON into `APIFY_INPUT_TEMPLATE` in Vercel. The app replaces `{{PRODUCT_URL}}` at runtime.
 
+If live reports fail with `Apify authentication failed`, the token is missing, expired, copied from the wrong Apify account, or does not have permission to run the selected actor. If they fail with `Apify actor not found`, copy the actor id exactly from Apify; ids like `username/actor-name` are accepted and normalized by the app.
+
 ## 3.2 Custom Domain
 
 1. In Vercel, open the `reviewintel-reports` project.
@@ -101,7 +103,13 @@ NEXT_PUBLIC_META_PIXEL_ID
 NEXT_PUBLIC_LINKEDIN_PARTNER_ID
 ```
 
-The app also records lightweight internal events in `AuditEvent` when the database is configured: `analytics.page_view` and `analytics.checkout_started`.
+The app also records lightweight internal events in `AuditEvent` when the database is configured:
+
+- `analytics.page_view`
+- `analytics.checkout_started`
+- `analytics.report_generated`
+- `analytics.report_generation_failed`
+- `analytics.report_export_started`
 
 ## 4. PayPal
 

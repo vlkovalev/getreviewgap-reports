@@ -28,14 +28,15 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
   }
 
   const actorInput = buildApifyInput(input)
-  const runResponse = await fetch(`https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}`, {
+  const apiActorId = normalizeApifyActorId(actorId)
+  const runResponse = await fetch(`https://api.apify.com/v2/acts/${apiActorId}/run-sync-get-dataset-items?token=${apifyToken}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(actorInput)
   })
 
   if (!runResponse.ok) {
-    throw new Error(`Apify request failed with status ${runResponse.status}`)
+    throw new Error(apifyStatusMessage(runResponse.status))
   }
 
   const items = await runResponse.json() as Array<Record<string, unknown>>
@@ -78,6 +79,18 @@ function replaceTemplateValues(value: unknown, productUrl: string): unknown {
 
 function cleanEnv(value: string | undefined) {
   return value?.trim().replace(/^["']|["']$/g, "")
+}
+
+function normalizeApifyActorId(actorId: string) {
+  return encodeURIComponent(actorId.replace("/", "~"))
+}
+
+function apifyStatusMessage(status: number) {
+  if (status === 401) return "Apify authentication failed. Check APIFY_TOKEN in Vercel and local .env."
+  if (status === 403) return "Apify access denied. Check that your token can run the selected Amazon reviews actor."
+  if (status === 404) return "Apify actor not found. Check APIFY_AMAZON_REVIEWS_ACTOR_ID and use the actor's exact id."
+  if (status === 429) return "Apify rate limit reached. Try again later or increase Apify capacity."
+  return `Apify request failed with status ${status}`
 }
 
 export async function generateReviewInsight(input: ReviewInput, reviews: string[]): Promise<{ insight: ReviewInsight; provider: string; model: string }> {

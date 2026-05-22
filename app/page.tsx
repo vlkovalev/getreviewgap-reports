@@ -23,7 +23,7 @@ const reportOutputs = [
 ]
 
 const trustNotes = [
-  "Public review intelligence only",
+  "Customer-supplied or authorized review intelligence only",
   "No CAPTCHA, login, paywall, or private data bypassing",
   "Private reports attached to your account",
   "CSV, JSON, and PDF-oriented exports"
@@ -40,11 +40,12 @@ export default function HomePage() {
               Affordable AI review reports for Shopify brands and Amazon sellers.
             </h1>
             <p className="mt-6 max-w-2xl text-xl text-white/72">
-              ReviewIntel Reports turns public Amazon product reviews into sentiment summaries, product gaps, rating signals, and buyer-language insights for sellers with 10-500 SKUs.
+              ReviewIntel Reports turns authorized review sources or pasted customer feedback into sentiment summaries, product gaps, rating signals, and buyer-language insights for sellers with 10-500 SKUs.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/dashboard/reports" className="btn-primary">Run a sample report</Link>
               <Link href="/pricing" className="btn-secondary">See plans</Link>
+              <Link href="/compliance" className="btn-secondary">Compliance</Link>
             </div>
           </div>
           <div className="card p-6 shadow-soft">

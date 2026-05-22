@@ -2,17 +2,14 @@
 
 import { useState } from "react"
 import type { PlanId } from "@/lib/plans"
+import { trackClientEvent } from "@/components/AnalyticsBeacon"
 
 export function PayPalCheckoutButton({ planId }: { planId: PlanId }) {
   const [status, setStatus] = useState("")
 
   async function startCheckout() {
     setStatus("Opening PayPal...")
-    void fetch("/api/analytics", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "checkout_started", properties: { provider: "paypal", planId } })
-    })
+    trackClientEvent("checkout_started", { provider: "paypal", planId })
     const response = await fetch("/api/paypal/create-order", {
       method: "POST",
       headers: { "content-type": "application/json" },

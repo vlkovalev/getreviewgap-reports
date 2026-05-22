@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import type { IntelligenceReport, ReportType, ScraperSource } from "@/lib/scrapers/types"
+import { trackClientEvent } from "@/components/AnalyticsBeacon"
 
 const reportTypes: Array<{ value: ReportType; label: string }> = [
   { value: "REVIEW_RATING", label: "Review and Rating" },
@@ -47,11 +48,18 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
     const payload = await response.json()
     if (!response.ok) {
       setStatus(payload.error ?? "Report failed")
+      trackClientEvent("report_generation_failed", { reportType, status: response.status })
       return
     }
     setReports((current) => [payload.report, ...current])
     if (typeof payload.credits === "number") setCreditCount(payload.credits)
     setStatus("Report generated. Open it or export it below.")
+    trackClientEvent("report_generated", {
+      reportType,
+      source: payload.report?.summary?.source ?? "stored",
+      hasProductUrl: Boolean(productUrl),
+      hasPastedReviews: Boolean(pastedReviews)
+    })
   }
 
   return (
@@ -81,7 +89,7 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">Amazon product URL, optional</span>
           <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder="https://www.amazon.com/dp/..." className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-          <span className="text-xs text-white/45">Add a URL for live Apify/OpenAI review intelligence. Leave blank to use the demo dataset.</span>
+          <span className="text-xs text-white/45">Use URLs and review sources you are permitted to analyze. Leave blank to use the demo dataset.</span>
         </label>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="grid gap-2 text-sm">
@@ -128,13 +136,13 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="font-bold">{report.title}</p>
-                  <p className="text-xs text-white/50">{report.status} · {report.generatedAt}</p>
+                  <p className="text-xs text-white/50">{report.status} - {report.generatedAt}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Link href={`/dashboard/reports/${report.id}`} className="rounded-full bg-white px-3 py-2 text-xs font-black text-black">View</Link>
-                  <a href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">CSV</a>
-                  <a href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">JSON</a>
-                  <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">PDF</a>
+                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "csv" })} href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">CSV</a>
+                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "json" })} href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">JSON</a>
+                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "pdf" })} href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">PDF</a>
                 </div>
               </div>
             </div>

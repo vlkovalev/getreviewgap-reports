@@ -2,17 +2,14 @@
 
 import { useState } from "react"
 import type { PlanId } from "@/lib/plans"
+import { trackClientEvent } from "@/components/AnalyticsBeacon"
 
 export function CardCheckoutButton({ planId }: { planId: PlanId }) {
   const [status, setStatus] = useState("")
 
   async function startCheckout() {
     setStatus("Opening secure card checkout...")
-    void fetch("/api/analytics", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "checkout_started", properties: { provider: "stripe", planId } })
-    })
+    trackClientEvent("checkout_started", { provider: "stripe", planId })
     const response = await fetch("/api/stripe/create-checkout-session", {
       method: "POST",
       headers: { "content-type": "application/json" },
