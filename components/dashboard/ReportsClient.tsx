@@ -16,8 +16,17 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
   const [reportType, setReportType] = useState<ReportType>("REVIEW_RATING")
   const [sourceId, setSourceId] = useState("")
   const [status, setStatus] = useState("")
+  const canGenerate = signedIn && creditCount > 0
 
   async function generate() {
+    if (!signedIn) {
+      setStatus("Sign in before generating reports so the report can be saved to your account.")
+      return
+    }
+    if (creditCount <= 0) {
+      setStatus("You are out of report credits. Buy a single report, pack, or monthly credits to continue.")
+      return
+    }
     setStatus("Generating report...")
     const response = await fetch("/api/scraper/reports", {
       method: "POST",
@@ -45,7 +54,12 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
           <p className="text-sm text-white/60">Report credits</p>
           <p className="mt-1 text-3xl font-black text-lime">{signedIn ? creditCount : "Sign in"}</p>
           {!signedIn ? <Link href="/login" className="mt-2 inline-flex text-sm font-bold text-lime">Sign in to use credits</Link> : null}
-          {signedIn && creditCount <= 0 ? <Link href="/dashboard/billing" className="mt-2 inline-flex text-sm font-bold text-lime">Buy more credits</Link> : null}
+          {signedIn && creditCount <= 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href="/pricing" className="rounded-full bg-lime px-4 py-2 text-sm font-black text-black">Buy credits</Link>
+              <Link href="/dashboard/billing" className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">Billing</Link>
+            </div>
+          ) : null}
         </div>
         <label className="mt-5 grid gap-2 text-sm">
           <span className="text-white/70">Report type</span>
@@ -60,8 +74,20 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
             {sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}
           </select>
         </label>
-        <button onClick={generate} className="mt-5 w-full rounded-full bg-lime px-5 py-3 font-black text-black">{signedIn ? "Use 1 credit and generate" : "Sign in required"}</button>
-        {status ? <p className="mt-4 text-sm text-white/65">{status}</p> : null}
+        <button
+          onClick={generate}
+          disabled={!canGenerate}
+          className={`mt-5 w-full rounded-full px-5 py-3 font-black ${canGenerate ? "bg-lime text-black hover:bg-lime/90" : "cursor-not-allowed border border-white/10 bg-white/10 text-white/45"}`}
+        >
+          {!signedIn ? "Sign in required" : creditCount <= 0 ? "Buy credits to generate" : "Use 1 credit and generate"}
+        </button>
+        {status ? (
+          <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4">
+            <p className="text-sm text-white/70">{status}</p>
+            {!signedIn ? <Link href="/login" className="mt-3 inline-flex text-sm font-black text-lime">Go to sign in</Link> : null}
+            {signedIn && creditCount <= 0 ? <Link href="/pricing" className="mt-3 inline-flex text-sm font-black text-lime">View credit plans</Link> : null}
+          </div>
+        ) : null}
       </section>
       <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
         <h2 className="text-2xl font-black">Reports</h2>
