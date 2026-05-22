@@ -109,6 +109,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
       provider,
       model,
       reviewCount: reviewResult.reviews.length,
+      warning: reviewResult.warning ?? "",
       executiveSummary: insight.executiveSummary,
       topComplaints: insight.topComplaints.slice(0, 5),
       topCompliments: insight.topCompliments.slice(0, 5),
@@ -119,7 +120,8 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     data: {
       rows,
       insight,
-      source: reviewResult.source
+      source: reviewResult.source,
+      warning: reviewResult.warning ?? ""
     }
   }
 

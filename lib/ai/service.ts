@@ -12,7 +12,7 @@ const demoReviews = [
   "Marketing photos made it look bigger. Still a solid product, just expensive."
 ]
 
-export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews: string[]; source: "apify" | "pasted" | "demo" }> {
+export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews: string[]; source: "apify" | "pasted" | "demo"; warning?: string }> {
   if (input.pastedReviews?.trim()) {
     return {
       reviews: input.pastedReviews.split(/\n+/).map((line) => line.trim()).filter(Boolean).slice(0, 500),
@@ -43,13 +43,13 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
     }
 
     const items = await runResponse.json() as Array<Record<string, unknown>>
-    const reviews = items
-      .map((item) => String(item.reviewText || item.review_text || item.review || item.reviewTitle || item.text || item.content || item.body || item.comment || item.description || ""))
-      .map((text) => text.trim())
-      .filter(Boolean)
-      .slice(0, 500)
+    const reviews = extractReviewTexts(items).slice(0, 500)
 
-    return { reviews: reviews.length ? reviews : demoReviews, source: reviews.length ? "apify" : "demo" }
+    return {
+      reviews,
+      source: "apify",
+      warning: reviews.length ? undefined : `Apify ran successfully but returned no review text from ${items.length} dataset item(s). Try a product with visible reviews, paste reviews manually, or configure APIFY_INPUT_TEMPLATE for a review-specific actor output.`
+    }
   }
 
   throw new Error(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
@@ -139,6 +139,43 @@ async function apifyErrorDetail(response: Response, token: string) {
 
 function extractAmazonAsin(url: string) {
   return url.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase()
+}
+
+function extractReviewTexts(items: Array<Record<string, unknown>>) {
+  const texts = new Set<string>()
+  for (const item of items) collectReviewTexts(item, texts)
+  return [...texts]
+    .map((text) => text.replace(/\s+/g, " ").trim())
+    .filter((text) => text.length >= 20)
+}
+
+function collectReviewTexts(value: unknown, texts: Set<string>, key = "") {
+  if (typeof value === "string") {
+    const normalizedKey = key.toLowerCase()
+    const looksLikeReviewField = [
+      "reviewtext",
+      "review_text",
+      "review",
+      "comment",
+      "body",
+      "content",
+      "text",
+      "description"
+    ].some((field) => normalizedKey.includes(field))
+    if (looksLikeReviewField) texts.add(value)
+    return
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectReviewTexts(item, texts, key)
+    return
+  }
+
+  if (value && typeof value === "object") {
+    for (const [childKey, childValue] of Object.entries(value)) {
+      collectReviewTexts(childValue, texts, childKey)
+    }
+  }
 }
 
 async function apifyRunLogTail(runId: string, token: string) {

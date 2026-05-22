@@ -52,6 +52,12 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           <Metric label="Provider" value={String(report.summary?.provider ?? "Report engine")} />
           <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
         </div>
+        {report.summary?.warning ? (
+          <div className="mt-5 rounded-2xl border border-yellow-300/25 bg-yellow-300/10 p-5 text-yellow-50/82">
+            <p className="text-sm font-black uppercase text-yellow-300">Data source warning</p>
+            <p className="mt-2">{String(report.summary.warning)}</p>
+          </div>
+        ) : null}
         <div className="mt-5 rounded-2xl border border-lime/20 bg-lime/10 p-5">
           <p className="text-sm font-black uppercase text-lime">Executive summary</p>
           <p className="mt-3 text-lg text-white/82">{String(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
