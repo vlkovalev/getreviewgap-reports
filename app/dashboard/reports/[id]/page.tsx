@@ -35,13 +35,14 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const headers = Object.keys(rows[0] ?? {})
 
   return (
-    <DashboardShell title={report.title} description="Full report view with summary, tabular output, regeneration endpoint, and CSV/JSON export links.">
+    <DashboardShell title={report.title} description="Full report view with summary, tabular output, and CSV/JSON/PDF export links.">
       <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <StatusBadge status={report.status} />
           <div className="flex gap-2">
             <a href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full bg-white px-4 py-2 text-sm font-black text-black">Export CSV</a>
             <a href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">Export JSON</a>
+            <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">Export PDF</a>
           </div>
         </div>
         <pre className="mt-5 overflow-x-auto rounded-xl border border-white/10 bg-black/40 p-4 text-xs text-white/75">{JSON.stringify(report.summary, null, 2)}</pre>
