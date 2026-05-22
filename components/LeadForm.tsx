@@ -32,7 +32,7 @@ export function LeadForm({ source = "lead-magnet" }: { source?: string }) {
         Message, optional
         <textarea suppressHydrationWarning name="message" className="min-h-28 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
       </label>
-      <button className="btn-primary" type="submit">Send me the checklist</button>
+      <button className="btn-primary" type="submit">Send me the sample report</button>
       {status && <p className="text-sm text-white/70">{status}</p>}
     </form>
   )
