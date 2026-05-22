@@ -11,3 +11,5 @@ tsconfig.tsbuildinfo
 coverage/
 dist/
 build/
+
+.vercel
