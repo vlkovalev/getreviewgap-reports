@@ -1,4 +1,4 @@
-import { exportReportCsv, exportReportJson } from "@/lib/reports/report-engine"
+import { exportReportCsv, exportReportJson, exportReportPdf } from "@/lib/reports/report-engine"
 import { getStore } from "@/lib/scrapers/store"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
@@ -27,6 +27,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (format === "csv") {
     return new Response(exportReportCsv(report), {
       headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${report.reportType.toLowerCase()}-${report.id}.csv"` }
+    })
+  }
+  if (format === "pdf") {
+    return new Response(exportReportPdf(report), {
+      headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="${report.reportType.toLowerCase()}-${report.id}.pdf"` }
     })
   }
   return new Response(exportReportJson(report), {

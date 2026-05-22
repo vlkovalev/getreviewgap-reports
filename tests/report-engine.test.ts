@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { exportReportCsv, exportReportJson, generateReport, listReportTypes, reportRowsForExport } from "../lib/reports/report-engine"
+import { exportReportCsv, exportReportJson, exportReportPdf, generateReport, listReportTypes, reportRowsForExport } from "../lib/reports/report-engine"
 import type { ReportType } from "../lib/scrapers/types"
 
 async function main() {
@@ -25,6 +25,7 @@ async function main() {
     assert.ok(rows.length > 0, `${type} should export at least one row`)
     assert.ok(exportReportCsv(report).includes(",") || rows.length === 1, `${type} should produce CSV`)
     assert.equal(JSON.parse(exportReportJson(report)).reportType, type)
+    assert.ok(exportReportPdf(report).toString("utf8", 0, 8).startsWith("%PDF-1."), `${type} should produce PDF`)
   }
 
   const priceReport = await generateReport("PRICE_MONITORING")
@@ -39,7 +40,7 @@ async function main() {
   assert.ok(Number(executiveReport.summary?.totalProductsTracked) > 0)
   assert.ok(Array.isArray(executiveReport.summary?.keyAlerts))
 
-  console.log("Report engine tests passed for all report types and CSV/JSON exports.")
+  console.log("Report engine tests passed for all report types and CSV/JSON/PDF exports.")
 }
 
 main().catch((error) => {

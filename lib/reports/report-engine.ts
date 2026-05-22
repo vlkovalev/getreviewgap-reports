@@ -97,6 +97,96 @@ export function exportReportJson(report: IntelligenceReport) {
   return JSON.stringify(report, null, 2)
 }
 
+export function exportReportPdf(report: IntelligenceReport) {
+  const lines = buildPdfLines(report)
+  const objects: string[] = []
+  const pages: number[] = []
+  const chunks = chunk(lines, 34)
+
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>")
+  objects.push("<< /Type /Pages /Kids [] /Count 0 >>")
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+  chunks.forEach((pageLines) => {
+    const content = [
+      "BT",
+      "/F1 11 Tf",
+      "50 760 Td",
+      "14 TL",
+      ...pageLines.map((line, index) => `${index === 0 ? "" : "T* "}${pdfText(line)}`),
+      "ET"
+    ].join("\n")
+    const contentObjectNumber = objects.length + 1
+    objects.push(`<< /Length ${Buffer.byteLength(content, "utf8")} >>\nstream\n${content}\nendstream`)
+    const pageObjectNumber = objects.length + 1
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`)
+    pages.push(pageObjectNumber)
+  })
+
+  objects[1] = `<< /Type /Pages /Kids [${pages.map((page) => `${page} 0 R`).join(" ")}] /Count ${pages.length} >>`
+
+  const header = "%PDF-1.4\n"
+  let body = ""
+  const offsets = [0]
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(header + body, "utf8"))
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`
+  })
+  const xrefOffset = Buffer.byteLength(header + body, "utf8")
+  const xref = [
+    "xref",
+    `0 ${objects.length + 1}`,
+    "0000000000 65535 f ",
+    ...offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `),
+    "trailer",
+    `<< /Size ${objects.length + 1} /Root 1 0 R >>`,
+    "startxref",
+    String(xrefOffset),
+    "%%EOF"
+  ].join("\n")
+
+  return Buffer.from(header + body + xref, "utf8")
+}
+
+function buildPdfLines(report: IntelligenceReport) {
+  const rows = reportRowsForExport(report).slice(0, 20)
+  const summaryEntries = Object.entries(report.summary ?? {}).slice(0, 12)
+  return [
+    "ReviewIntel Reports",
+    report.title,
+    `Type: ${report.reportType}`,
+    `Status: ${report.status}`,
+    `Generated: ${report.generatedAt ?? report.createdAt}`,
+    "",
+    "Summary",
+    ...summaryEntries.map(([key, value]) => `${key}: ${stringifyPdfValue(value)}`),
+    "",
+    "Report rows",
+    ...rows.flatMap((row, index) => [
+      `${index + 1}. ${stringifyPdfValue(row.productName ?? row.title ?? row.source ?? "Report row")}`,
+      ...Object.entries(row).slice(0, 6).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
+    ])
+  ].map((line) => line.slice(0, 100))
+}
+
+function stringifyPdfValue(value: unknown): string {
+  if (value === null || value === undefined) return "-"
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value)
+  if (Array.isArray(value)) return value.map((item) => stringifyPdfValue(item)).join("; ").slice(0, 160)
+  return JSON.stringify(value).slice(0, 160)
+}
+
+function pdfText(text: string) {
+  const escaped = text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "")
+  return `(${escaped}) Tj`
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size))
+  return chunks.length ? chunks : [[]]
+}
+
 function getFilteredProducts(filters: ReportFilters): ProductWithSource[] {
   const store = getStore()
   const from = filters.dateFrom ? new Date(filters.dateFrom).getTime() : Number.NEGATIVE_INFINITY
