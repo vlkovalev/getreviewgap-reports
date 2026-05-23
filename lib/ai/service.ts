@@ -82,9 +82,9 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   let pagesFetched = 0
   let availableReviewCount: number | undefined
   let productName: string | undefined
-  let hasNextPage = true
+  let previousPageAddedReviews = true
 
-  while (pagesFetched < maxPages && hasNextPage) {
+  while (pagesFetched < maxPages && previousPageAddedReviews) {
     const params = new URLSearchParams({
       asin,
       domain: amazonMarketplaceCode(input.productUrl),
@@ -114,7 +114,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     const previousCount = reviews.size
     for (const text of usableReviews) reviews.add(text)
     pagesFetched += 1
-    hasNextPage = pageInfo ? Boolean(pageInfo.hasNextPage) : usableReviews.length > 0 && reviews.size > previousCount
+    previousPageAddedReviews = usableReviews.length > 0 && reviews.size > previousCount
   }
 
   const collectedReviews = [...reviews].slice(0, 500)

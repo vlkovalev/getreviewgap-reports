@@ -15,14 +15,16 @@ async function main() {
     pagesRequested.push(page)
     const bodies = page === 1
       ? ["First useful review body about battery performance.", "Duplicate review body about product size."]
-      : ["Duplicate review body about product size.", "Second page review body about attachment safety."]
+      : page === 2
+        ? ["Duplicate review body about product size.", "Second page review body about attachment safety."]
+        : []
     return new Response(JSON.stringify({
       data: {
         amazonProduct: {
           title: "Cordless Massage Gun",
           reviewsPaginated: {
             reviews: bodies.map((body) => ({ body })),
-            pageInfo: { currentPage: page, totalPages: 2, totalResults: 42, hasNextPage: page === 1 }
+            pageInfo: { currentPage: page, totalPages: 3, totalResults: 42, hasNextPage: false }
           }
         }
       }
@@ -36,10 +38,10 @@ async function main() {
       marketplace: "amazon.ca"
     })
 
-    assert.deepEqual(pagesRequested, [1, 2])
+    assert.deepEqual(pagesRequested, [1, 2, 3])
     assert.equal(result.source, "canopy")
     assert.equal(result.productName, "Cordless Massage Gun")
-    assert.equal(result.pagesFetched, 2)
+    assert.equal(result.pagesFetched, 3)
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.reviews.length, 3)
     assert.match(result.sampleNote ?? "", /3 of 42 available reviews/)
