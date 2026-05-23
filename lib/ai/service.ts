@@ -33,7 +33,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
   }
 
   if (input.platform === "shopify") {
-    throw new Error("Shopify reports need pasted or exported customer reviews for now. Paste review text from your store or approved review app export to generate a report.")
+    throw new Error("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
   }
 
   const canopyKey = cleanEnv(process.env.CANOPY_API_KEY)

@@ -90,6 +90,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     productName: initialProductName,
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
+    reviewApp: filters.reviewApp,
     platform,
     marketplace,
     reviewPageLimit: filters.reviewPageLimit
@@ -103,6 +104,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     productName,
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
+    reviewApp: filters.reviewApp,
     platform,
     marketplace,
     reviewPageLimit: filters.reviewPageLimit
@@ -127,6 +129,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
       marketplace,
       asin: reviewResult.asin ?? "",
       competitorName: filters.competitorName ?? "",
+      reviewApp: filters.reviewApp ?? "",
       source: reviewResult.source,
       provider,
       model,
@@ -247,7 +250,7 @@ export function exportReportPdf(report: IntelligenceReport) {
         y -= 18
         return
       }
-      const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Depth|Written reviews analyzed|Confidence):/.test(line)
+      const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Confidence):/.test(line)
       const isIndented = line.startsWith("   ")
       contentLines.push(pdfDraw(line, isMeta ? 46 : isIndented ? 62 : 52, y, 9.5, isMeta ? "F2" : "F1", isMeta ? "0.18 0.23 0.27" : "0.26 0.29 0.32"))
       y -= line ? 13 : 7
@@ -312,6 +315,7 @@ function buildPdfLines(report: IntelligenceReport) {
     `Status: ${report.status}`,
     `Generated: ${report.generatedAt ?? report.createdAt}`,
     `Source: ${stringifyPdfValue(summary.source ?? summary.sourceFilter ?? "-")}`,
+    ...(summary.reviewApp ? [`Review app: ${stringifyPdfValue(formatReviewApp(summary.reviewApp))}`] : []),
     `Depth: ${stringifyPdfValue(summary.reviewDepth ?? "Default")}`,
     `Written reviews analyzed: ${reviewCount}`,
     `Confidence: ${pdfConfidence(reviewCount).label}`,
@@ -360,6 +364,21 @@ function stringifyPdfValue(value: unknown): string {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value)
   if (Array.isArray(value)) return value.map((item) => stringifyPdfValue(item)).join("; ").slice(0, 160)
   return JSON.stringify(value).slice(0, 160)
+}
+
+function formatReviewApp(value: unknown) {
+  const app = String(value ?? "").trim()
+  if (!app) return "Import"
+  const labels: Record<string, string> = {
+    judgeme: "Judge.me",
+    loox: "Loox",
+    yotpo: "Yotpo",
+    okendo: "Okendo",
+    stamped: "Stamped",
+    "shopify-product-reviews": "Shopify Reviews",
+    other: "Other"
+  }
+  return labels[app] ?? app
 }
 
 function pdfConfidence(reviewCount: number) {
@@ -429,7 +448,7 @@ function splitPdfLine(value: string) {
   if (!value) return [""]
   if (isPdfSectionHeading(value)) return [value]
   const indent = value.match(/^\s*/)?.[0] ?? ""
-  const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Depth|Written reviews analyzed|Confidence|Sample):/.test(value)
+  const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Confidence|Sample):/.test(value)
   const width = isMeta ? 86 : indent.length ? 80 : 84
   const continuationIndent = indent || (isMeta ? "  " : "   ")
   const words = value.replace(/\s+/g, " ").trim().split(" ")

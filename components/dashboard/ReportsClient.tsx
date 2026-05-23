@@ -17,6 +17,16 @@ const reviewDepths = [
   { value: 50, label: "Deep", caption: "50 pages", helper: "Maximum coverage for serious research." }
 ] as const
 
+const shopifyReviewApps = [
+  { value: "judgeme", label: "Judge.me", helper: "Export reviews from Judge.me as CSV, then upload or paste them here." },
+  { value: "loox", label: "Loox", helper: "Use a Loox review export or copied review text from your approved source." },
+  { value: "yotpo", label: "Yotpo", helper: "Import a Yotpo CSV export or paste authorized review text." },
+  { value: "okendo", label: "Okendo", helper: "Use an Okendo export with review body, rating, and product fields." },
+  { value: "stamped", label: "Stamped", helper: "Upload a Stamped CSV/TXT export or paste review rows." },
+  { value: "shopify-product-reviews", label: "Shopify Product Reviews", helper: "Use the review export from Shopify's legacy review app." },
+  { value: "other", label: "Other / custom", helper: "Any CSV or TXT file works if it includes customer review text." }
+] as const
+
 export function ReportsClient({
   initialReports,
   sources,
@@ -39,6 +49,7 @@ export function ReportsClient({
   const [reportType, setReportType] = useState<ReportType>("REVIEW_RATING")
   const [platform, setPlatform] = useState<"amazon" | "shopify">(initialPlatform)
   const [reviewPageLimit, setReviewPageLimit] = useState<5 | 10 | 50>(10)
+  const [reviewApp, setReviewApp] = useState<typeof shopifyReviewApps[number]["value"]>("judgeme")
   const [sourceId, setSourceId] = useState("")
   const [productUrl, setProductUrl] = useState(initialProductUrl)
   const [productName, setProductName] = useState(initialProductName)
@@ -75,7 +86,7 @@ export function ReportsClient({
       return
     }
     if (platform === "shopify" && !pastedReviews.trim()) {
-      setStatus("Paste Shopify review text or an approved review-app export before generating. Automated Shopify review collection is not connected yet.")
+      setStatus("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
       return
     }
     setStatus("Generating report...")
@@ -90,6 +101,7 @@ export function ReportsClient({
         productName: productName || undefined,
         competitorName: competitorName || undefined,
         pastedReviews: pastedReviews || undefined,
+        reviewApp: platform === "shopify" ? reviewApp : undefined,
         reviewPageLimit
       })
     })
@@ -107,6 +119,7 @@ export function ReportsClient({
       source: payload.report?.summary?.source ?? "stored",
       hasProductUrl: Boolean(productUrl),
       hasPastedReviews: Boolean(pastedReviews),
+      reviewApp: platform === "shopify" ? reviewApp : undefined,
       reviewPageLimit
     })
   }
@@ -187,8 +200,24 @@ export function ReportsClient({
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">{platform === "amazon" ? "Amazon product URL, optional" : "Shopify product URL, optional"}</span>
           <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-          <span className="text-xs text-white/45">{platform === "amazon" ? "Automatic Amazon collection uses the configured structured API; import a review export when a marketplace limits access." : "For Shopify, import or paste reviews exported from your store or review app. A direct connector can be added once your provider is selected."}</span>
+          <span className="text-xs text-white/45">{platform === "amazon" ? "Automatic Amazon collection uses the configured structured API; import a review export when a marketplace limits access." : "Optional. The report can use this for context, but Shopify analysis comes from the review export you upload or paste below."}</span>
         </label>
+        {platform === "shopify" ? (
+          <div className="mt-4 rounded-2xl border border-cyan/20 bg-cyan/10 p-4">
+            <label className="grid gap-2 text-sm">
+              <span className="font-black uppercase text-cyan">Review app / export source</span>
+              <select value={reviewApp} onChange={(event) => setReviewApp(event.target.value as typeof shopifyReviewApps[number]["value"])} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white">
+                {shopifyReviewApps.map((app) => <option key={app.value} value={app.value}>{app.label}</option>)}
+              </select>
+            </label>
+            <p className="mt-3 text-sm text-white/70">{shopifyReviewApps.find((app) => app.value === reviewApp)?.helper}</p>
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-white/58">
+              <p className="font-bold text-white/78">Recommended export columns</p>
+              <p className="mt-2 font-mono">review_text, rating, review_title, product_name, review_date</p>
+              <p className="mt-2">Direct Shopify review collection is planned app-by-app. For now, imports are safer and more reliable because every Shopify store uses a different review provider.</p>
+            </div>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="grid gap-2 text-sm">
             <span className="text-white/70">Product name, optional</span>
@@ -200,13 +229,13 @@ export function ReportsClient({
           </label>
         </div>
         <label className="mt-4 grid gap-2 text-sm">
-          <span className="text-white/70">Paste reviews{platform === "shopify" ? " (required for Shopify now)" : ", optional"}</span>
-          <textarea value={pastedReviews} onChange={(event) => setPastedReviews(event.target.value)} rows={5} placeholder={platform === "shopify" ? "Paste Shopify review export text, one review per line." : "Paste one review per line, or let Amazon collection fetch available reviews."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          <span className="text-white/70">{platform === "shopify" ? "Shopify review text or CSV rows" : "Paste reviews, optional"}</span>
+          <textarea value={pastedReviews} onChange={(event) => setPastedReviews(event.target.value)} rows={5} placeholder={platform === "shopify" ? "Paste exported review rows here. Example: Great quality and fast shipping, 5 stars, Glow Serum" : "Paste one review per line, or let Amazon collection fetch available reviews."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
           <div className="rounded-xl border border-dashed border-white/15 bg-black/25 p-4">
             <label className="flex cursor-pointer flex-wrap items-center justify-between gap-3">
               <span>
-                <span className="block font-bold text-white/75">Import review file</span>
-                <span className="mt-1 block text-xs text-white/45">CSV or TXT export, up to 30,000 characters</span>
+                <span className="block font-bold text-white/75">{platform === "shopify" ? "Upload Shopify review export" : "Import review file"}</span>
+                <span className="mt-1 block text-xs text-white/45">CSV or TXT, up to 30,000 characters. Keep customer private data out of the file.</span>
               </span>
               <span className="rounded-full border border-white/15 px-4 py-2 text-xs font-black">Choose file</span>
               <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={importReviews} className="sr-only" />

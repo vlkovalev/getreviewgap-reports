@@ -9,6 +9,7 @@ export function reviewInsightPrompt(input: ReviewInput, reviews: string[]) {
       productName: input.productName || "Unknown product",
       competitorName: input.competitorName || "Unknown competitor",
       marketplace: input.marketplace || "amazon.com",
+      reviewApp: input.reviewApp || "not specified",
       reviews
     },
     outputSchema: {

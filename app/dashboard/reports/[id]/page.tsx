@@ -97,7 +97,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             <Metric label="Written reviews" value={String(reviewCount)} />
             <Metric label="Depth" value={String(report.summary?.reviewDepth ?? "Default")} />
             <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
-            <Metric label="Source" value={String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
+            <Metric label={platform === "shopify" ? "Review app" : "Source"} value={platform === "shopify" ? formatReviewApp(report.summary?.reviewApp) : String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
             <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
             <Metric label="Sample pages" value={String(report.summary?.pagesFetched ?? "-")} />
             <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
@@ -358,6 +358,21 @@ function displayUrl(value: string) {
   } catch {
     return value.slice(0, 100)
   }
+}
+
+function formatReviewApp(value: unknown) {
+  const app = String(value ?? "").trim()
+  if (!app) return "Import"
+  const labels: Record<string, string> = {
+    judgeme: "Judge.me",
+    loox: "Loox",
+    yotpo: "Yotpo",
+    okendo: "Okendo",
+    stamped: "Stamped",
+    "shopify-product-reviews": "Shopify Reviews",
+    other: "Other"
+  }
+  return labels[app] ?? app
 }
 
 function createFreshReportHref(report: IntelligenceReport, productUrl: string) {

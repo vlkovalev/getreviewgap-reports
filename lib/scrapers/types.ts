@@ -115,6 +115,7 @@ export type ReportFilters = {
   productName?: string
   competitorName?: string
   pastedReviews?: string
+  reviewApp?: string
   reviewPageLimit?: number
 }
 

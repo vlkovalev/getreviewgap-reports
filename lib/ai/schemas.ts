@@ -8,6 +8,7 @@ export const reviewInputSchema = z.object({
   competitorName: z.string().trim().max(160).optional().or(z.literal("")),
   marketplace: z.string().trim().max(80).optional().default("amazon.com"),
   pastedReviews: z.string().trim().max(30000).optional().or(z.literal("")),
+  reviewApp: z.string().trim().max(80).optional().or(z.literal("")),
   reviewPageLimit: z.number().int().min(1).max(50).optional(),
   website: z.string().optional()
 })
