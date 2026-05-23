@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs"
-import { getDb, hasRealDatabaseUrl } from "@/lib/db"
+import { getDb, hasRealDatabaseUrl, withDbRetry } from "@/lib/db"
 
 export type Customer = {
   id: string
@@ -68,7 +68,7 @@ function toCustomer(record: { id: string; email: string; credits: number; create
 
 export async function findCustomerByEmail(email: string) {
   if (hasRealDatabaseUrl()) {
-    const customer = await getDb().customerAccount.findUnique({ where: { email: email.toLowerCase() } })
+    const customer = await withDbRetry(() => getDb().customerAccount.findUnique({ where: { email: email.toLowerCase() } }))
     return customer ? toCustomer(customer) : null
   }
   return memoryCustomers().find((customer) => customer.email.toLowerCase() === email.toLowerCase()) ?? null
@@ -76,7 +76,7 @@ export async function findCustomerByEmail(email: string) {
 
 export async function validateCustomerPassword(email: string, password: string) {
   if (hasRealDatabaseUrl()) {
-    const customer = await getDb().customerAccount.findUnique({ where: { email: email.toLowerCase() } })
+    const customer = await withDbRetry(() => getDb().customerAccount.findUnique({ where: { email: email.toLowerCase() } }))
     if (!customer) return null
     const valid = await bcrypt.compare(password, customer.passwordHash)
     return valid ? toCustomer(customer) : null
@@ -88,7 +88,7 @@ export async function validateCustomerPassword(email: string, password: string) 
 export async function findCustomerById(id: string | undefined) {
   if (!id) return null
   if (hasRealDatabaseUrl()) {
-    const customer = await getDb().customerAccount.findUnique({ where: { id } })
+    const customer = await withDbRetry(() => getDb().customerAccount.findUnique({ where: { id } }))
     return customer ? toCustomer(customer) : null
   }
   return memoryCustomers().find((customer) => customer.id === id) ?? null
@@ -101,7 +101,7 @@ export async function createCustomer(email: string, password: string) {
 
   if (hasRealDatabaseUrl()) {
     const passwordHash = await bcrypt.hash(password, 10)
-    const customer = await getDb().customerAccount.create({
+    const customer = await withDbRetry(() => getDb().customerAccount.create({
       data: {
         email: normalizedEmail,
         passwordHash,
@@ -113,7 +113,7 @@ export async function createCustomer(email: string, password: string) {
           }
         }
       }
-    })
+    }))
     return toCustomer(customer)
   }
 
@@ -138,12 +138,12 @@ export async function createCustomer(email: string, password: string) {
 export async function consumeCredit(customerId: string, referenceId?: string) {
   if (hasRealDatabaseUrl()) {
     const db = getDb()
-    const customer = await db.customerAccount.findUnique({ where: { id: customerId } })
+    const customer = await withDbRetry(() => db.customerAccount.findUnique({ where: { id: customerId } }))
     if (!customer || customer.credits <= 0) return false
-    await db.$transaction([
+    await withDbRetry(() => db.$transaction([
       db.customerAccount.update({ where: { id: customerId }, data: { credits: { decrement: 1 } } }),
       db.creditTransaction.create({ data: { customerId, amount: -1, reason: "report_generation", referenceId } })
-    ])
+    ]))
     return true
   }
 
@@ -164,7 +164,7 @@ export async function consumeCredit(customerId: string, referenceId?: string) {
 export async function addCredits(customerId: string, credits: number, reason = "purchase", referenceId?: string) {
   if (hasRealDatabaseUrl()) {
     const db = getDb()
-    const customer = await db.customerAccount.update({
+    const customer = await withDbRetry(() => db.customerAccount.update({
       where: { id: customerId },
       data: {
         credits: { increment: credits },
@@ -176,7 +176,7 @@ export async function addCredits(customerId: string, credits: number, reason = "
           }
         }
       }
-    })
+    }))
     return toCustomer(customer)
   }
 
@@ -199,7 +199,7 @@ export async function addCreditsOnce(customerId: string, credits: number, reason
 
   if (hasRealDatabaseUrl()) {
     const db = getDb()
-    const existing = await db.creditTransaction.findFirst({ where: { customerId, reason, referenceId } })
+    const existing = await withDbRetry(() => db.creditTransaction.findFirst({ where: { customerId, reason, referenceId } }))
     if (existing) return findCustomerById(customerId)
     return addCredits(customerId, credits, reason, referenceId)
   }
@@ -211,11 +211,11 @@ export async function addCreditsOnce(customerId: string, credits: number, reason
 
 export async function getCustomerCreditLedger(customerId: string, limit = 10): Promise<CreditLedgerItem[]> {
   if (hasRealDatabaseUrl()) {
-    const rows = await getDb().creditTransaction.findMany({
+    const rows = await withDbRetry(() => getDb().creditTransaction.findMany({
       where: { customerId },
       orderBy: { createdAt: "desc" },
       take: limit
-    })
+    }))
     return rows.map((row) => ({
       id: row.id,
       amount: row.amount,
@@ -234,11 +234,11 @@ export async function getCustomerCreditLedger(customerId: string, limit = 10): P
 
 export async function getCustomerPurchases(customerId: string, limit = 8): Promise<PurchaseHistoryItem[]> {
   if (hasRealDatabaseUrl()) {
-    const rows = await getDb().customerPurchase.findMany({
+    const rows = await withDbRetry(() => getDb().customerPurchase.findMany({
       where: { customerId },
       orderBy: { createdAt: "desc" },
       take: limit
-    })
+    }))
     return rows.map((row) => ({
       id: row.id,
       provider: row.provider,

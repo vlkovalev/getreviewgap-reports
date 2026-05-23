@@ -4,7 +4,7 @@ import { generateReport, listReportTypes } from "@/lib/reports/report-engine"
 import { getStore } from "@/lib/scrapers/store"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { addCredits, consumeCredit } from "@/lib/customer-store"
-import { getDb, hasRealDatabaseUrl } from "@/lib/db"
+import { getDb, hasRealDatabaseUrl, isDatabaseConnectionError } from "@/lib/db"
 
 const createReportSchema = z.object({
   reportType: z.enum(["PRICE_MONITORING", "AVAILABILITY", "COMPETITOR_ASSORTMENT", "DISCOUNT_PROMOTION", "REVIEW_RATING", "DATA_QUALITY", "EXECUTIVE_SUMMARY"]),
@@ -48,6 +48,13 @@ export async function POST(request: Request) {
   } catch (error) {
     if (consumedCustomerId) await addCredits(consumedCustomerId, 1, "report_generation_refund").catch(() => null)
     console.error("Report generation failed", error)
-    return NextResponse.json({ error: "Could not generate report", details: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
+    return NextResponse.json({ error: "Could not generate report", details: publicErrorDetails(error) }, { status: 500 })
   }
+}
+
+function publicErrorDetails(error: unknown) {
+  if (isDatabaseConnectionError(error)) {
+    return "The database is temporarily unavailable. Please retry in a minute. If the report did not start, your credit was not used."
+  }
+  return error instanceof Error ? error.message : "Unknown error"
 }
