@@ -81,6 +81,7 @@ APIFY_AMAZON_REVIEWS_ACTOR_ID=junipr/amazon-reviews-scraper
 ```
 
 ReviewGap extracts the ASIN from the product URL and automatically selects the matching marketplace for Amazon US, Canada, UK, Germany, France, Italy, Spain, Australia, Japan, India, Brazil, and Mexico. No Canada-only setting is required.
+When this Junipr actor id is selected, its native ASIN-based request is used automatically even if an older `APIFY_INPUT_TEMPLATE` is still configured.
 
 If you later select a different actor that does not accept the built-in input formats, add an input template like this:
 

@@ -56,15 +56,6 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
 }
 
 function buildApifyInputs(input: ReviewInput, actorId: string) {
-  if (process.env.APIFY_INPUT_TEMPLATE) {
-    try {
-      const template = JSON.parse(process.env.APIFY_INPUT_TEMPLATE) as Record<string, unknown>
-      return [replaceTemplateValues(template, input.productUrl)]
-    } catch {
-      return [{ productUrl: input.productUrl, maxItems: 500 }]
-    }
-  }
-
   const asin = extractAmazonAsin(input.productUrl)
   if (actorId.toLowerCase().includes("junipr/amazon-reviews-scraper") && asin) {
     return [{
@@ -76,6 +67,15 @@ function buildApifyInputs(input: ReviewInput, actorId: string) {
       includeImages: false,
       includeProductInfo: true
     }]
+  }
+
+  if (process.env.APIFY_INPUT_TEMPLATE) {
+    try {
+      const template = JSON.parse(process.env.APIFY_INPUT_TEMPLATE) as Record<string, unknown>
+      return [replaceTemplateValues(template, input.productUrl)]
+    } catch {
+      return [{ productUrl: input.productUrl, maxItems: 500 }]
+    }
   }
 
   const common = { maxItems: 500, maxReviews: 500, reviewsCount: 500, proxyConfiguration: { useApifyProxy: true } }
