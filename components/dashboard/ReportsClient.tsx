@@ -11,14 +11,30 @@ const reportTypes: Array<{ value: ReportType; label: string }> = [
   { value: "DATA_QUALITY", label: "Review Data Quality" }
 ]
 
-export function ReportsClient({ initialReports, sources, credits, signedIn }: { initialReports: IntelligenceReport[]; sources: ScraperSource[]; credits: number; signedIn: boolean }) {
+export function ReportsClient({
+  initialReports,
+  sources,
+  credits,
+  signedIn,
+  initialProductUrl = "",
+  initialProductName = "",
+  initialPlatform = "amazon"
+}: {
+  initialReports: IntelligenceReport[]
+  sources: ScraperSource[]
+  credits: number
+  signedIn: boolean
+  initialProductUrl?: string
+  initialProductName?: string
+  initialPlatform?: "amazon" | "shopify"
+}) {
   const [reports, setReports] = useState(initialReports)
   const [creditCount, setCreditCount] = useState(credits)
   const [reportType, setReportType] = useState<ReportType>("REVIEW_RATING")
-  const [platform, setPlatform] = useState<"amazon" | "shopify">("amazon")
+  const [platform, setPlatform] = useState<"amazon" | "shopify">(initialPlatform)
   const [sourceId, setSourceId] = useState("")
-  const [productUrl, setProductUrl] = useState("")
-  const [productName, setProductName] = useState("")
+  const [productUrl, setProductUrl] = useState(initialProductUrl)
+  const [productName, setProductName] = useState(initialProductName)
   const [competitorName, setCompetitorName] = useState("")
   const [pastedReviews, setPastedReviews] = useState("")
   const [importedFileName, setImportedFileName] = useState("")
@@ -90,6 +106,11 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
         <p className="mt-3 text-sm text-white/60">
           Generate buyer-sentiment intelligence from Amazon reviews or Shopify/DTC review exports. Price, contact-data, and broad marketplace scraping are intentionally not offered as paid services.
         </p>
+        {initialProductUrl ? (
+          <p className="mt-4 rounded-xl border border-lime/25 bg-lime/10 p-4 text-sm text-white/76">
+            Product loaded from a saved report. Click generate below to create a new analysis with the current connector.
+          </p>
+        ) : null}
         <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
           <p className="text-sm text-white/60">Report credits</p>
           <p className="mt-1 text-3xl font-black text-lime">{signedIn ? creditCount : "Sign in"}</p>
@@ -176,8 +197,12 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
                 <div>
                   <p className="font-bold">{report.title}</p>
                   <p className="text-xs text-white/50">{report.status} - {report.generatedAt}</p>
+                  {isEmptyReport(report) ? <p className="mt-2 text-xs font-bold text-yellow-300">Saved empty report - it does not update automatically.</p> : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {isEmptyReport(report) && productHref(report) ? (
+                    <Link href={productHref(report)!} className="rounded-full bg-lime px-3 py-2 text-xs font-black text-black">Run fresh analysis</Link>
+                  ) : null}
                   <Link href={`/dashboard/reports/${report.id}`} className="rounded-full bg-white px-3 py-2 text-xs font-black text-black">View</Link>
                   <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "csv" })} href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">CSV</a>
                   <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "json" })} href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">JSON</a>
@@ -190,4 +215,19 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
       </section>
     </div>
   )
+}
+
+function isEmptyReport(report: IntelligenceReport) {
+  return Number(report.summary?.reviewCount ?? 0) === 0
+}
+
+function productHref(report: IntelligenceReport) {
+  const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
+  if (!productUrl) return null
+  const params = new URLSearchParams({
+    productUrl,
+    productName: String(report.summary?.productName ?? report.filters?.productName ?? ""),
+    platform: String(report.summary?.platform ?? report.filters?.platform ?? "amazon")
+  })
+  return `/dashboard/reports?${params.toString()}`
 }

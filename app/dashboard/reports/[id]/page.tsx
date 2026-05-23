@@ -9,8 +9,15 @@ import type { IntelligenceReport, ReportFilters, ReportType } from "@/lib/scrape
 export default async function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const customer = await getCurrentCustomer()
+  if (!customer) {
+    return (
+      <DashboardShell title="Sign in to view this report" description="Saved reports and downloads are private to your account.">
+        <Link href="/login" className="rounded-full bg-lime px-5 py-3 font-black text-black">Sign in</Link>
+      </DashboardShell>
+    )
+  }
   const report = hasRealDatabaseUrl()
-    ? await getDb().intelligenceReport.findFirst({ where: { id, ...(customer ? { customerId: customer.id } : {}) } }).then((item) => item ? ({
+    ? await getDb().intelligenceReport.findFirst({ where: { id, customerId: customer.id } }).then((item) => item ? ({
       id: item.id,
       customerId: item.customerId ?? undefined,
       reportType: item.reportType as ReportType,
@@ -23,7 +30,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString()
     } satisfies IntelligenceReport) : null)
-    : getStore().reports.find((item) => item.id === id && (!customer || !item.customerId || item.customerId === customer.id))
+    : getStore().reports.find((item) => item.id === id && item.customerId === customer.id)
 
   if (!report) {
     return (
@@ -38,6 +45,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const insight = report.data?.insight as ReviewInsightLike | undefined
   const reviewCount = Number(report.summary?.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
   const dataScore = scoreDataQuality(report.summary ?? {}, insight)
+  const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
+  const shouldRerun = reviewCount === 0 && Boolean(productUrl)
+  const freshReportHref = productUrl ? createFreshReportHref(report, productUrl) : ""
   const platform = report.summary?.platform
     ? String(report.summary.platform)
     : report.summary?.marketplace
@@ -46,6 +56,15 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
 
   return (
     <DashboardShell title={cleanReportTitle(report.title)} description="Executive review intelligence brief with actions, proof points, and export-ready appendix.">
+      {shouldRerun ? (
+        <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-yellow-300/25 bg-yellow-300/10 p-5">
+          <div>
+            <p className="text-sm font-black uppercase text-yellow-300">Saved empty report</p>
+            <p className="mt-2 max-w-2xl text-white/76">This report is a historical export and will not update when the review connector changes. Run a new analysis to test current live collection.</p>
+          </div>
+          <Link href={freshReportHref} className="rounded-full bg-lime px-5 py-3 font-black text-black">Run fresh analysis</Link>
+        </section>
+      ) : null}
       <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
         <div className="border-b border-white/10 bg-gradient-to-br from-lime/20 via-white/[0.04] to-cyan/10 p-6 md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-5">
@@ -320,4 +339,13 @@ function displayUrl(value: string) {
   } catch {
     return value.slice(0, 100)
   }
+}
+
+function createFreshReportHref(report: IntelligenceReport, productUrl: string) {
+  const params = new URLSearchParams({
+    productUrl,
+    productName: String(report.summary?.productName ?? report.filters?.productName ?? ""),
+    platform: String(report.summary?.platform ?? report.filters?.platform ?? "amazon")
+  })
+  return `/dashboard/reports?${params.toString()}`
 }

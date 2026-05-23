@@ -7,8 +7,9 @@ import type { IntelligenceReport, ReportFilters, ReportType } from "@/lib/scrape
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
   const customer = await getCurrentCustomer()
+  if (!customer) return Response.json({ error: "Sign in to download saved reports." }, { status: 401 })
   const report = hasRealDatabaseUrl()
-    ? await getDb().intelligenceReport.findFirst({ where: { id, ...(customer ? { customerId: customer.id } : {}) } }).then((item) => item ? ({
+    ? await getDb().intelligenceReport.findFirst({ where: { id, customerId: customer.id } }).then((item) => item ? ({
       id: item.id,
       customerId: item.customerId ?? undefined,
       reportType: item.reportType as ReportType,
@@ -21,7 +22,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString()
     } satisfies IntelligenceReport) : null)
-    : getStore().reports.find((item) => item.id === id && (!customer || !item.customerId || item.customerId === customer.id))
+    : getStore().reports.find((item) => item.id === id && item.customerId === customer.id)
   if (!report) return Response.json({ error: "Report not found" }, { status: 404 })
   const format = new URL(request.url).searchParams.get("format") ?? "json"
   if (format === "csv") {

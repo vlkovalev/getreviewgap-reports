@@ -20,14 +20,15 @@ const createReportSchema = z.object({
 
 export async function GET() {
   const customer = await getCurrentCustomer()
+  if (!customer) return NextResponse.json({ reports: [], reportTypes: listReportTypes(), customer: null })
   if (hasRealDatabaseUrl()) {
     const reports = await getDb().intelligenceReport.findMany({
-      where: customer ? { customerId: customer.id } : {},
+      where: { customerId: customer.id },
       orderBy: { createdAt: "desc" }
     })
     return NextResponse.json({ reports, reportTypes: listReportTypes(), customer })
   }
-  const reports = getStore().reports.filter((report) => !customer || !report.customerId || report.customerId === customer.id)
+  const reports = getStore().reports.filter((report) => report.customerId === customer.id)
   return NextResponse.json({ reports, reportTypes: listReportTypes(), customer })
 }
 
