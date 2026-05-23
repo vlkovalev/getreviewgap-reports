@@ -224,7 +224,7 @@ export function exportReportPdf(report: IntelligenceReport) {
   const lines = buildPdfLines(report)
   const objects: string[] = []
   const pages: number[] = []
-  const chunks = chunk(lines, 30)
+  const chunks = chunk(lines, 34)
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>")
   objects.push("<< /Type /Pages /Kids [] /Count 0 >>")
@@ -232,7 +232,7 @@ export function exportReportPdf(report: IntelligenceReport) {
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
 
   chunks.forEach((pageLines, pageIndex) => {
-    let y = 698
+    let y = 688
     const contentLines = [
       "q 0.06 0.07 0.09 rg 0 720 612 72 re f Q",
       "q 0.78 1 0.24 rg 0 716 612 4 re f Q",
@@ -242,14 +242,15 @@ export function exportReportPdf(report: IntelligenceReport) {
     ]
     pageLines.forEach((line) => {
       if (isPdfSectionHeading(line)) {
-        y -= 10
+        y -= 6
         contentLines.push(pdfDraw(line.toUpperCase(), 46, y, 11, "F2", "0.30 0.77 0.82"))
-        y -= 20
+        y -= 18
         return
       }
       const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Depth|Written reviews analyzed|Confidence):/.test(line)
-      contentLines.push(pdfDraw(line, isMeta ? 46 : 52, y, isMeta ? 10 : 10, isMeta ? "F2" : "F1", isMeta ? "0.18 0.23 0.27" : "0.26 0.29 0.32"))
-      y -= line ? 15 : 8
+      const isIndented = line.startsWith("   ")
+      contentLines.push(pdfDraw(line, isMeta ? 46 : isIndented ? 62 : 52, y, 9.5, isMeta ? "F2" : "F1", isMeta ? "0.18 0.23 0.27" : "0.26 0.29 0.32"))
+      y -= line ? 13 : 7
     })
     contentLines.push(
       "q 0.90 0.92 0.93 RG 46 43 m 566 43 l S Q",
@@ -351,7 +352,7 @@ function buildPdfLines(report: IntelligenceReport) {
       `${index + 1}. ${stringifyPdfValue(row.theme ?? row.productName ?? row.title ?? row.source ?? "Report row")}`,
       ...Object.entries(row).filter(([, value]) => value !== "" && value !== null && value !== undefined).slice(0, 5).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
     ])
-  ].flatMap((line) => splitPdfLine(String(line))).map((line) => line.slice(0, 100))
+  ].flatMap((line) => splitPdfLine(String(line)))
 }
 
 function stringifyPdfValue(value: unknown): string {
@@ -425,9 +426,29 @@ function wrapPdfLine(value: string) {
 }
 
 function splitPdfLine(value: string) {
+  if (!value) return [""]
+  if (isPdfSectionHeading(value)) return [value]
+  const indent = value.match(/^\s*/)?.[0] ?? ""
+  const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Depth|Written reviews analyzed|Confidence|Sample):/.test(value)
+  const width = isMeta ? 86 : indent.length ? 80 : 84
+  const continuationIndent = indent || (isMeta ? "  " : "   ")
+  const words = value.replace(/\s+/g, " ").trim().split(" ")
   const lines: string[] = []
-  for (let index = 0; index < value.length; index += 100) lines.push(value.slice(index, index + 100))
-  return lines.length ? lines : [""]
+  let current = ""
+  for (const word of words) {
+    if (!current) {
+      current = word
+      continue
+    }
+    if (`${current} ${word}`.length <= width) {
+      current = `${current} ${word}`
+      continue
+    }
+    lines.push(lines.length ? `${continuationIndent}${current}` : current)
+    current = word
+  }
+  if (current) lines.push(lines.length ? `${continuationIndent}${current}` : current)
+  return lines
 }
 
 function pdfText(text: string) {
