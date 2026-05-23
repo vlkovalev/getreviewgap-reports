@@ -239,23 +239,61 @@ export function exportReportPdf(report: IntelligenceReport) {
 
 function buildPdfLines(report: IntelligenceReport) {
   const rows = reportRowsForExport(report).slice(0, 20)
-  const summaryEntries = Object.entries(report.summary ?? {}).slice(0, 12)
+  const summary = report.summary ?? {}
+  const insight = report.data?.insight as {
+    topComplaints?: Array<{ theme?: string; evidence?: string; severity?: string; productImplication?: string }>
+    topCompliments?: Array<{ theme?: string; evidence?: string; marketingImplication?: string }>
+    buyerLanguage?: string[]
+    productImprovementIdeas?: Array<{ idea?: string; whyItMatters?: string; confidence?: string }>
+    adHooks?: string[]
+    positioningAngles?: string[]
+    assumptions?: string[]
+    dataQuality?: { reviewCount?: number; limitations?: string[] }
+  } | undefined
+  const reviewCount = Number(summary.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
   return [
     "ReviewGap",
-    report.title,
+    "AI Review Intelligence Brief",
+    `Product: ${stringifyPdfValue(summary.productName ?? report.title)}`,
+    `URL: ${stringifyPdfValue(summary.productUrl ?? "-")}`,
     `Type: ${report.reportType}`,
     `Status: ${report.status}`,
     `Generated: ${report.generatedAt ?? report.createdAt}`,
+    `Source: ${stringifyPdfValue(summary.source ?? summary.sourceFilter ?? "-")}`,
+    `Reviews analyzed: ${reviewCount}`,
+    `Confidence: ${pdfConfidence(reviewCount)}`,
     "",
-    "Summary",
-    ...summaryEntries.map(([key, value]) => `${key}: ${stringifyPdfValue(value)}`),
+    "Executive Summary",
+    wrapPdfLine(stringifyPdfValue(summary.executiveSummary ?? "No executive summary was generated.")),
+    ...(summary.warning ? ["", "Data Source Warning", wrapPdfLine(stringifyPdfValue(summary.warning))] : []),
     "",
-    "Report rows",
+    "Next Best Actions",
+    ...pdfActions(insight).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
+    "",
+    "Top Complaints",
+    ...pdfComplaintLines(insight),
+    "",
+    "Top Compliments",
+    ...pdfComplimentLines(insight),
+    "",
+    "Buyer Language",
+    wrapPdfLine((insight?.buyerLanguage ?? []).slice(0, 16).join("; ") || "No buyer language available."),
+    "",
+    "Ad Hooks",
+    ...(insight?.adHooks?.length ? insight.adHooks.slice(0, 6).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No ad hooks available."]),
+    "",
+    "Positioning Angles",
+    ...(insight?.positioningAngles?.length ? insight.positioningAngles.slice(0, 6).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No positioning angles available."]),
+    "",
+    "Assumptions and Limitations",
+    ...[...(insight?.assumptions ?? []), ...(insight?.dataQuality?.limitations ?? [])].slice(0, 8).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
+    "",
+    "Appendix Rows",
     ...rows.flatMap((row, index) => [
-      `${index + 1}. ${stringifyPdfValue(row.productName ?? row.title ?? row.source ?? "Report row")}`,
-      ...Object.entries(row).slice(0, 6).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
+      `${index + 1}. ${stringifyPdfValue(row.theme ?? row.productName ?? row.title ?? row.source ?? "Report row")}`,
+      ...Object.entries(row).slice(0, 5).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
     ])
-  ].map((line) => line.slice(0, 100))
+  ].flatMap((line) => splitPdfLine(String(line))).map((line) => line.slice(0, 100))
 }
 
 function stringifyPdfValue(value: unknown): string {
@@ -263,6 +301,50 @@ function stringifyPdfValue(value: unknown): string {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value)
   if (Array.isArray(value)) return value.map((item) => stringifyPdfValue(item)).join("; ").slice(0, 160)
   return JSON.stringify(value).slice(0, 160)
+}
+
+function pdfConfidence(reviewCount: number) {
+  if (reviewCount >= 100) return "High"
+  if (reviewCount >= 20) return "Medium"
+  return "Low"
+}
+
+function pdfActions(insight: { productImprovementIdeas?: Array<{ idea?: string }>; topComplaints?: Array<{ theme?: string }>; adHooks?: string[] } | undefined) {
+  const ideas = insight?.productImprovementIdeas?.map((item) => item.idea).filter(Boolean) as string[] | undefined
+  const complaints = insight?.topComplaints?.map((item) => item.theme ? `Address ${item.theme} in product, listing, or support copy.` : "").filter(Boolean) as string[] | undefined
+  const hooks = insight?.adHooks?.map((item) => `Test hook: ${item}`) ?? []
+  const actions = [...(ideas ?? []), ...(complaints ?? []), ...hooks].slice(0, 5)
+  return actions.length ? actions : ["Collect more review data before making product decisions.", "Paste reviews manually if the connector returns no text."]
+}
+
+function pdfComplaintLines(insight: { topComplaints?: Array<{ theme?: string; severity?: string; evidence?: string; productImplication?: string }> } | undefined) {
+  const items = insight?.topComplaints ?? []
+  if (!items.length) return ["No complaints available."]
+  return items.slice(0, 5).flatMap((item, index) => [
+    `${index + 1}. ${stringifyPdfValue(item.theme)} (${stringifyPdfValue(item.severity)})`,
+    `   Evidence: ${wrapPdfLine(stringifyPdfValue(item.evidence))}`,
+    `   Action: ${wrapPdfLine(stringifyPdfValue(item.productImplication))}`
+  ])
+}
+
+function pdfComplimentLines(insight: { topCompliments?: Array<{ theme?: string; evidence?: string; marketingImplication?: string }> } | undefined) {
+  const items = insight?.topCompliments ?? []
+  if (!items.length) return ["No compliments available."]
+  return items.slice(0, 5).flatMap((item, index) => [
+    `${index + 1}. ${stringifyPdfValue(item.theme)}`,
+    `   Evidence: ${wrapPdfLine(stringifyPdfValue(item.evidence))}`,
+    `   Use: ${wrapPdfLine(stringifyPdfValue(item.marketingImplication))}`
+  ])
+}
+
+function wrapPdfLine(value: string) {
+  return value.replace(/\s+/g, " ").trim()
+}
+
+function splitPdfLine(value: string) {
+  const lines: string[] = []
+  for (let index = 0; index < value.length; index += 100) lines.push(value.slice(index, index + 100))
+  return lines.length ? lines : [""]
 }
 
 function pdfText(text: string) {

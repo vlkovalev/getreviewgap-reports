@@ -24,6 +24,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       updatedAt: item.updatedAt.toISOString()
     } satisfies IntelligenceReport) : null)
     : getStore().reports.find((item) => item.id === id && (!customer || !item.customerId || item.customerId === customer.id))
+
   if (!report) {
     return (
       <DashboardShell title="Report not found" description="Generate a new report from the reports page.">
@@ -31,97 +32,237 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       </DashboardShell>
     )
   }
+
   const rows = reportRowsForExport(report)
   const headers = Object.keys(rows[0] ?? {})
   const insight = report.data?.insight as ReviewInsightLike | undefined
+  const reviewCount = Number(report.summary?.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
+  const dataScore = scoreDataQuality(report.summary ?? {}, insight)
 
   return (
-    <DashboardShell title={report.title} description="Full report view with summary, tabular output, and CSV/JSON/PDF export links.">
-      <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <StatusBadge status={report.status} />
-          <div className="flex gap-2">
-            <a href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full bg-white px-4 py-2 text-sm font-black text-black">Export CSV</a>
-            <a href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">Export JSON</a>
-            <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">Export PDF</a>
+    <DashboardShell title={cleanReportTitle(report.title)} description="Executive review intelligence brief with actions, proof points, and export-ready appendix.">
+      <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
+        <div className="border-b border-white/10 bg-gradient-to-br from-lime/20 via-white/[0.04] to-cyan/10 p-6 md:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="max-w-3xl">
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusBadge status={report.status} />
+                <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-black uppercase text-white/55">{String(report.reportType).replaceAll("_", " ")}</span>
+              </div>
+              <p className="mt-6 text-sm font-black uppercase text-lime">ReviewGap brief</p>
+              <h1 className="mt-2 text-4xl font-black leading-none md:text-6xl">{String(report.summary?.productName ?? "Product review analysis")}</h1>
+              <p className="mt-4 max-w-2xl text-white/70">{String(report.summary?.productUrl ?? "No product URL supplied")}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full bg-lime px-4 py-2 text-sm font-black text-black">PDF</a>
+              <a href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full bg-white px-4 py-2 text-sm font-black text-black">CSV</a>
+              <a href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">JSON</a>
+            </div>
+          </div>
+
+          <div className="mt-7 grid gap-3 md:grid-cols-5">
+            <Metric label="Reviews analyzed" value={String(reviewCount)} />
+            <Metric label="Source" value={String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
+            <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
+            <Metric label="Provider" value={String(report.summary?.provider ?? "report engine")} />
+            <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
           </div>
         </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <Metric label="Source" value={String(report.summary?.source ?? report.summary?.sourceFilter ?? "Demo")} />
-          <Metric label="Reviews" value={String(report.summary?.reviewCount ?? "-")} />
-          <Metric label="Provider" value={String(report.summary?.provider ?? "Report engine")} />
-          <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
-        </div>
-        {report.summary?.warning ? (
-          <div className="mt-5 rounded-2xl border border-yellow-300/25 bg-yellow-300/10 p-5 text-yellow-50/82">
-            <p className="text-sm font-black uppercase text-yellow-300">Data source warning</p>
-            <p className="mt-2">{String(report.summary.warning)}</p>
-          </div>
-        ) : null}
-        <div className="mt-5 rounded-2xl border border-lime/20 bg-lime/10 p-5">
-          <p className="text-sm font-black uppercase text-lime">Executive summary</p>
-          <p className="mt-3 text-lg text-white/82">{String(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
+
+        <div className="grid gap-5 p-6 md:p-8 lg:grid-cols-[1.1fr_.9fr]">
+          <section className="rounded-2xl border border-lime/20 bg-lime/10 p-5">
+            <p className="text-sm font-black uppercase text-lime">Executive summary</p>
+            <p className="mt-3 text-lg leading-relaxed text-white/84">{String(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
+          </section>
+          <section className="rounded-2xl border border-white/10 bg-black/25 p-5">
+            <p className="text-sm font-black uppercase text-cyan">Next best actions</p>
+            <div className="mt-4 grid gap-3">
+              {nextActions(insight).map((item) => <ActionItem key={item} text={item} />)}
+            </div>
+          </section>
         </div>
       </section>
-      {insight ? (
-        <section className="mt-6 grid gap-4 lg:grid-cols-2">
-          <InsightList title="Top complaints" items={insight.topComplaints?.map((item) => `${item.theme}: ${item.productImplication}`) ?? []} tone="coral" />
-          <InsightList title="Top compliments" items={insight.topCompliments?.map((item) => `${item.theme}: ${item.marketingImplication}`) ?? []} tone="lime" />
-          <InsightList title="Buyer language" items={insight.buyerLanguage ?? []} tone="cyan" />
-          <InsightList title="Product ideas" items={insight.productImprovementIdeas?.map((item) => `${item.idea}: ${item.whyItMatters}`) ?? []} tone="yellow" />
+
+      {report.summary?.warning ? (
+        <section className="mt-6 rounded-2xl border border-yellow-300/25 bg-yellow-300/10 p-5 text-yellow-50/82">
+          <p className="text-sm font-black uppercase text-yellow-300">Data source warning</p>
+          <p className="mt-2">{String(report.summary.warning)}</p>
         </section>
       ) : null}
+
+      {insight ? (
+        <>
+          <section className="mt-6 grid gap-4 lg:grid-cols-2">
+            <EvidenceList title="Top complaints to exploit or avoid" items={insight.topComplaints?.map((item) => ({
+              title: item.theme,
+              eyebrow: `Severity: ${item.severity}`,
+              body: item.evidence,
+              footer: item.productImplication
+            })) ?? []} tone="coral" />
+            <EvidenceList title="Strengths customers already value" items={insight.topCompliments?.map((item) => ({
+              title: item.theme,
+              eyebrow: "Positive signal",
+              body: item.evidence,
+              footer: item.marketingImplication
+            })) ?? []} tone="lime" />
+          </section>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-[.9fr_1.1fr]">
+            <BriefPanel title="Buyer language" tone="cyan">
+              <div className="flex flex-wrap gap-2">
+                {insight.buyerLanguage?.length ? insight.buyerLanguage.slice(0, 16).map((item) => (
+                  <span key={item} className="rounded-full border border-cyan/20 bg-cyan/10 px-3 py-2 text-sm font-bold text-cyan">{item}</span>
+                )) : <EmptyText text="No buyer phrases were available in this report." />}
+              </div>
+            </BriefPanel>
+            <BriefPanel title="Product improvement ideas" tone="yellow">
+              <div className="grid gap-3">
+                {insight.productImprovementIdeas?.length ? insight.productImprovementIdeas.slice(0, 5).map((item) => (
+                  <div key={item.idea} className="rounded-xl bg-black/25 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-black">{item.idea}</p>
+                      <span className="rounded-full bg-yellow-300/15 px-2 py-1 text-xs font-black uppercase text-yellow-300">{item.confidence}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-white/64">{item.whyItMatters}</p>
+                  </div>
+                )) : <EmptyText text="No product ideas were available in this report." />}
+              </div>
+            </BriefPanel>
+          </section>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-2">
+            <SimpleList title="Ad hooks" items={insight.adHooks ?? []} tone="lime" />
+            <SimpleList title="Positioning angles" items={insight.positioningAngles ?? []} tone="cyan" />
+          </section>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-2">
+            <SimpleList title="Assumptions" items={insight.assumptions ?? []} tone="yellow" />
+            <SimpleList title="Data limitations" items={insight.dataQuality?.limitations ?? []} tone="coral" />
+          </section>
+        </>
+      ) : null}
+
       <section className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.04] p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl font-black">Report rows</h2>
+          <div>
+            <p className="text-sm font-black uppercase text-white/40">Appendix</p>
+            <h2 className="text-2xl font-black">Structured report rows</h2>
+          </div>
           <p className="text-sm text-white/50">{rows.length} rows</p>
         </div>
-        <table className="w-full text-left text-sm">
-          <thead className="text-white/50"><tr>{headers.map((header) => <th key={header} className="min-w-32 py-2">{header}</th>)}</tr></thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={index} className="border-t border-white/10">
-                {headers.map((header) => <td key={header} className="py-3 align-top">{renderCell(row[header])}</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {rows.length && headers.length ? (
+          <table className="w-full text-left text-sm">
+            <thead className="text-white/50"><tr>{headers.map((header) => <th key={header} className="min-w-32 py-2 pr-5">{formatHeader(header)}</th>)}</tr></thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={index} className="border-t border-white/10">
+                  {headers.map((header) => <td key={header} className="py-3 pr-5 align-top">{renderCell(row[header])}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : <EmptyText text="No structured rows were produced for this report." />}
       </section>
     </DashboardShell>
   )
 }
 
 type ReviewInsightLike = {
-  topComplaints?: Array<{ theme: string; productImplication: string }>
-  topCompliments?: Array<{ theme: string; marketingImplication: string }>
+  executiveSummary?: string
+  topComplaints?: Array<{ theme: string; evidence: string; severity: string; productImplication: string }>
+  topCompliments?: Array<{ theme: string; evidence: string; marketingImplication: string }>
   buyerLanguage?: string[]
-  productImprovementIdeas?: Array<{ idea: string; whyItMatters: string }>
+  productImprovementIdeas?: Array<{ idea: string; whyItMatters: string; confidence: string }>
+  adHooks?: string[]
+  positioningAngles?: string[]
+  assumptions?: string[]
+  dataQuality?: { reviewCount?: number; limitations?: string[] }
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, tone = "white" }: { label: string; value: string; tone?: "white" | "lime" | "yellow" | "coral" }) {
+  const color = tone === "lime" ? "text-lime" : tone === "yellow" ? "text-yellow-300" : tone === "coral" ? "text-coral" : "text-white"
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
       <p className="text-xs font-black uppercase text-white/40">{label}</p>
-      <p className="mt-2 break-words font-bold text-white">{value}</p>
+      <p className={`mt-2 break-words text-xl font-black ${color}`}>{value}</p>
     </div>
   )
 }
 
-function InsightList({ title, items, tone }: { title: string; items: string[]; tone: "coral" | "lime" | "cyan" | "yellow" }) {
-  const color = tone === "coral" ? "text-coral" : tone === "lime" ? "text-lime" : tone === "cyan" ? "text-cyan" : "text-yellow-300"
+function BriefPanel({ title, tone, children }: { title: string; tone: "coral" | "lime" | "cyan" | "yellow"; children: React.ReactNode }) {
+  const color = toneClass(tone)
   return (
     <article className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
       <h2 className={`text-xl font-black ${color}`}>{title}</h2>
-      <ul className="mt-4 grid gap-2 text-sm text-white/70">
-        {items.length ? items.slice(0, 6).map((item) => <li key={item} className="rounded-xl bg-black/25 p-3">{item}</li>) : <li className="rounded-xl border border-dashed border-white/15 p-3">No items in this section.</li>}
-      </ul>
+      <div className="mt-4">{children}</div>
     </article>
   )
 }
 
+function EvidenceList({ title, items, tone }: { title: string; items: Array<{ title: string; eyebrow: string; body: string; footer: string }>; tone: "coral" | "lime" }) {
+  return (
+    <BriefPanel title={title} tone={tone}>
+      <div className="grid gap-3">
+        {items.length ? items.slice(0, 5).map((item) => (
+          <article key={`${item.title}-${item.body}`} className="rounded-xl bg-black/25 p-4">
+            <p className="text-xs font-black uppercase text-white/38">{item.eyebrow}</p>
+            <h3 className="mt-1 font-black text-white">{item.title}</h3>
+            <p className="mt-2 text-sm text-white/64">{item.body}</p>
+            <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/76">{item.footer}</p>
+          </article>
+        )) : <EmptyText text="No evidence was available in this section." />}
+      </div>
+    </BriefPanel>
+  )
+}
+
+function SimpleList({ title, items, tone }: { title: string; items: string[]; tone: "coral" | "lime" | "cyan" | "yellow" }) {
+  return (
+    <BriefPanel title={title} tone={tone}>
+      <ul className="grid gap-2 text-sm text-white/70">
+        {items.length ? items.slice(0, 8).map((item) => <li key={item} className="rounded-xl bg-black/25 p-3">{item}</li>) : <li><EmptyText text="No items were available in this section." /></li>}
+      </ul>
+    </BriefPanel>
+  )
+}
+
+function ActionItem({ text }: { text: string }) {
+  return <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/76">{text}</p>
+}
+
+function EmptyText({ text }: { text: string }) {
+  return <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-white/45">{text}</p>
+}
+
+function nextActions(insight: ReviewInsightLike | undefined) {
+  const ideas = insight?.productImprovementIdeas?.map((item) => item.idea) ?? []
+  const complaints = insight?.topComplaints?.map((item) => `Address "${item.theme}" in product, listing, or support copy.`) ?? []
+  const hooks = insight?.adHooks?.map((item) => `Test hook: ${item}`) ?? []
+  return [...ideas, ...complaints, ...hooks].slice(0, 4).length ? [...ideas, ...complaints, ...hooks].slice(0, 4) : [
+    "Collect more review data before making product decisions.",
+    "Paste reviews manually if the connector returns no text.",
+    "Use the data warning to decide whether this report is ready to share."
+  ]
+}
+
+function scoreDataQuality(summary: Record<string, unknown>, insight: ReviewInsightLike | undefined) {
+  const count = Number(summary?.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
+  if (count >= 100) return { label: "High", tone: "lime" as const }
+  if (count >= 20) return { label: "Medium", tone: "yellow" as const }
+  return { label: "Low", tone: "coral" as const }
+}
+
+function cleanReportTitle(title: string) {
+  return title.replace("Review and Rating Report", "Review Intelligence Brief")
+}
+
+function toneClass(tone: "coral" | "lime" | "cyan" | "yellow") {
+  return tone === "coral" ? "text-coral" : tone === "lime" ? "text-lime" : tone === "cyan" ? "text-cyan" : "text-yellow-300"
+}
+
 function summarizeObject(value: unknown) {
   if (!value || typeof value !== "object") return "This report is ready for review."
-  return Object.entries(value as Record<string, unknown>).slice(0, 4).map(([key, item]) => `${key}: ${renderPlain(item)}`).join(" | ")
+  return Object.entries(value as Record<string, unknown>).slice(0, 4).map(([key, item]) => `${formatHeader(key)}: ${renderPlain(item)}`).join(" | ")
 }
 
 function renderPlain(value: unknown) {
@@ -133,4 +274,8 @@ function renderPlain(value: unknown) {
 function renderCell(value: unknown) {
   if (Array.isArray(value) || (value && typeof value === "object")) return <span className="font-mono text-xs text-white/60">{JSON.stringify(value)}</span>
   return String(value ?? "-")
+}
+
+function formatHeader(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
