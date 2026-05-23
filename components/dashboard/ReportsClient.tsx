@@ -85,8 +85,10 @@ export function ReportsClient({
       setStatus("You are out of report credits. Buy a single report, pack, or monthly credits to continue.")
       return
     }
-    if (platform === "shopify" && !pastedReviews.trim()) {
-      setStatus("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
+    if (platform === "shopify" && !pastedReviews.trim() && (reviewApp !== "judgeme" || !productUrl.trim())) {
+      setStatus(reviewApp === "judgeme"
+        ? "Add a Shopify product URL to use the Judge.me connector, or upload a Judge.me CSV/TXT export."
+        : "Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
       return
     }
     setStatus("Generating report...")
@@ -210,11 +212,11 @@ export function ReportsClient({
                 {shopifyReviewApps.map((app) => <option key={app.value} value={app.value}>{app.label}</option>)}
               </select>
             </label>
-            <p className="mt-3 text-sm text-white/70">{shopifyReviewApps.find((app) => app.value === reviewApp)?.helper}</p>
+            <p className="mt-3 text-sm text-white/70">{reviewApp === "judgeme" ? "Paste a Shopify product URL to try direct Judge.me collection. If credentials are not configured or the product cannot be matched, upload a Judge.me CSV/TXT export instead." : shopifyReviewApps.find((app) => app.value === reviewApp)?.helper}</p>
             <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-white/58">
               <p className="font-bold text-white/78">Recommended export columns</p>
               <p className="mt-2 font-mono">review_text, rating, review_title, product_name, review_date</p>
-              <p className="mt-2">Direct Shopify review collection is planned app-by-app. For now, imports are safer and more reliable because every Shopify store uses a different review provider.</p>
+              <p className="mt-2">{reviewApp === "judgeme" ? "Judge.me direct collection uses your configured Judge.me API credentials on the server. Imports remain available for competitor or client exports." : "Direct Shopify review collection is planned app-by-app. For now, imports are safer and more reliable because every Shopify store uses a different review provider."}</p>
             </div>
           </div>
         ) : null}

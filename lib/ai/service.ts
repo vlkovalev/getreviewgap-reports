@@ -12,7 +12,7 @@ const demoReviews = [
   "Marketing photos made it look bigger. Still a solid product, just expensive."
 ]
 
-type ReviewSource = "canopy" | "apify" | "pasted" | "demo"
+type ReviewSource = "canopy" | "apify" | "judgeme" | "pasted" | "demo"
 type ReviewFetchResult = {
   reviews: string[]
   source: ReviewSource
@@ -33,6 +33,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
   }
 
   if (input.platform === "shopify") {
+    if (input.reviewApp === "judgeme") return fetchJudgeMeReviews(input)
     throw new Error("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
   }
 
@@ -72,6 +73,104 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
   }
 
   throw new Error(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
+}
+
+async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResult> {
+  const apiToken = cleanEnv(process.env.JUDGEME_API_TOKEN)
+  const shopDomain = cleanEnv(process.env.JUDGEME_SHOP_DOMAIN) || shopDomainFromUrl(input.productUrl)
+  if (!apiToken || !shopDomain) {
+    throw new Error("Judge.me direct collection is not configured yet. Add JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN in Vercel, or upload a Judge.me CSV/TXT export.")
+  }
+
+  const handle = shopifyProductHandle(input.productUrl)
+  if (!handle) {
+    throw new Error("Could not identify the Shopify product handle. Use a product URL like https://store.com/products/product-handle or upload a Judge.me export.")
+  }
+
+  const product = await fetchJudgeMeProduct({ apiToken, shopDomain, handle })
+  const productId = product.id
+  if (!productId) {
+    throw new Error("Judge.me could not match that Shopify product handle. Check the product URL or upload a Judge.me export.")
+  }
+
+  const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
+  const reviews = new Set<string>()
+  let pagesFetched = 0
+  let availableReviewCount: number | undefined
+  let previousPageAddedReviews = true
+
+  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+    const params = new URLSearchParams({
+      api_token: apiToken,
+      shop_domain: shopDomain,
+      product_id: String(productId),
+      published: "true",
+      per_page: "100",
+      page: String(pagesFetched + 1)
+    })
+    const response = await fetch(`https://api.judge.me/api/v1/reviews?${params}`, { cache: "no-store" })
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Check JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN.")
+      throw new Error(`Judge.me review request failed with status ${response.status}.`)
+    }
+    const payload = await response.json() as Record<string, unknown>
+    const pageReviews = judgeMeReviewTexts(payload)
+    const previousCount = reviews.size
+    for (const text of pageReviews) reviews.add(text)
+    availableReviewCount ||= judgeMeReviewCount(payload)
+    pagesFetched += 1
+    previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount && pageReviews.length >= 100
+  }
+
+  const collectedReviews = [...reviews].slice(0, 500)
+  return {
+    reviews: collectedReviews,
+    source: "judgeme",
+    productName: product.title || input.productName || `Shopify product ${handle}`,
+    pagesFetched,
+    availableReviewCount,
+    sampleNote: `Judge.me returned ${collectedReviews.length} published written review text${collectedReviews.length === 1 ? "" : "s"} after checking ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`,
+    warning: collectedReviews.length ? undefined : "Judge.me returned no published review text for this product. Upload a Judge.me export or verify the product handle."
+  }
+}
+
+async function fetchJudgeMeProduct({ apiToken, shopDomain, handle }: { apiToken: string; shopDomain: string; handle: string }) {
+  const params = new URLSearchParams({
+    api_token: apiToken,
+    shop_domain: shopDomain,
+    handle
+  })
+  const response = await fetch(`https://api.judge.me/api/v1/products/-1?${params}`, { cache: "no-store" })
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Check JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN.")
+    throw new Error(`Judge.me product lookup failed with status ${response.status}.`)
+  }
+  const payload = await response.json() as Record<string, unknown>
+  const product = payload.product && typeof payload.product === "object" && !Array.isArray(payload.product)
+    ? payload.product as Record<string, unknown>
+    : {}
+  return {
+    id: typeof product.id === "number" || typeof product.id === "string" ? product.id : undefined,
+    title: typeof product.title === "string" ? product.title.trim() : undefined
+  }
+}
+
+function judgeMeReviewTexts(payload: Record<string, unknown>) {
+  const reviews = Array.isArray(payload.reviews) ? payload.reviews : []
+  return reviews.flatMap((review) => {
+    if (!review || typeof review !== "object" || Array.isArray(review)) return []
+    const row = review as Record<string, unknown>
+    const title = typeof row.title === "string" ? row.title.trim() : ""
+    const body = typeof row.body === "string" ? row.body.trim() : ""
+    const rating = typeof row.rating === "number" || typeof row.rating === "string" ? `Rating: ${row.rating}.` : ""
+    const text = [rating, title, body].filter(Boolean).join(" ").replace(/\s+/g, " ").trim()
+    return text.length >= 20 ? [text] : []
+  })
+}
+
+function judgeMeReviewCount(payload: Record<string, unknown>) {
+  const count = payload.count ?? payload.total_count ?? payload.total
+  return typeof count === "number" ? count : undefined
 }
 
 async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<ReviewFetchResult> {
@@ -230,6 +329,26 @@ function replaceTemplateValues(value: unknown, productUrl: string): unknown {
 
 function cleanEnv(value: string | undefined) {
   return value?.trim().replace(/^["']|["']$/g, "")
+}
+
+function shopDomainFromUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, "")
+    return hostname.endsWith(".myshopify.com") ? hostname : ""
+  } catch {
+    return ""
+  }
+}
+
+function shopifyProductHandle(url: string) {
+  try {
+    const parsed = new URL(url)
+    const parts = parsed.pathname.split("/").filter(Boolean)
+    const productsIndex = parts.findIndex((part) => part === "products")
+    return productsIndex >= 0 ? parts[productsIndex + 1] : ""
+  } catch {
+    return ""
+  }
 }
 
 function normalizeApifyActorId(actorId: string) {

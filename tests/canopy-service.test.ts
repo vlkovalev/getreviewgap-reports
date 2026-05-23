@@ -5,9 +5,12 @@ async function main() {
   const originalFetch = globalThis.fetch
   const originalKey = process.env.CANOPY_API_KEY
   const originalLimit = process.env.CANOPY_REVIEW_PAGE_LIMIT
+  const originalJudgeMeToken = process.env.JUDGEME_API_TOKEN
+  const originalJudgeMeShop = process.env.JUDGEME_SHOP_DOMAIN
   const pagesRequested: number[] = []
   await assertDefaultPageLimit()
   await assertRequestedPageLimit()
+  await assertJudgeMeConnector()
 
   process.env.CANOPY_API_KEY = "test-key"
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "3"
@@ -54,9 +57,54 @@ async function main() {
     else process.env.CANOPY_API_KEY = originalKey
     if (originalLimit === undefined) delete process.env.CANOPY_REVIEW_PAGE_LIMIT
     else process.env.CANOPY_REVIEW_PAGE_LIMIT = originalLimit
+    if (originalJudgeMeToken === undefined) delete process.env.JUDGEME_API_TOKEN
+    else process.env.JUDGEME_API_TOKEN = originalJudgeMeToken
+    if (originalJudgeMeShop === undefined) delete process.env.JUDGEME_SHOP_DOMAIN
+    else process.env.JUDGEME_SHOP_DOMAIN = originalJudgeMeShop
   }
 
-  console.log("Canopy service tests passed for pagination, metadata, deduplication, and canonical URLs.")
+  console.log("Review connector tests passed for Canopy pagination, Judge.me, metadata, deduplication, and canonical URLs.")
+}
+
+async function assertJudgeMeConnector() {
+  delete process.env.CANOPY_API_KEY
+  process.env.JUDGEME_API_TOKEN = "judge-token"
+  process.env.JUDGEME_SHOP_DOMAIN = "demo.myshopify.com"
+  const requestedUrls: string[] = []
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    requestedUrls.push(url.toString())
+    if (url.pathname.includes("/products/-1")) {
+      assert.equal(url.searchParams.get("handle"), "glow-serum")
+      return new Response(JSON.stringify({ product: { id: 321, title: "Glow Serum" } }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    if (url.pathname.includes("/reviews")) {
+      assert.equal(url.searchParams.get("product_id"), "321")
+      assert.equal(url.searchParams.get("per_page"), "100")
+      return new Response(JSON.stringify({
+        reviews: [
+          { title: "Love it", body: "This serum feels light and absorbs quickly with no sticky finish.", rating: 5 },
+          { title: "Pump issue", body: "The formula is good but the pump stopped working after a few uses.", rating: 3 }
+        ],
+        count: 2
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    return new Response("not found", { status: 404 })
+  }
+
+  const result = await fetchAmazonReviews({
+    productUrl: "https://demo.com/products/glow-serum",
+    platform: "shopify",
+    marketplace: "Shopify / DTC store",
+    reviewApp: "judgeme",
+    reviewPageLimit: 5
+  })
+  assert.equal(result.source, "judgeme")
+  assert.equal(result.productName, "Glow Serum")
+  assert.equal(result.pagesFetched, 1)
+  assert.equal(result.availableReviewCount, 2)
+  assert.equal(result.reviews.length, 2)
+  assert.equal(requestedUrls.length, 2)
 }
 
 async function assertRequestedPageLimit() {
