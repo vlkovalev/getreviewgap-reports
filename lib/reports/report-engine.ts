@@ -16,6 +16,13 @@ const reportLabels: Record<ReportType, string> = {
 
 type ProductWithSource = ProductRecord & { sourceName: string; snapshots: ProductSnapshot[] }
 
+export class NoReviewDataError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "NoReviewDataError"
+  }
+}
+
 export function getReportTypeLabel(type: ReportType) {
   return reportLabels[type]
 }
@@ -82,6 +89,9 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     pastedReviews: filters.pastedReviews,
     marketplace: "amazon.com"
   })
+  if (reviewResult.source === "apify" && reviewResult.reviews.length === 0) {
+    throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
+  }
   const { insight, provider, model } = await generateReviewInsight({
     productUrl,
     productName,

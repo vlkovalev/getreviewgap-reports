@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { generateReport, listReportTypes } from "@/lib/reports/report-engine"
+import { generateReport, listReportTypes, NoReviewDataError } from "@/lib/reports/report-engine"
 import { getStore } from "@/lib/scrapers/store"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { addCredits, consumeCredit } from "@/lib/customer-store"
@@ -48,6 +48,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (consumedCustomerId) await addCredits(consumedCustomerId, 1, "report_generation_refund").catch(() => null)
     console.error("Report generation failed", error)
+    if (error instanceof NoReviewDataError) {
+      return NextResponse.json({ error: "No reviews found. Your credit has been returned.", details: error.message }, { status: 422 })
+    }
     return NextResponse.json({ error: "Could not generate report", details: publicErrorDetails(error) }, { status: 500 })
   }
 }
