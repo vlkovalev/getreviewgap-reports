@@ -21,7 +21,9 @@ ReviewGap is a full-stack MVP for the validated business idea: **AI-powered comp
 - Deterministic report engine in `lib/reports/report-engine.ts`.
 - Report tests covering all report types and CSV/JSON export.
 - AI service with production-oriented prompt template and JSON validation.
-- Junipr/Apify integration for multi-market Amazon review collection.
+- Canopy API integration for structured multi-market Amazon review collection when `CANOPY_API_KEY` is configured.
+- Apify fallback support for experimentation, with clear empty-data handling when Amazon restricts review-page access.
+- CSV/TXT review import for authorized Amazon or Shopify exports.
 - Shopify/DTC report workflow using pasted or approved review-app exports until a specific store review provider connector is selected.
 - Demo fallback when `OPENAI_API_KEY` or Apify keys are missing.
 - Prisma schema for users, profiles, review reports, agent runs, subscriptions, audit events, leads, and inquiries.
@@ -60,8 +62,9 @@ EMAIL_FROM="ReviewGap <hello@example.com>"
 OWNER_EMAIL="owner@example.com"
 OPENAI_API_KEY=""
 OPENAI_MODEL="gpt-4o-mini"
+CANOPY_API_KEY=""
 APIFY_TOKEN=""
-APIFY_AMAZON_REVIEWS_ACTOR_ID="junipr/amazon-reviews-scraper"
+APIFY_AMAZON_REVIEWS_ACTOR_ID=""
 APIFY_INPUT_TEMPLATE=""
 PAYPAL_MODE="sandbox"
 PAYPAL_CLIENT_ID=""
@@ -78,7 +81,8 @@ Do not commit real secrets. Create a local `.env` file from `.env.example` and p
 ## Setup Checklist
 
 - OpenAI: create or rotate an API key, then set `OPENAI_API_KEY`.
-- Apify: set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID="junipr/amazon-reviews-scraper"`. The app infers the marketplace from Amazon URLs across the supported US, Canadian, UK, European, Australian, Japanese, Indian, Brazilian, and Mexican stores. Junipr's native ASIN-based input takes priority automatically; if another actor needs custom input, set `APIFY_INPUT_TEMPLATE` with `{{PRODUCT_URL}}`.
+- Amazon reviews: set `CANOPY_API_KEY` for the preferred structured review API workflow. The app infers the Amazon marketplace from the product URL. Canopy documents marketplace-specific review retrieval and a free monthly request allowance.
+- Apify fallback: `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID` remain supported for testing, but Amazon review-page restrictions can cause empty results even on products with visible ratings.
 - Shopify: users can generate reports from pasted/exported Shopify review text now. Direct collection must be added for the store's chosen review provider (for example, a permitted export or API integration) rather than pretending every Shopify storefront exposes reviews in one format.
 - Database: create a Supabase or Neon Postgres database and set `DATABASE_URL`.
 - Admin: set `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
@@ -194,7 +198,7 @@ CSV, JSON, and PDF exports are implemented and tested for generated reports.
 
 ## Manual Setup Still Needed
 
-- Choose the exact Apify Amazon review actor and set `APIFY_AMAZON_REVIEWS_ACTOR_ID`.
+- Create a Canopy API key and set `CANOPY_API_KEY` for reliable Amazon review retrieval; verify it with products from every marketplace you intend to support.
 - Add `OPENAI_API_KEY`.
 - Add real authentication if user accounts are required.
 - Add PayPal REST API credentials before taking PayPal payments; checkout is denominated in USD.

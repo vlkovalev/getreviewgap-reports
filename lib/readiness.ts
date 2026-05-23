@@ -50,10 +50,16 @@ export async function getReadinessChecks(): Promise<ReadinessCheck[]> {
     detail: clean(process.env.OPENAI_API_KEY)?.startsWith("sk-") ? "AI report generation key is configured." : "Add OPENAI_API_KEY for real AI analysis; demo fallback may still run."
   })
 
+  const hasCanopy = Boolean(clean(process.env.CANOPY_API_KEY))
+  const hasApify = Boolean(clean(process.env.APIFY_TOKEN) && clean(process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID))
   checks.push({
-    label: "Apify reviews",
-    status: clean(process.env.APIFY_TOKEN) && clean(process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID) ? "ready" : "warning",
-    detail: clean(process.env.APIFY_TOKEN) && clean(process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID) ? "Amazon review actor is configured." : "Add APIFY_TOKEN and APIFY_AMAZON_REVIEWS_ACTOR_ID for live review collection."
+    label: "Amazon review connector",
+    status: hasCanopy ? "ready" : hasApify ? "warning" : "missing",
+    detail: hasCanopy
+      ? "Canopy structured Amazon reviews API is configured."
+      : hasApify
+        ? "Apify fallback is configured, but Amazon review-page restrictions can return empty datasets. Add CANOPY_API_KEY for preferred live collection."
+        : "Add CANOPY_API_KEY for live Amazon review collection."
   })
 
   checks.push({

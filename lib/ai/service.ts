@@ -12,7 +12,9 @@ const demoReviews = [
   "Marketing photos made it look bigger. Still a solid product, just expensive."
 ]
 
-export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews: string[]; source: "apify" | "pasted" | "demo"; warning?: string }> {
+type ReviewSource = "canopy" | "apify" | "pasted" | "demo"
+
+export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews: string[]; source: ReviewSource; warning?: string }> {
   if (input.pastedReviews?.trim()) {
     return {
       reviews: input.pastedReviews.split(/\n+/).map((line) => line.trim()).filter(Boolean).slice(0, 500),
@@ -23,6 +25,9 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
   if (input.platform === "shopify") {
     throw new Error("Shopify reports need pasted or exported customer reviews for now. Paste review text from your store or approved review app export to generate a report.")
   }
+
+  const canopyKey = cleanEnv(process.env.CANOPY_API_KEY)
+  if (canopyKey) return fetchCanopyReviews(input, canopyKey)
 
   const apifyToken = cleanEnv(process.env.APIFY_TOKEN)
   const actorId = cleanEnv(process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID)
@@ -52,11 +57,37 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
     return {
       reviews,
       source: "apify",
-      warning: reviews.length ? undefined : `Apify ran successfully but returned no review text from ${items.length} dataset item(s). Try a product with visible reviews, paste reviews manually, or configure APIFY_INPUT_TEMPLATE for a review-specific actor output.`
+      warning: reviews.length ? undefined : `The configured Apify actor returned no review text from ${items.length} dataset item(s). Amazon can restrict access to review pages even when ratings are visible. Connect CANOPY_API_KEY for structured Amazon review retrieval, or import review text from an authorized export.`
     }
   }
 
   throw new Error(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
+}
+
+async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<{ reviews: string[]; source: ReviewSource; warning?: string }> {
+  const asin = extractAmazonAsin(input.productUrl)
+  if (!asin) throw new Error("Could not identify an Amazon ASIN in this URL. Use a product URL containing /dp/ASIN.")
+  const params = new URLSearchParams({
+    asin,
+    domain: amazonMarketplaceCode(input.productUrl),
+    page: "1",
+    rating: "ALL"
+  })
+  const response = await fetch(`https://api.canopyapi.co/v1/amazon/product/reviews?${params}`, {
+    headers: { "API-KEY": apiKey },
+    cache: "no-store"
+  })
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) throw new Error("Canopy authentication failed. Check CANOPY_API_KEY in Vercel.")
+    throw new Error(`Canopy review request failed with status ${response.status}.`)
+  }
+  const payload = await response.json() as Record<string, unknown>
+  const reviews = extractReviewTexts([payload]).slice(0, 500)
+  return {
+    reviews,
+    source: "canopy",
+    warning: reviews.length ? undefined : "Canopy returned no review text for this product and marketplace. Try an authorized review export or a different product."
+  }
 }
 
 function buildApifyInputs(input: ReviewInput, actorId: string) {

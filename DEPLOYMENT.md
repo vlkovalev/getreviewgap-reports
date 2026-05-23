@@ -29,6 +29,7 @@ ADMIN_EMAIL
 ADMIN_PASSWORD
 OPENAI_API_KEY
 OPENAI_MODEL
+CANOPY_API_KEY
 APIFY_TOKEN
 APIFY_AMAZON_REVIEWS_ACTOR_ID
 APIFY_INPUT_TEMPLATE
@@ -72,18 +73,21 @@ invoice.paid
 
 The webhook grants credits idempotently. The checkout success page also grants credits as a fallback, but both paths use the same checkout-session reference so customers should not receive duplicate credits for the same Stripe session.
 
-## 3.1 Apify Amazon Review Actor
+## 3.1 Amazon Review Collection
 
-Set `APIFY_TOKEN` and use the Junipr Amazon reviews actor:
+Preferred production connector:
 
 ```txt
-APIFY_AMAZON_REVIEWS_ACTOR_ID=junipr/amazon-reviews-scraper
+CANOPY_API_KEY
 ```
 
-ReviewGap extracts the ASIN from the product URL and automatically selects the matching marketplace for Amazon US, Canada, UK, Germany, France, Italy, Spain, Australia, Japan, India, Brazil, and Mexico. No Canada-only setting is required.
-When this Junipr actor id is selected, its native ASIN-based request is used automatically even if an older `APIFY_INPUT_TEMPLATE` is still configured.
+Canopy provides a structured Amazon Product Reviews API with marketplace-specific review retrieval. ReviewGap sends the ASIN and marketplace inferred from the product URL. Validate US and any international marketplace you intend to sell before accepting customer payments for automatic collection.
 
-Shopify/DTC reports currently accept review text pasted from an authorized store export or review-app export. Add a provider-specific Shopify connector only after confirming the merchant's review app and permitted API/export method.
+Fallback connector:
+
+Set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID` only for actors you have tested on your intended marketplace. ReviewGap extracts the ASIN and selects the marketplace automatically for supported actor integrations. In validation testing, page-crawling actors returned zero reviews from an Amazon.ca product with visible ratings, so do not treat an untested Apify actor as production-ready.
+
+Shopify/DTC reports currently accept review text uploaded or pasted from an authorized store export or review-app export. Add a provider-specific Shopify connector only after confirming the merchant's review app and permitted API/export method.
 
 If you later select a different actor that does not accept the built-in input formats, add an input template like this:
 

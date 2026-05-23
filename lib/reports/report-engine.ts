@@ -92,7 +92,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     platform,
     marketplace
   })
-  if (reviewResult.source === "apify" && reviewResult.reviews.length === 0) {
+  if ((reviewResult.source === "apify" || reviewResult.source === "canopy") && reviewResult.reviews.length === 0) {
     throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
   }
   const { insight, provider, model } = await generateReviewInsight({
@@ -355,14 +355,14 @@ function emptyReviewRows(warning?: string) {
       theme: "No review text captured",
       evidence: warning || "The data connector completed but did not return usable review text.",
       severity: "high",
-      recommendation: "Try a product with visible reviews, switch to Amazon.com, paste reviews manually, or configure a dedicated Amazon reviews actor."
+      recommendation: "Connect the structured Amazon reviews API or import authorized review text; do not rely on an unverified page-scraping actor."
     },
     {
       section: "Next step",
       theme: "Manual review paste fallback",
       evidence: "The report generator can analyze pasted review text immediately.",
       severity: "medium",
-      recommendation: "Copy 20-50 visible customer reviews into the Paste reviews field to produce a full insight report."
+      recommendation: "Upload a CSV/TXT review export or copy 20-50 visible customer reviews into the report form."
     }
   ]
 }

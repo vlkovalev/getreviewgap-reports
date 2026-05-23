@@ -21,8 +21,23 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
   const [productName, setProductName] = useState("")
   const [competitorName, setCompetitorName] = useState("")
   const [pastedReviews, setPastedReviews] = useState("")
+  const [importedFileName, setImportedFileName] = useState("")
   const [status, setStatus] = useState("")
   const canGenerate = signedIn && creditCount > 0
+
+  async function importReviews(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    const cleanText = text.trim().slice(0, 30000)
+    if (!cleanText) {
+      setStatus("This review file is empty. Choose a CSV or text export containing customer review content.")
+      return
+    }
+    setPastedReviews(cleanText)
+    setImportedFileName(file.name)
+    setStatus(`Loaded ${file.name}. Review the text, then generate your report.`)
+  }
 
   async function generate() {
     if (!signedIn) {
@@ -102,7 +117,7 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">{platform === "amazon" ? "Amazon product URL, optional" : "Shopify product URL, optional"}</span>
           <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-          <span className="text-xs text-white/45">{platform === "amazon" ? "Amazon review collection supports US, Canada, UK, Europe, Australia, Japan, India, Brazil, and Mexico." : "For Shopify, paste reviews exported from your store or review app. A connector can be added once your review provider is selected."}</span>
+          <span className="text-xs text-white/45">{platform === "amazon" ? "Automatic Amazon collection uses the configured structured API; import a review export when a marketplace limits access." : "For Shopify, import or paste reviews exported from your store or review app. A direct connector can be added once your provider is selected."}</span>
         </label>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="grid gap-2 text-sm">
@@ -117,6 +132,17 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">Paste reviews{platform === "shopify" ? " (required for Shopify now)" : ", optional"}</span>
           <textarea value={pastedReviews} onChange={(event) => setPastedReviews(event.target.value)} rows={5} placeholder={platform === "shopify" ? "Paste Shopify review export text, one review per line." : "Paste one review per line, or let Amazon collection fetch available reviews."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          <div className="rounded-xl border border-dashed border-white/15 bg-black/25 p-4">
+            <label className="flex cursor-pointer flex-wrap items-center justify-between gap-3">
+              <span>
+                <span className="block font-bold text-white/75">Import review file</span>
+                <span className="mt-1 block text-xs text-white/45">CSV or TXT export, up to 30,000 characters</span>
+              </span>
+              <span className="rounded-full border border-white/15 px-4 py-2 text-xs font-black">Choose file</span>
+              <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={importReviews} className="sr-only" />
+            </label>
+            {importedFileName ? <p className="mt-3 text-xs font-bold text-lime">Loaded: {importedFileName}</p> : null}
+          </div>
         </label>
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">Source filter</span>

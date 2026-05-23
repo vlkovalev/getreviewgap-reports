@@ -10,6 +10,7 @@ export function ReportGenerator() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [platform, setPlatform] = useState<"amazon" | "shopify">("amazon")
+  const [importedReviews, setImportedReviews] = useState("")
 
   useEffect(() => {
     fetch("/api/reports")
@@ -55,6 +56,14 @@ export function ReportGenerator() {
     }
   }
 
+  async function importReviewFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+    const text = (await file.text()).trim().slice(0, 30000)
+    setImportedReviews(text)
+    setError(text ? "" : "This review file is empty.")
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[.9fr_1.1fr]">
       <form onSubmit={submit} className="card grid gap-4 p-6">
@@ -89,7 +98,11 @@ export function ReportGenerator() {
         </label>
         <label className="grid gap-2 text-sm font-bold">
           Paste reviews{platform === "shopify" ? " (required for Shopify now)" : ", optional"}
-          <textarea name="pastedReviews" required={platform === "shopify"} placeholder={platform === "shopify" ? "Paste Shopify customer review export text, one review per line." : "Paste one review per line to test with real text before Apify is configured."} className="min-h-36 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
+          <textarea name="pastedReviews" value={importedReviews} onChange={(event) => setImportedReviews(event.target.value)} required={platform === "shopify"} placeholder={platform === "shopify" ? "Paste Shopify customer review export text, one review per line." : "Paste one review per line or import a review file."} className="min-h-36 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
+        </label>
+        <label className="rounded-xl border border-dashed border-white/15 bg-white/[0.04] p-4 text-sm font-bold">
+          Import review export
+          <input onChange={importReviewFile} type="file" accept=".csv,.txt,text/csv,text/plain" className="mt-3 block w-full text-xs text-white/60" />
         </label>
         <button disabled={loading} className="btn-primary disabled:opacity-60">{loading ? "Generating..." : "Generate report"}</button>
         {error && <p className="rounded-2xl bg-red-400/15 p-3 text-sm text-red-100">{error}</p>}
