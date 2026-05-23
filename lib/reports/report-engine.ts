@@ -91,7 +91,8 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
     platform,
-    marketplace
+    marketplace,
+    reviewPageLimit: filters.reviewPageLimit
   })
   if ((reviewResult.source === "apify" || reviewResult.source === "canopy") && reviewResult.reviews.length === 0) {
     throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
@@ -103,7 +104,8 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
     platform,
-    marketplace
+    marketplace,
+    reviewPageLimit: filters.reviewPageLimit
   }, reviewResult.reviews)
   const now = new Date()
   const insightRows = [
@@ -129,6 +131,8 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
       provider,
       model,
       reviewCount: reviewResult.reviews.length,
+      reviewDepth: reviewDepthLabel(filters.reviewPageLimit),
+      reviewPageLimit: filters.reviewPageLimit ?? "",
       pagesFetched: reviewResult.pagesFetched ?? "",
       availableReviewCount: reviewResult.availableReviewCount ?? "",
       sampleNote: reviewResult.sampleNote ?? "",
@@ -177,6 +181,13 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
   }
 
   return addReport(reportInput)
+}
+
+function reviewDepthLabel(pageLimit?: number) {
+  if (pageLimit === 5) return "Quick"
+  if (pageLimit === 10) return "Standard"
+  if (pageLimit === 50) return "Deep"
+  return "Default"
 }
 
 export function regenerateReport(reportId: string) {
@@ -236,7 +247,7 @@ export function exportReportPdf(report: IntelligenceReport) {
         y -= 20
         return
       }
-      const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Reviews analyzed|Confidence):/.test(line)
+      const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Depth|Written reviews analyzed|Confidence):/.test(line)
       contentLines.push(pdfDraw(line, isMeta ? 46 : 52, y, isMeta ? 10 : 10, isMeta ? "F2" : "F1", isMeta ? "0.18 0.23 0.27" : "0.26 0.29 0.32"))
       y -= line ? 15 : 8
     })
@@ -300,6 +311,7 @@ function buildPdfLines(report: IntelligenceReport) {
     `Status: ${report.status}`,
     `Generated: ${report.generatedAt ?? report.createdAt}`,
     `Source: ${stringifyPdfValue(summary.source ?? summary.sourceFilter ?? "-")}`,
+    `Depth: ${stringifyPdfValue(summary.reviewDepth ?? "Default")}`,
     `Written reviews analyzed: ${reviewCount}`,
     `Confidence: ${pdfConfidence(reviewCount).label}`,
     ...(summary.sampleNote ? [`Sample: ${stringifyPdfValue(summary.sampleNote)}`] : []),

@@ -3,6 +3,8 @@ import { exportReportCsv, exportReportJson, exportReportPdf, generateReport, lis
 import type { ReportType } from "../lib/scrapers/types"
 
 async function main() {
+  process.env.DATABASE_URL = "postgresql://USER:PASSWORD@HOST:5432/DATABASE"
+
   const requiredTypes: ReportType[] = [
     "PRICE_MONITORING",
     "AVAILABILITY",

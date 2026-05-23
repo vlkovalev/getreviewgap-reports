@@ -11,6 +11,12 @@ const reportTypes: Array<{ value: ReportType; label: string }> = [
   { value: "DATA_QUALITY", label: "Review Data Quality" }
 ]
 
+const reviewDepths = [
+  { value: 5, label: "Quick", caption: "5 pages", helper: "Fast preview with lower provider cost." },
+  { value: 10, label: "Standard", caption: "10 pages", helper: "Best default for most product checks." },
+  { value: 50, label: "Deep", caption: "50 pages", helper: "Maximum coverage for serious research." }
+] as const
+
 export function ReportsClient({
   initialReports,
   sources,
@@ -32,6 +38,7 @@ export function ReportsClient({
   const [creditCount, setCreditCount] = useState(credits)
   const [reportType, setReportType] = useState<ReportType>("REVIEW_RATING")
   const [platform, setPlatform] = useState<"amazon" | "shopify">(initialPlatform)
+  const [reviewPageLimit, setReviewPageLimit] = useState<5 | 10 | 50>(10)
   const [sourceId, setSourceId] = useState("")
   const [productUrl, setProductUrl] = useState(initialProductUrl)
   const [productName, setProductName] = useState(initialProductName)
@@ -82,7 +89,8 @@ export function ReportsClient({
         productUrl: productUrl || undefined,
         productName: productName || undefined,
         competitorName: competitorName || undefined,
-        pastedReviews: pastedReviews || undefined
+        pastedReviews: pastedReviews || undefined,
+        reviewPageLimit
       })
     })
     const payload = await response.json()
@@ -98,7 +106,8 @@ export function ReportsClient({
       reportType,
       source: payload.report?.summary?.source ?? "stored",
       hasProductUrl: Boolean(productUrl),
-      hasPastedReviews: Boolean(pastedReviews)
+      hasPastedReviews: Boolean(pastedReviews),
+      reviewPageLimit
     })
   }
 
@@ -205,6 +214,26 @@ export function ReportsClient({
             {importedFileName ? <p className="mt-3 text-xs font-bold text-lime">Loaded: {importedFileName}</p> : null}
           </div>
         </label>
+        {platform === "amazon" && !pastedReviews.trim() ? (
+          <div className="mt-4 grid gap-2 text-sm">
+            <span className="text-white/70">Review depth</span>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {reviewDepths.map((depth) => (
+                <button
+                  key={depth.value}
+                  type="button"
+                  onClick={() => setReviewPageLimit(depth.value)}
+                  className={`rounded-xl border p-4 text-left transition ${reviewPageLimit === depth.value ? "border-lime bg-lime text-black" : "border-white/10 bg-black text-white hover:border-white/25"}`}
+                >
+                  <span className="block font-black">{depth.label}</span>
+                  <span className={`mt-1 block text-xs font-bold ${reviewPageLimit === depth.value ? "text-black/70" : "text-white/55"}`}>{depth.caption}</span>
+                  <span className={`mt-2 block text-xs ${reviewPageLimit === depth.value ? "text-black/70" : "text-white/45"}`}>{depth.helper}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-white/45">Each report still uses 1 credit. Deep reports may take longer and use more provider quota.</p>
+          </div>
+        ) : null}
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">Source filter</span>
           <select value={sourceId} onChange={(event) => setSourceId(event.target.value)} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white">

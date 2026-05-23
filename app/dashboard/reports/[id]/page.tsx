@@ -93,8 +93,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-7">
             <Metric label="Written reviews" value={String(reviewCount)} />
+            <Metric label="Depth" value={String(report.summary?.reviewDepth ?? "Default")} />
             <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
             <Metric label="Source" value={String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
             <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />

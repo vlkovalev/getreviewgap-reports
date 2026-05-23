@@ -77,7 +77,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
 async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<ReviewFetchResult> {
   const asin = extractAmazonAsin(input.productUrl)
   if (!asin) throw new Error("Could not identify an Amazon ASIN in this URL. Use a product URL containing /dp/ASIN.")
-  const maxPages = canopyReviewPageLimit()
+  const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
   const reviews = new Set<string>()
   let pagesFetched = 0
   let availableReviewCount: number | undefined
@@ -133,8 +133,8 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   }
 }
 
-function canopyReviewPageLimit() {
-  const configured = Number(process.env.CANOPY_REVIEW_PAGE_LIMIT ?? 50)
+function canopyReviewPageLimit(requestedLimit?: number) {
+  const configured = Number(requestedLimit ?? process.env.CANOPY_REVIEW_PAGE_LIMIT ?? 50)
   return Number.isFinite(configured) ? Math.max(1, Math.min(50, Math.floor(configured))) : 50
 }
 
