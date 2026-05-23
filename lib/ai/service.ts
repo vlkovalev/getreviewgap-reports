@@ -119,8 +119,8 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
 
   const collectedReviews = [...reviews].slice(0, 500)
   const sampleNote = availableReviewCount && availableReviewCount > collectedReviews.length
-    ? `Analyzed ${collectedReviews.length} of ${availableReviewCount} available reviews across ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
-    : `Analyzed ${collectedReviews.length} review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
+    ? `The provider returned ${collectedReviews.length} unique written review texts from ${availableReviewCount} available review records after checking ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
+    : `The provider returned ${collectedReviews.length} unique written review text${collectedReviews.length === 1 ? "" : "s"} after checking ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}. Marketplace star ratings can be much higher than retrievable written review text.`
   return {
     reviews: collectedReviews,
     source: "canopy",

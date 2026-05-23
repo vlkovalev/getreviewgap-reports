@@ -44,7 +44,7 @@ async function main() {
     assert.equal(result.pagesFetched, 3)
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.reviews.length, 3)
-    assert.match(result.sampleNote ?? "", /3 of 42 available reviews/)
+    assert.match(result.sampleNote ?? "", /3 unique written review texts from 42 available review records/)
     assert.equal(canonicalAmazonProductUrl("https://www.amazon.ca/example/dp/B082Y114TB/ref=tracking"), "https://www.amazon.ca/dp/B082Y114TB")
   } finally {
     globalThis.fetch = originalFetch
