@@ -98,7 +98,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
             <Metric label="Source" value={String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
             <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
-            <Metric label="Provider" value={String(report.summary?.provider ?? "report engine")} />
+            <Metric label="Sample pages" value={String(report.summary?.pagesFetched ?? "-")} />
             <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
           </div>
         </div>
@@ -115,6 +115,11 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             </div>
           </section>
         </div>
+        <section className="mx-6 mb-6 rounded-2xl border border-white/10 bg-black/25 p-5 md:mx-8 md:mb-8">
+          <p className="text-sm font-black uppercase text-cyan">Evidence scope</p>
+          <p className="mt-2 text-white/74">{String(report.summary?.sampleNote ?? confidenceNote(reviewCount))}</p>
+          <p className="mt-2 text-sm text-white/55">{confidenceNote(reviewCount)} Customer-reported complaints require human review before product or safety decisions.</p>
+        </section>
       </section>
 
       {report.summary?.warning ? (
@@ -309,6 +314,12 @@ function scoreDataQuality(summary: Record<string, unknown>, insight: ReviewInsig
   if (count >= 100) return { label: "High", tone: "lime" as const }
   if (count >= 20) return { label: "Medium", tone: "yellow" as const }
   return { label: "Low", tone: "coral" as const }
+}
+
+function confidenceNote(reviewCount: number) {
+  if (reviewCount >= 100) return "A larger sample can reveal stronger recurring themes, though it is still not proof of a defect."
+  if (reviewCount >= 20) return "This sample is useful for directional patterns, but not complete market evidence."
+  return "This small sample identifies early signals only; collect more reviews before making decisions."
 }
 
 function cleanReportTitle(title: string) {

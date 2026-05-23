@@ -2,7 +2,7 @@ import { average, isValidHttpUrl, percent, toCsv } from "@/lib/scrapers/parser-u
 import { addReport, getStore } from "@/lib/scrapers/store"
 import type { IntelligenceReport, ProductRecord, ProductSnapshot, ReportFilters, ReportType } from "@/lib/scrapers/types"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
-import { amazonMarketplaceLabel, fetchAmazonReviews, generateReviewInsight } from "@/lib/ai/service"
+import { amazonMarketplaceLabel, canonicalAmazonProductUrl, fetchAmazonReviews, generateReviewInsight } from "@/lib/ai/service"
 
 const reportLabels: Record<ReportType, string> = {
   PRICE_MONITORING: "Price Monitoring Report",
@@ -82,11 +82,12 @@ export async function generateReport(type: ReportType, filters: ReportFilters = 
 async function generateReviewIntelligenceReport(type: ReportType, filters: ReportFilters, customerId?: string) {
   const platform = filters.platform ?? "amazon"
   const productUrl = filters.productUrl || (platform === "shopify" ? "https://shopify.com" : "https://www.amazon.com/dp/demo")
-  const productName = filters.productName || inferProductName(productUrl, platform)
+  const cleanProductUrl = platform === "amazon" ? canonicalAmazonProductUrl(productUrl) : productUrl
+  const initialProductName = filters.productName || inferProductName(productUrl, platform)
   const marketplace = platform === "shopify" ? "Shopify / DTC store" : amazonMarketplaceLabel(productUrl)
   const reviewResult = await fetchAmazonReviews({
-    productUrl,
-    productName,
+    productUrl: cleanProductUrl,
+    productName: initialProductName,
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
     platform,
@@ -95,8 +96,9 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
   if ((reviewResult.source === "apify" || reviewResult.source === "canopy") && reviewResult.reviews.length === 0) {
     throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
   }
+  const productName = filters.productName || reviewResult.productName || initialProductName
   const { insight, provider, model } = await generateReviewInsight({
-    productUrl,
+    productUrl: cleanProductUrl,
     productName,
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
@@ -115,17 +117,21 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     reportType: type,
     customerId,
     title: `${type === "EXECUTIVE_SUMMARY" ? "Executive Review Brief" : "Review Intelligence Brief"} - ${productName}`,
-    filters,
+    filters: { ...filters, productUrl: cleanProductUrl, productName },
     summary: {
       productName,
-      productUrl,
+      productUrl: cleanProductUrl,
       platform,
       marketplace,
+      asin: reviewResult.asin ?? "",
       competitorName: filters.competitorName ?? "",
       source: reviewResult.source,
       provider,
       model,
       reviewCount: reviewResult.reviews.length,
+      pagesFetched: reviewResult.pagesFetched ?? "",
+      availableReviewCount: reviewResult.availableReviewCount ?? "",
+      sampleNote: reviewResult.sampleNote ?? "",
       warning: reviewResult.warning ?? "",
       executiveSummary: insight.executiveSummary,
       topComplaints: insight.topComplaints.slice(0, 5),
@@ -272,7 +278,7 @@ export function exportReportPdf(report: IntelligenceReport) {
 }
 
 function buildPdfLines(report: IntelligenceReport) {
-  const rows = reportRowsForExport(report).slice(0, 20)
+  const rows = reportRowsForExport(report).filter((row) => row.section !== "Ad hook").slice(0, 8)
   const summary = report.summary ?? {}
   const insight = report.data?.insight as {
     topComplaints?: Array<{ theme?: string; evidence?: string; severity?: string; productImplication?: string }>
@@ -289,34 +295,40 @@ function buildPdfLines(report: IntelligenceReport) {
     `Product: ${stringifyPdfValue(summary.productName ?? report.title)}`,
     `URL: ${stringifyPdfValue(summary.productUrl ?? "-")}`,
     `Platform: ${stringifyPdfValue(summary.platform ?? summary.marketplace ?? "-")}`,
+    ...(summary.asin ? [`ASIN: ${stringifyPdfValue(summary.asin)}`] : []),
     `Type: ${report.reportType}`,
     `Status: ${report.status}`,
     `Generated: ${report.generatedAt ?? report.createdAt}`,
     `Source: ${stringifyPdfValue(summary.source ?? summary.sourceFilter ?? "-")}`,
     `Reviews analyzed: ${reviewCount}`,
-    `Confidence: ${pdfConfidence(reviewCount)}`,
+    `Confidence: ${pdfConfidence(reviewCount).label}`,
+    ...(summary.sampleNote ? [`Sample: ${stringifyPdfValue(summary.sampleNote)}`] : []),
     "",
     "Executive Summary",
     wrapPdfLine(stringifyPdfValue(summary.executiveSummary ?? "No executive summary was generated.")),
+    "",
+    "Interpretation Note",
+    wrapPdfLine(pdfConfidence(reviewCount).note),
+    "Customer-reported complaints are signals for human review, not verified product defects.",
     ...(summary.warning ? ["", "Data Source Warning", wrapPdfLine(stringifyPdfValue(summary.warning))] : []),
     "",
     "Next Best Actions",
     ...pdfActions(insight).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
     "",
     "Top Complaints",
-    ...pdfComplaintLines(insight),
+    ...pdfComplaintLines(insight).slice(0, 9),
     "",
     "Top Compliments",
-    ...pdfComplimentLines(insight),
+    ...pdfComplimentLines(insight).slice(0, 9),
     "",
     "Buyer Language",
     wrapPdfLine((insight?.buyerLanguage ?? []).slice(0, 16).join("; ") || "No buyer language available."),
     "",
     "Ad Hooks",
-    ...(insight?.adHooks?.length ? insight.adHooks.slice(0, 6).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No ad hooks available."]),
+    ...(insight?.adHooks?.length ? insight.adHooks.slice(0, 3).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No ad hooks available."]),
     "",
     "Positioning Angles",
-    ...(insight?.positioningAngles?.length ? insight.positioningAngles.slice(0, 6).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No positioning angles available."]),
+    ...(insight?.positioningAngles?.length ? insight.positioningAngles.slice(0, 3).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No positioning angles available."]),
     "",
     "Assumptions and Limitations",
     ...[...(insight?.assumptions ?? []), ...(insight?.dataQuality?.limitations ?? [])].slice(0, 8).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
@@ -324,7 +336,7 @@ function buildPdfLines(report: IntelligenceReport) {
     "Appendix Rows",
     ...rows.flatMap((row, index) => [
       `${index + 1}. ${stringifyPdfValue(row.theme ?? row.productName ?? row.title ?? row.source ?? "Report row")}`,
-      ...Object.entries(row).slice(0, 5).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
+      ...Object.entries(row).filter(([, value]) => value !== "" && value !== null && value !== undefined).slice(0, 5).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
     ])
   ].flatMap((line) => splitPdfLine(String(line))).map((line) => line.slice(0, 100))
 }
@@ -337,9 +349,9 @@ function stringifyPdfValue(value: unknown): string {
 }
 
 function pdfConfidence(reviewCount: number) {
-  if (reviewCount >= 100) return "High"
-  if (reviewCount >= 20) return "Medium"
-  return "Low"
+  if (reviewCount >= 100) return { label: "High", note: "This larger sample can reveal stronger recurring themes, though human review is still required." }
+  if (reviewCount >= 20) return { label: "Medium", note: "This sample is useful for directional patterns, but it should not be treated as complete market evidence." }
+  return { label: "Low", note: "This small sample can identify early signals only. Collect more reviews before making product or safety decisions." }
 }
 
 function inferProductName(productUrl: string, platform: "amazon" | "shopify" = "amazon") {
@@ -417,6 +429,7 @@ function pdfDraw(text: string, x: number, y: number, size: number, font: "F1" | 
 function isPdfSectionHeading(line: string) {
   return [
     "Executive Summary",
+    "Interpretation Note",
     "Data Source Warning",
     "Next Best Actions",
     "Top Complaints",

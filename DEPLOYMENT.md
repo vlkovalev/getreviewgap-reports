@@ -30,6 +30,7 @@ ADMIN_PASSWORD
 OPENAI_API_KEY
 OPENAI_MODEL
 CANOPY_API_KEY
+CANOPY_REVIEW_PAGE_LIMIT
 APIFY_TOKEN
 APIFY_AMAZON_REVIEWS_ACTOR_ID
 APIFY_INPUT_TEMPLATE
@@ -81,7 +82,7 @@ Preferred production connector:
 CANOPY_API_KEY
 ```
 
-Canopy provides a structured Amazon Product Reviews API with marketplace-specific review retrieval. ReviewGap calls its REST endpoint at `rest.canopyapi.co`, sending the ASIN and marketplace inferred from the product URL. Validate US and any international marketplace you intend to sell before accepting customer payments for automatic collection.
+Canopy provides a structured Amazon Product Reviews API with marketplace-specific review retrieval. ReviewGap calls its REST endpoint at `rest.canopyapi.co`, sending the ASIN and marketplace inferred from the product URL. Set `CANOPY_REVIEW_PAGE_LIMIT` to `5` for a cost-aware default sample of roughly 50 reviews per report, or adjust from `1` to `10` after measuring margins and latency. Validate US and any international marketplace you intend to sell before accepting customer payments for automatic collection.
 
 Fallback connector:
 

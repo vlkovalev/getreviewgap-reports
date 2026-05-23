@@ -13,8 +13,18 @@ const demoReviews = [
 ]
 
 type ReviewSource = "canopy" | "apify" | "pasted" | "demo"
+type ReviewFetchResult = {
+  reviews: string[]
+  source: ReviewSource
+  warning?: string
+  productName?: string
+  asin?: string
+  pagesFetched?: number
+  availableReviewCount?: number
+  sampleNote?: string
+}
 
-export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews: string[]; source: ReviewSource; warning?: string }> {
+export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetchResult> {
   if (input.pastedReviews?.trim()) {
     return {
       reviews: input.pastedReviews.split(/\n+/).map((line) => line.trim()).filter(Boolean).slice(0, 500),
@@ -64,35 +74,94 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
   throw new Error(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
 }
 
-async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<{ reviews: string[]; source: ReviewSource; warning?: string }> {
+async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<ReviewFetchResult> {
   const asin = extractAmazonAsin(input.productUrl)
   if (!asin) throw new Error("Could not identify an Amazon ASIN in this URL. Use a product URL containing /dp/ASIN.")
-  const params = new URLSearchParams({
-    asin,
-    domain: amazonMarketplaceCode(input.productUrl),
-    page: "1",
-    rating: "ALL"
-  })
-  let response: Response
-  try {
-    response = await fetch(`https://rest.canopyapi.co/api/amazon/product/reviews?${params}`, {
-      headers: { "API-KEY": apiKey },
-      cache: "no-store"
+  const maxPages = canopyReviewPageLimit()
+  const reviews = new Set<string>()
+  let pagesFetched = 0
+  let availableReviewCount: number | undefined
+  let productName: string | undefined
+  let hasNextPage = true
+
+  while (pagesFetched < maxPages && hasNextPage) {
+    const params = new URLSearchParams({
+      asin,
+      domain: amazonMarketplaceCode(input.productUrl),
+      page: String(pagesFetched + 1),
+      rating: "ALL"
     })
-  } catch {
-    throw new Error("Could not connect to the Amazon reviews provider. Please retry shortly; your credit has been returned.")
+    let response: Response
+    try {
+      response = await fetch(`https://rest.canopyapi.co/api/amazon/product/reviews?${params}`, {
+        headers: { "API-KEY": apiKey },
+        cache: "no-store"
+      })
+    } catch {
+      throw new Error("Could not connect to the Amazon reviews provider. Please retry shortly; your credit has been returned.")
+    }
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) throw new Error("Canopy authentication failed. Check CANOPY_API_KEY in Vercel.")
+      throw new Error(`Canopy review request failed with status ${response.status}.`)
+    }
+    const payload = await response.json() as Record<string, unknown>
+    const product = canopyProduct(payload)
+    const pageInfo = canopyPageInfo(product)
+    productName ||= typeof product?.title === "string" ? product.title.trim() : undefined
+    availableReviewCount ||= typeof pageInfo?.totalResults === "number" ? pageInfo.totalResults : undefined
+    const pageReviews = canopyPaginatedReviewTexts(product)
+    const usableReviews = pageReviews.length ? pageReviews : extractReviewTexts([payload])
+    const previousCount = reviews.size
+    for (const text of usableReviews) reviews.add(text)
+    pagesFetched += 1
+    hasNextPage = pageInfo ? Boolean(pageInfo.hasNextPage) : usableReviews.length > 0 && reviews.size > previousCount
   }
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error("Canopy authentication failed. Check CANOPY_API_KEY in Vercel.")
-    throw new Error(`Canopy review request failed with status ${response.status}.`)
-  }
-  const payload = await response.json() as Record<string, unknown>
-  const reviews = extractReviewTexts([payload]).slice(0, 500)
+
+  const collectedReviews = [...reviews].slice(0, 500)
+  const sampleNote = availableReviewCount && availableReviewCount > collectedReviews.length
+    ? `Analyzed ${collectedReviews.length} of ${availableReviewCount} available reviews across ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
+    : `Analyzed ${collectedReviews.length} review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
   return {
-    reviews,
+    reviews: collectedReviews,
     source: "canopy",
-    warning: reviews.length ? undefined : "Canopy returned no review text for this product and marketplace. Try an authorized review export or a different product."
+    productName,
+    asin,
+    pagesFetched,
+    availableReviewCount,
+    sampleNote,
+    warning: collectedReviews.length ? undefined : "Canopy returned no review text for this product and marketplace. Try an authorized review export or a different product."
   }
+}
+
+function canopyReviewPageLimit() {
+  const configured = Number(process.env.CANOPY_REVIEW_PAGE_LIMIT ?? 5)
+  return Number.isFinite(configured) ? Math.max(1, Math.min(10, Math.floor(configured))) : 5
+}
+
+function canopyProduct(payload: Record<string, unknown>) {
+  const data = payload.data
+  if (!data || typeof data !== "object" || Array.isArray(data)) return undefined
+  const product = (data as Record<string, unknown>).amazonProduct
+  return product && typeof product === "object" && !Array.isArray(product) ? product as Record<string, unknown> : undefined
+}
+
+function canopyPageInfo(product: Record<string, unknown> | undefined) {
+  const pagination = product?.reviewsPaginated
+  if (!pagination || typeof pagination !== "object" || Array.isArray(pagination)) return undefined
+  const info = (pagination as Record<string, unknown>).pageInfo
+  return info && typeof info === "object" && !Array.isArray(info) ? info as Record<string, unknown> : undefined
+}
+
+function canopyPaginatedReviewTexts(product: Record<string, unknown> | undefined) {
+  const pagination = product?.reviewsPaginated
+  if (!pagination || typeof pagination !== "object" || Array.isArray(pagination)) return []
+  const rows = (pagination as Record<string, unknown>).reviews
+  if (!Array.isArray(rows)) return []
+  return rows.flatMap((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return []
+    const body = (row as Record<string, unknown>).body
+    return typeof body === "string" && body.trim().length >= 20 ? [body.replace(/\s+/g, " ").trim()] : []
+  })
 }
 
 function buildApifyInputs(input: ReviewInput, actorId: string) {
@@ -211,6 +280,12 @@ function amazonMarketplaceCode(url: string) {
 
 export function amazonMarketplaceLabel(url: string) {
   return new URL(url).hostname.toLowerCase().replace(/^www\./, "")
+}
+
+export function canonicalAmazonProductUrl(url: string) {
+  const parsed = new URL(url)
+  const asin = extractAmazonAsin(url)
+  return asin ? `${parsed.protocol}//${parsed.hostname}/dp/${asin}` : url
 }
 
 function extractReviewTexts(items: Array<Record<string, unknown>>) {
