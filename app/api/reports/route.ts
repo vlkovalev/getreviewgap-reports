@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Thanks." })
     }
 
-    const reportInput = { ...parsed.data, marketplace: amazonMarketplaceLabel(parsed.data.productUrl) }
+    const reportInput = { ...parsed.data, marketplace: parsed.data.platform === "shopify" ? "Shopify / DTC store" : amazonMarketplaceLabel(parsed.data.productUrl) }
     const reviewResult = await fetchAmazonReviews(reportInput)
     const { insight, provider, model } = await generateReviewInsight(reportInput, reviewResult.reviews)
     const report = await createReportRecord({

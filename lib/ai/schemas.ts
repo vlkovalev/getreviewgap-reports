@@ -2,6 +2,7 @@ import { z } from "zod"
 
 export const reviewInputSchema = z.object({
   productUrl: z.string().url().max(2000),
+  platform: z.enum(["amazon", "shopify"]).optional().default("amazon"),
   email: z.string().email().max(120).optional().or(z.literal("")),
   productName: z.string().trim().max(160).optional().or(z.literal("")),
   competitorName: z.string().trim().max(160).optional().or(z.literal("")),

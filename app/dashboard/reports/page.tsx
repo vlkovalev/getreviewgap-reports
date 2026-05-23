@@ -24,7 +24,7 @@ export default async function ReportsPage() {
     } satisfies IntelligenceReport)))
     : store.reports.filter((report) => !customer || !report.customerId || report.customerId === customer.id)
   return (
-    <DashboardShell title="Amazon review intelligence" description="Generate review, rating, sentiment, and data-quality reports. Broader marketplace scraping remains internal demo infrastructure, not the first paid offer.">
+    <DashboardShell title="Review intelligence reports" description="Analyze Amazon customer reviews or authorized Shopify/DTC review exports. Turn recurring feedback into product and marketing decisions.">
       <ReportsClient initialReports={reports} sources={store.sources} credits={customer?.credits ?? 0} signedIn={Boolean(customer)} />
     </DashboardShell>
   )

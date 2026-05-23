@@ -38,6 +38,11 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const insight = report.data?.insight as ReviewInsightLike | undefined
   const reviewCount = Number(report.summary?.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
   const dataScore = scoreDataQuality(report.summary ?? {}, insight)
+  const platform = report.summary?.platform
+    ? String(report.summary.platform)
+    : report.summary?.marketplace
+      ? (String(report.summary.marketplace).toLowerCase().includes("shopify") ? "shopify" : "amazon")
+      : "mixed"
 
   return (
     <DashboardShell title={cleanReportTitle(report.title)} description="Executive review intelligence brief with actions, proof points, and export-ready appendix.">
@@ -51,7 +56,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
               </div>
               <p className="mt-6 text-sm font-black uppercase text-lime">ReviewGap brief</p>
               <h1 className="mt-2 text-4xl font-black leading-none md:text-6xl">{String(report.summary?.productName ?? "Product review analysis")}</h1>
-              <p className="mt-4 max-w-2xl text-white/70">{String(report.summary?.productUrl ?? "No product URL supplied")}</p>
+              <p className="mt-4 max-w-2xl text-white/70">
+                {report.summary?.productUrl ? <a href={String(report.summary.productUrl)} target="_blank" rel="noreferrer" className="hover:text-lime">{displayUrl(String(report.summary.productUrl))}</a> : "No product URL supplied"}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full bg-lime px-4 py-2 text-sm font-black text-black">PDF</a>
@@ -60,8 +67,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          <div className="mt-7 grid gap-3 md:grid-cols-5">
+          <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
             <Metric label="Reviews analyzed" value={String(reviewCount)} />
+            <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
             <Metric label="Source" value={String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
             <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
             <Metric label="Provider" value={String(report.summary?.provider ?? "report engine")} />
@@ -92,6 +100,21 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
 
       {insight ? (
         <>
+          <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-sm font-black uppercase text-lime">Decision snapshot</p>
+                <h2 className="mt-2 text-2xl font-black">What to act on first</h2>
+              </div>
+              <p className="text-sm text-white/45">Evidence-led findings from {reviewCount} review{reviewCount === 1 ? "" : "s"}</p>
+            </div>
+            <div className="mt-5 grid gap-3 lg:grid-cols-3">
+              <SnapshotItem label="Main friction" title={insight.topComplaints?.[0]?.theme ?? "No complaint signal"} body={insight.topComplaints?.[0]?.productImplication ?? "Collect more reviews before choosing a product response."} tone="coral" />
+              <SnapshotItem label="Winning signal" title={insight.topCompliments?.[0]?.theme ?? "No positive signal"} body={insight.topCompliments?.[0]?.marketingImplication ?? "No validated marketing claim is available yet."} tone="lime" />
+              <SnapshotItem label="Recommended move" title={insight.productImprovementIdeas?.[0]?.idea ?? "Increase evidence"} body={insight.productImprovementIdeas?.[0]?.whyItMatters ?? "Add more customer review text to increase confidence."} tone="cyan" />
+            </div>
+          </section>
+
           <section className="mt-6 grid gap-4 lg:grid-cols-2">
             <EvidenceList title="Top complaints to exploit or avoid" items={insight.topComplaints?.map((item) => ({
               title: item.theme,
@@ -230,6 +253,16 @@ function ActionItem({ text }: { text: string }) {
   return <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/76">{text}</p>
 }
 
+function SnapshotItem({ label, title, body, tone }: { label: string; title: string; body: string; tone: "coral" | "lime" | "cyan" }) {
+  return (
+    <article className="rounded-xl border border-white/10 bg-black/25 p-5">
+      <p className={`text-xs font-black uppercase ${toneClass(tone)}`}>{label}</p>
+      <h3 className="mt-3 text-xl font-black">{title}</h3>
+      <p className="mt-3 text-sm leading-relaxed text-white/65">{body}</p>
+    </article>
+  )
+}
+
 function EmptyText({ text }: { text: string }) {
   return <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-white/45">{text}</p>
 }
@@ -278,4 +311,13 @@ function renderCell(value: unknown) {
 
 function formatHeader(value: string) {
   return value.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function displayUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return `${url.hostname.replace(/^www\./, "")}${url.pathname}`.slice(0, 100)
+  } catch {
+    return value.slice(0, 100)
+  }
 }

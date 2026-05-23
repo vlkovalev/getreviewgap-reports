@@ -29,6 +29,7 @@ export default async function PricingPage() {
         <p className="mt-5 max-w-3xl text-lg text-white/70">
           One credit generates one AI review report. Buy credits once, or choose a monthly plan that refreshes automatically and rolls unused credits forward.
         </p>
+        <p className="mt-4 inline-flex rounded-full border border-cyan/25 bg-cyan/10 px-4 py-2 text-sm font-bold text-cyan">All prices are in USD. Pay by card or PayPal.</p>
         <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
           {isSignedIn ? (
             <p className="text-white/70">Signed in as <span className="font-bold text-white">{customer?.email}</span>. Purchases will add credits to this account.</p>
@@ -94,7 +95,7 @@ function PricingCard({ planId, isSignedIn }: { planId: PlanId; isSignedIn: boole
         {badge ? <span className="rounded-full bg-lime px-3 py-1 text-xs font-black uppercase text-black">{badge}</span> : null}
       </div>
       <p className="mt-2 text-white/60">{plan.description}</p>
-      <p className="mt-5 text-4xl font-black text-lime">{plan.priceLabel}</p>
+      <p className="mt-5 text-4xl font-black text-lime">{plan.priceLabel} <span className="text-sm text-white/45">USD</span></p>
       <ul className="mt-6 space-y-3 text-white/70">
         {plan.features.map((feature) => <li key={feature}>- {feature}</li>)}
       </ul>

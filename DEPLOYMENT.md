@@ -83,6 +83,8 @@ APIFY_AMAZON_REVIEWS_ACTOR_ID=junipr/amazon-reviews-scraper
 ReviewGap extracts the ASIN from the product URL and automatically selects the matching marketplace for Amazon US, Canada, UK, Germany, France, Italy, Spain, Australia, Japan, India, Brazil, and Mexico. No Canada-only setting is required.
 When this Junipr actor id is selected, its native ASIN-based request is used automatically even if an older `APIFY_INPUT_TEMPLATE` is still configured.
 
+Shopify/DTC reports currently accept review text pasted from an authorized store export or review-app export. Add a provider-specific Shopify connector only after confirming the merchant's review app and permitted API/export method.
+
 If you later select a different actor that does not accept the built-in input formats, add an input template like this:
 
 ```json
@@ -121,6 +123,8 @@ The app also records lightweight internal events in `AuditEvent` when the databa
 - `analytics.report_export_started`
 
 ## 4. PayPal
+
+Stripe and PayPal checkout amounts are configured in US dollars (`USD`). Confirm the displayed USD amount during both test and live purchase checks.
 
 For testing:
 

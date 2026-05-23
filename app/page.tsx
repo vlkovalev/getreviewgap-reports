@@ -10,7 +10,7 @@ const benefits = [
 ]
 
 const steps = [
-  ["Choose a product", "Paste an Amazon product URL or run a demo report while your review source is being connected."],
+  ["Choose a product", "Paste an Amazon product URL, or use exported Shopify review text from your store or approved review app."],
   ["Generate insights", "AI groups sentiment, repeated complaints, rating signals, buyer phrases, and product gaps."],
   ["Use the report", "Export a concise report for product, listing, CRO, and advertising decisions."]
 ]
@@ -135,7 +135,7 @@ export default function HomePage() {
           <div className="rounded-3xl border border-lime/30 bg-lime/10 p-8">
             <p className="font-black uppercase text-lime">Simple pricing</p>
             <h2 className="mt-3 text-4xl font-black md:text-5xl">Start at $5. Upgrade when reports become a workflow.</h2>
-            <p className="mt-5 text-white/70">Buy one report, grab a one-time pack, or use monthly credits that roll over up to 3x.</p>
+            <p className="mt-5 text-white/70">Buy one report, grab a one-time pack, or use monthly credits that roll over up to 3x. All prices are USD.</p>
             <Link href="/pricing" className="btn-primary mt-7">View pricing</Link>
           </div>
           <div className="grid gap-3">

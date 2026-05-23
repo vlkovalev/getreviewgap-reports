@@ -21,7 +21,8 @@ ReviewGap is a full-stack MVP for the validated business idea: **AI-powered comp
 - Deterministic report engine in `lib/reports/report-engine.ts`.
 - Report tests covering all report types and CSV/JSON export.
 - AI service with production-oriented prompt template and JSON validation.
-- Apify integration scaffold for Amazon review scraping.
+- Junipr/Apify integration for multi-market Amazon review collection.
+- Shopify/DTC report workflow using pasted or approved review-app exports until a specific store review provider connector is selected.
 - Demo fallback when `OPENAI_API_KEY` or Apify keys are missing.
 - Prisma schema for users, profiles, review reports, agent runs, subscriptions, audit events, leads, and inquiries.
 - Supabase SQL migrations with UUID primary keys, status fields, indexes, foreign keys, and RLS policies.
@@ -78,6 +79,7 @@ Do not commit real secrets. Create a local `.env` file from `.env.example` and p
 
 - OpenAI: create or rotate an API key, then set `OPENAI_API_KEY`.
 - Apify: set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID="junipr/amazon-reviews-scraper"`. The app infers the marketplace from Amazon URLs across the supported US, Canadian, UK, European, Australian, Japanese, Indian, Brazilian, and Mexican stores. Junipr's native ASIN-based input takes priority automatically; if another actor needs custom input, set `APIFY_INPUT_TEMPLATE` with `{{PRODUCT_URL}}`.
+- Shopify: users can generate reports from pasted/exported Shopify review text now. Direct collection must be added for the store's chosen review provider (for example, a permitted export or API integration) rather than pretending every Shopify storefront exposes reviews in one format.
 - Database: create a Supabase or Neon Postgres database and set `DATABASE_URL`.
 - Admin: set `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 - Email: configure Resend later with `RESEND_API_KEY`, `EMAIL_FROM`, and `OWNER_EMAIL`.
@@ -195,8 +197,8 @@ CSV, JSON, and PDF exports are implemented and tested for generated reports.
 - Choose the exact Apify Amazon review actor and set `APIFY_AMAZON_REVIEWS_ACTOR_ID`.
 - Add `OPENAI_API_KEY`.
 - Add real authentication if user accounts are required.
-- Add PayPal REST API credentials before taking PayPal payments.
-- Add `STRIPE_SECRET_KEY` before taking card payments through Stripe Checkout.
+- Add PayPal REST API credentials before taking PayPal payments; checkout is denominated in USD.
+- Add `STRIPE_SECRET_KEY` before taking USD card payments through Stripe Checkout.
 - Add `STRIPE_WEBHOOK_SECRET` before real subscriptions. The webhook listens for `checkout.session.completed` and `invoice.paid`.
 - Add email/domain verification for Resend.
 - Replace demo content with real sample reports.

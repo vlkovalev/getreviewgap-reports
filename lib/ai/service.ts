@@ -20,6 +20,10 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
     }
   }
 
+  if (input.platform === "shopify") {
+    throw new Error("Shopify reports need pasted or exported customer reviews for now. Paste review text from your store or approved review app export to generate a report.")
+  }
+
   const apifyToken = cleanEnv(process.env.APIFY_TOKEN)
   const actorId = cleanEnv(process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID)
 

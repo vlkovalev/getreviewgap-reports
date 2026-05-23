@@ -27,7 +27,7 @@ export default async function BillingPage() {
         <section className="card p-6">
           <p className="text-sm font-black uppercase text-coral">Checkout</p>
           <h2 className="mt-3 text-2xl font-black">Card or PayPal</h2>
-          <p className="mt-2 text-white/65">Buy one-time packs or monthly auto-refreshing credits from Pricing.</p>
+          <p className="mt-2 text-white/65">All purchases are charged in USD. Buy one-time packs or monthly auto-refreshing credits from Pricing.</p>
         </section>
       </div>
 

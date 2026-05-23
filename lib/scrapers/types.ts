@@ -110,6 +110,7 @@ export type ReportFilters = {
   sourceId?: string
   dateFrom?: string
   dateTo?: string
+  platform?: "amazon" | "shopify"
   productUrl?: string
   productName?: string
   competitorName?: string

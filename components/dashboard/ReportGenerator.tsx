@@ -9,6 +9,7 @@ export function ReportGenerator() {
   const [selected, setSelected] = useState<StoredReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [platform, setPlatform] = useState<"amazon" | "shopify">("amazon")
 
   useEffect(() => {
     fetch("/api/reports")
@@ -24,6 +25,7 @@ export function ReportGenerator() {
     const formData = new FormData(event.currentTarget)
     const payload = {
       productUrl: formData.get("productUrl"),
+      platform,
       productName: formData.get("productName"),
       competitorName: formData.get("competitorName"),
       email: formData.get("email"),
@@ -61,10 +63,17 @@ export function ReportGenerator() {
           <p className="mt-2 text-sm text-white/60">Use a product URL plus optional pasted reviews. If API keys are missing, the app returns a clearly marked demo report.</p>
         </div>
         <input className="hidden" name="website" tabIndex={-1} autoComplete="off" />
+        <div className="grid gap-2 text-sm font-bold">
+          Review source
+          <div className="grid grid-cols-2 rounded-xl border border-white/10 bg-black/30 p-1">
+            <button type="button" onClick={() => setPlatform("amazon")} className={`rounded-lg px-3 py-3 ${platform === "amazon" ? "bg-lime text-black" : "text-white/65"}`}>Amazon</button>
+            <button type="button" onClick={() => setPlatform("shopify")} className={`rounded-lg px-3 py-3 ${platform === "shopify" ? "bg-lime text-black" : "text-white/65"}`}>Shopify / DTC</button>
+          </div>
+        </div>
         <label className="grid gap-2 text-sm font-bold">
-          Amazon product URL
-          <input name="productUrl" type="url" required placeholder="https://www.amazon.com/dp/..." className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
-          <span className="text-xs font-normal text-white/50">Supports Amazon US, Canada, UK, Europe, Australia, Japan, India, Brazil, and Mexico.</span>
+          {platform === "amazon" ? "Amazon product URL" : "Shopify product URL"}
+          <input name="productUrl" type="url" required placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."} className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
+          <span className="text-xs font-normal text-white/50">{platform === "amazon" ? "Supports Amazon US, Canada, UK, Europe, Australia, Japan, India, Brazil, and Mexico." : "Paste reviews from a store export or approved review app export; direct collection is not connected yet."}</span>
         </label>
         <label className="grid gap-2 text-sm font-bold">
           Product name
@@ -79,8 +88,8 @@ export function ReportGenerator() {
           <input name="email" type="email" placeholder="you@brand.com" className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
         </label>
         <label className="grid gap-2 text-sm font-bold">
-          Paste reviews, optional
-          <textarea name="pastedReviews" placeholder="Paste one review per line to test with real text before Apify is configured." className="min-h-36 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
+          Paste reviews{platform === "shopify" ? " (required for Shopify now)" : ", optional"}
+          <textarea name="pastedReviews" required={platform === "shopify"} placeholder={platform === "shopify" ? "Paste Shopify customer review export text, one review per line." : "Paste one review per line to test with real text before Apify is configured."} className="min-h-36 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
         </label>
         <button disabled={loading} className="btn-primary disabled:opacity-60">{loading ? "Generating..." : "Generate report"}</button>
         {error && <p className="rounded-2xl bg-red-400/15 p-3 text-sm text-red-100">{error}</p>}

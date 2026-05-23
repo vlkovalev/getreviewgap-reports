@@ -15,6 +15,7 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
   const [reports, setReports] = useState(initialReports)
   const [creditCount, setCreditCount] = useState(credits)
   const [reportType, setReportType] = useState<ReportType>("REVIEW_RATING")
+  const [platform, setPlatform] = useState<"amazon" | "shopify">("amazon")
   const [sourceId, setSourceId] = useState("")
   const [productUrl, setProductUrl] = useState("")
   const [productName, setProductName] = useState("")
@@ -32,12 +33,17 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
       setStatus("You are out of report credits. Buy a single report, pack, or monthly credits to continue.")
       return
     }
+    if (platform === "shopify" && !pastedReviews.trim()) {
+      setStatus("Paste Shopify review text or an approved review-app export before generating. Automated Shopify review collection is not connected yet.")
+      return
+    }
     setStatus("Generating report...")
     const response = await fetch("/api/scraper/reports", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         reportType,
+        platform,
         sourceId: sourceId || undefined,
         productUrl: productUrl || undefined,
         productName: productName || undefined,
@@ -67,7 +73,7 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
       <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
         <h2 className="text-2xl font-black">Generate report</h2>
         <p className="mt-3 text-sm text-white/60">
-          MVP focus: Amazon review intelligence. Price, ad, seller-contact, and broad marketplace scraping are intentionally not offered as paid services.
+          Generate buyer-sentiment intelligence from Amazon reviews or Shopify/DTC review exports. Price, contact-data, and broad marketplace scraping are intentionally not offered as paid services.
         </p>
         <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
           <p className="text-sm text-white/60">Report credits</p>
@@ -86,10 +92,17 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
             {reportTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
           </select>
         </label>
+        <div className="mt-4 grid gap-2 text-sm">
+          <span className="text-white/70">Review source</span>
+          <div className="grid grid-cols-2 rounded-xl border border-white/10 bg-black p-1">
+            <button type="button" onClick={() => setPlatform("amazon")} className={`rounded-lg px-3 py-3 font-bold ${platform === "amazon" ? "bg-lime text-black" : "text-white/65"}`}>Amazon</button>
+            <button type="button" onClick={() => setPlatform("shopify")} className={`rounded-lg px-3 py-3 font-bold ${platform === "shopify" ? "bg-lime text-black" : "text-white/65"}`}>Shopify / DTC</button>
+          </div>
+        </div>
         <label className="mt-4 grid gap-2 text-sm">
-          <span className="text-white/70">Amazon product URL, optional</span>
-          <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder="https://www.amazon.com/dp/..." className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-          <span className="text-xs text-white/45">Supports Amazon US, Canada, UK, Europe, Australia, Japan, India, Brazil, and Mexico. Use sources you are permitted to analyze.</span>
+          <span className="text-white/70">{platform === "amazon" ? "Amazon product URL, optional" : "Shopify product URL, optional"}</span>
+          <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          <span className="text-xs text-white/45">{platform === "amazon" ? "Amazon review collection supports US, Canada, UK, Europe, Australia, Japan, India, Brazil, and Mexico." : "For Shopify, paste reviews exported from your store or review app. A connector can be added once your review provider is selected."}</span>
         </label>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="grid gap-2 text-sm">
@@ -102,8 +115,8 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
           </label>
         </div>
         <label className="mt-4 grid gap-2 text-sm">
-          <span className="text-white/70">Paste reviews, optional</span>
-          <textarea value={pastedReviews} onChange={(event) => setPastedReviews(event.target.value)} rows={4} placeholder="Paste one review per line to test with real text." className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          <span className="text-white/70">Paste reviews{platform === "shopify" ? " (required for Shopify now)" : ", optional"}</span>
+          <textarea value={pastedReviews} onChange={(event) => setPastedReviews(event.target.value)} rows={5} placeholder={platform === "shopify" ? "Paste Shopify review export text, one review per line." : "Paste one review per line, or let Amazon collection fetch available reviews."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
         </label>
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">Source filter</span>

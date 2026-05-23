@@ -25,6 +25,7 @@ export function ContactForm() {
         <label className="grid gap-2 text-sm font-bold">Service interest
           <select suppressHydrationWarning name="serviceInterest" required className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime">
             <option value="Amazon review reports">Amazon review reports</option>
+            <option value="Shopify review reports">Shopify review reports</option>
             <option value="Agency workflow">Agency workflow</option>
             <option value="Custom integration">Custom integration</option>
           </select>

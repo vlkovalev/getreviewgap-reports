@@ -11,6 +11,7 @@ const createReportSchema = z.object({
   sourceId: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
+  platform: z.enum(["amazon", "shopify"]).optional().default("amazon"),
   productUrl: z.string().url().max(2000).optional().or(z.literal("")),
   productName: z.string().trim().max(160).optional().or(z.literal("")),
   competitorName: z.string().trim().max(160).optional().or(z.literal("")),
@@ -37,12 +38,12 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid report request", details: parsed.error.flatten() }, { status: 400 })
     }
-    const { reportType, sourceId, dateFrom, dateTo, productUrl, productName, competitorName, pastedReviews } = parsed.data
+    const { reportType, sourceId, dateFrom, dateTo, platform, productUrl, productName, competitorName, pastedReviews } = parsed.data
     const customer = await getCurrentCustomer()
     if (!customer) return NextResponse.json({ error: "Sign in to generate and save reports." }, { status: 401 })
     if (!(await consumeCredit(customer.id))) return NextResponse.json({ error: "You are out of report credits. Choose a plan or bundle from Billing." }, { status: 402 })
     consumedCustomerId = customer.id
-    const report = await generateReport(reportType, { sourceId, dateFrom, dateTo, productUrl: productUrl || undefined, productName: productName || undefined, competitorName: competitorName || undefined, pastedReviews: pastedReviews || undefined }, customer.id)
+    const report = await generateReport(reportType, { sourceId, dateFrom, dateTo, platform, productUrl: productUrl || undefined, productName: productName || undefined, competitorName: competitorName || undefined, pastedReviews: pastedReviews || undefined }, customer.id)
     const updatedCustomer = await getCurrentCustomer()
     return NextResponse.json({ report, credits: updatedCustomer?.credits ?? Math.max(customer.credits - 1, 0) }, { status: 201 })
   } catch (error) {

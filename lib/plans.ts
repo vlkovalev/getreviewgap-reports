@@ -38,7 +38,7 @@ export const paidPlans: Record<PlanId, { id: PlanId; name: string; price: number
     name: "Starter",
     price: 29,
     priceLabel: "$29/mo",
-    description: "For solo Amazon sellers and small brands that research reviews every month.",
+    description: "For solo sellers and Shopify brands researching reviews every month.",
     features: ["10 credits per month", "Rollover up to 30 credits", "For solo sellers", "Buyer language extraction"]
   },
   growth: {
