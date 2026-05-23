@@ -81,7 +81,7 @@ Preferred production connector:
 CANOPY_API_KEY
 ```
 
-Canopy provides a structured Amazon Product Reviews API with marketplace-specific review retrieval. ReviewGap sends the ASIN and marketplace inferred from the product URL. Validate US and any international marketplace you intend to sell before accepting customer payments for automatic collection.
+Canopy provides a structured Amazon Product Reviews API with marketplace-specific review retrieval. ReviewGap calls its REST endpoint at `rest.canopyapi.co`, sending the ASIN and marketplace inferred from the product URL. Validate US and any international marketplace you intend to sell before accepting customer payments for automatic collection.
 
 Fallback connector:
 

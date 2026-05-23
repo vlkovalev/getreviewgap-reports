@@ -21,7 +21,7 @@ ReviewGap is a full-stack MVP for the validated business idea: **AI-powered comp
 - Deterministic report engine in `lib/reports/report-engine.ts`.
 - Report tests covering all report types and CSV/JSON export.
 - AI service with production-oriented prompt template and JSON validation.
-- Canopy API integration for structured multi-market Amazon review collection when `CANOPY_API_KEY` is configured.
+- Canopy REST API integration for structured multi-market Amazon review collection when `CANOPY_API_KEY` is configured.
 - Apify fallback support for experimentation, with clear empty-data handling when Amazon restricts review-page access.
 - CSV/TXT review import for authorized Amazon or Shopify exports.
 - Shopify/DTC report workflow using pasted or approved review-app exports until a specific store review provider connector is selected.

@@ -73,10 +73,15 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<{
     page: "1",
     rating: "ALL"
   })
-  const response = await fetch(`https://api.canopyapi.co/v1/amazon/product/reviews?${params}`, {
-    headers: { "API-KEY": apiKey },
-    cache: "no-store"
-  })
+  let response: Response
+  try {
+    response = await fetch(`https://rest.canopyapi.co/api/amazon/product/reviews?${params}`, {
+      headers: { "API-KEY": apiKey },
+      cache: "no-store"
+    })
+  } catch {
+    throw new Error("Could not connect to the Amazon reviews provider. Please retry shortly; your credit has been returned.")
+  }
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) throw new Error("Canopy authentication failed. Check CANOPY_API_KEY in Vercel.")
     throw new Error(`Canopy review request failed with status ${response.status}.`)
