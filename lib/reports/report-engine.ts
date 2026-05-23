@@ -74,7 +74,7 @@ export async function generateReport(type: ReportType, filters: ReportFilters = 
 
 async function generateReviewIntelligenceReport(type: ReportType, filters: ReportFilters, customerId?: string) {
   const productUrl = filters.productUrl || "https://www.amazon.com/dp/demo"
-  const productName = filters.productName || "Amazon product"
+  const productName = filters.productName || inferProductName(productUrl)
   const reviewResult = await fetchAmazonReviews({
     productUrl,
     productName,
@@ -90,16 +90,17 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     marketplace: "amazon.com"
   }, reviewResult.reviews)
   const now = new Date()
-  const rows = [
+  const insightRows = [
     ...insight.topComplaints.map((item) => ({ section: "Top complaint", theme: item.theme, evidence: item.evidence, severity: item.severity, recommendation: item.productImplication })),
     ...insight.topCompliments.map((item) => ({ section: "Top compliment", theme: item.theme, evidence: item.evidence, severity: "", recommendation: item.marketingImplication })),
     ...insight.productImprovementIdeas.map((item) => ({ section: "Product idea", theme: item.idea, evidence: item.whyItMatters, severity: item.confidence, recommendation: item.whyItMatters })),
     ...insight.adHooks.map((hook) => ({ section: "Ad hook", theme: hook, evidence: "", severity: "", recommendation: hook }))
   ]
+  const rows = insightRows.length ? insightRows : emptyReviewRows(reviewResult.warning)
   const reportInput = {
     reportType: type,
     customerId,
-    title: `${type === "EXECUTIVE_SUMMARY" ? "Executive Review Intelligence" : "Review and Rating Report"} - ${productName}`,
+    title: `${type === "EXECUTIVE_SUMMARY" ? "Executive Review Brief" : "Review Intelligence Brief"} - ${productName}`,
     filters,
     summary: {
       productName,
@@ -173,8 +174,8 @@ export function regenerateReport(reportId: string) {
 
 export function reportRowsForExport(report: IntelligenceReport): Record<string, unknown>[] {
   const data = report.data ?? {}
-  if (Array.isArray(data.rows)) return data.rows as Record<string, unknown>[]
-  if (Array.isArray(data.alerts)) return data.alerts as Record<string, unknown>[]
+  if (Array.isArray(data.rows) && data.rows.length) return data.rows as Record<string, unknown>[]
+  if (Array.isArray(data.alerts) && data.alerts.length) return data.alerts as Record<string, unknown>[]
   return [{ title: report.title, reportType: report.reportType, status: report.status, ...report.summary }]
 }
 
@@ -307,6 +308,30 @@ function pdfConfidence(reviewCount: number) {
   if (reviewCount >= 100) return "High"
   if (reviewCount >= 20) return "Medium"
   return "Low"
+}
+
+function inferProductName(productUrl: string) {
+  const asin = productUrl.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase()
+  return asin ? `Amazon product ${asin}` : "Amazon product"
+}
+
+function emptyReviewRows(warning?: string) {
+  return [
+    {
+      section: "Data source warning",
+      theme: "No review text captured",
+      evidence: warning || "The data connector completed but did not return usable review text.",
+      severity: "high",
+      recommendation: "Try a product with visible reviews, switch to Amazon.com, paste reviews manually, or configure a dedicated Amazon reviews actor."
+    },
+    {
+      section: "Next step",
+      theme: "Manual review paste fallback",
+      evidence: "The report generator can analyze pasted review text immediately.",
+      severity: "medium",
+      recommendation: "Copy 20-50 visible customer reviews into the Paste reviews field to produce a full insight report."
+    }
+  ]
 }
 
 function pdfActions(insight: { productImprovementIdeas?: Array<{ idea?: string }>; topComplaints?: Array<{ theme?: string }>; adHooks?: string[] } | undefined) {
