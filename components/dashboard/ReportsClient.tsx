@@ -39,7 +39,10 @@ export function ReportsClient({
   const [pastedReviews, setPastedReviews] = useState("")
   const [importedFileName, setImportedFileName] = useState("")
   const [status, setStatus] = useState("")
+  const [showArchived, setShowArchived] = useState(false)
+  const [busyReportId, setBusyReportId] = useState("")
   const canGenerate = signedIn && creditCount > 0
+  const visibleReports = reports.filter((report) => isArchived(report) === showArchived)
 
   async function importReviews(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0]
@@ -97,6 +100,43 @@ export function ReportsClient({
       hasProductUrl: Boolean(productUrl),
       hasPastedReviews: Boolean(pastedReviews)
     })
+  }
+
+  async function setArchived(report: IntelligenceReport, action: "archive" | "restore") {
+    setBusyReportId(report.id)
+    const response = await fetch(`/api/scraper/reports/${report.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action })
+    })
+    const payload = await response.json()
+    if (!response.ok) {
+      setStatus(payload.error ?? "Could not update report.")
+      setBusyReportId("")
+      return
+    }
+    setReports((current) => current.map((item) => item.id === report.id ? {
+      ...item,
+      summary: payload.report.summary as Record<string, unknown>,
+      updatedAt: payload.report.updatedAt instanceof Date ? payload.report.updatedAt.toISOString() : String(payload.report.updatedAt ?? item.updatedAt)
+    } : item))
+    setStatus(action === "archive" ? "Report archived. You can restore it from Archived reports." : "Report restored to active reports.")
+    setBusyReportId("")
+  }
+
+  async function deleteReport(report: IntelligenceReport) {
+    if (!window.confirm("Delete this report permanently? This cannot be undone.")) return
+    setBusyReportId(report.id)
+    const response = await fetch(`/api/scraper/reports/${report.id}`, { method: "DELETE" })
+    const payload = await response.json()
+    if (!response.ok) {
+      setStatus(payload.error ?? "Could not delete report.")
+      setBusyReportId("")
+      return
+    }
+    setReports((current) => current.filter((item) => item.id !== report.id))
+    setStatus("Report permanently deleted.")
+    setBusyReportId("")
   }
 
   return (
@@ -188,10 +228,16 @@ export function ReportsClient({
         ) : null}
       </section>
       <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <h2 className="text-2xl font-black">Reports</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-black">Reports</h2>
+          <div className="grid grid-cols-2 rounded-xl border border-white/10 bg-black p-1 text-sm">
+            <button type="button" onClick={() => setShowArchived(false)} className={`rounded-lg px-4 py-2 font-bold ${!showArchived ? "bg-lime text-black" : "text-white/65"}`}>Active</button>
+            <button type="button" onClick={() => setShowArchived(true)} className={`rounded-lg px-4 py-2 font-bold ${showArchived ? "bg-lime text-black" : "text-white/65"}`}>Archived</button>
+          </div>
+        </div>
         <div className="mt-5 space-y-3">
-          {reports.length === 0 ? <p className="rounded-xl border border-dashed border-white/20 p-6 text-white/60">No reports yet. Generate one to see the output and exports.</p> : null}
-          {reports.map((report) => (
+          {visibleReports.length === 0 ? <p className="rounded-xl border border-dashed border-white/20 p-6 text-white/60">{showArchived ? "No archived reports." : "No active reports yet. Generate one to see the output and exports."}</p> : null}
+          {visibleReports.map((report) => (
             <div key={report.id} className="rounded-xl border border-white/10 bg-black/30 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -207,6 +253,8 @@ export function ReportsClient({
                   <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "csv" })} href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">CSV</a>
                   <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "json" })} href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">JSON</a>
                   <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "pdf" })} href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">PDF</a>
+                  <button type="button" disabled={busyReportId === report.id} onClick={() => setArchived(report, showArchived ? "restore" : "archive")} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black disabled:opacity-40">{showArchived ? "Restore" : "Archive"}</button>
+                  <button type="button" disabled={busyReportId === report.id} onClick={() => deleteReport(report)} className="rounded-full border border-coral/30 px-3 py-2 text-xs font-black text-coral disabled:opacity-40">Delete</button>
                 </div>
               </div>
             </div>
@@ -219,6 +267,10 @@ export function ReportsClient({
 
 function isEmptyReport(report: IntelligenceReport) {
   return Number(report.summary?.reviewCount ?? 0) === 0
+}
+
+function isArchived(report: IntelligenceReport) {
+  return Boolean(report.summary?.archivedAt)
 }
 
 function productHref(report: IntelligenceReport) {

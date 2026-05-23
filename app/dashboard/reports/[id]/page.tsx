@@ -48,6 +48,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
   const shouldRerun = reviewCount === 0 && Boolean(productUrl)
   const freshReportHref = productUrl ? createFreshReportHref(report, productUrl) : ""
+  const archivedAt = report.summary?.archivedAt ? String(report.summary.archivedAt) : ""
   const platform = report.summary?.platform
     ? String(report.summary.platform)
     : report.summary?.marketplace
@@ -56,6 +57,12 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
 
   return (
     <DashboardShell title={cleanReportTitle(report.title)} description="Executive review intelligence brief with actions, proof points, and export-ready appendix.">
+      {archivedAt ? (
+        <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+          <p className="text-sm font-black uppercase text-white/45">Archived report</p>
+          <p className="mt-2 text-white/70">This report was archived on {new Date(archivedAt).toLocaleDateString()} and remains available for export or restoration from My reports.</p>
+        </section>
+      ) : null}
       {shouldRerun ? (
         <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-yellow-300/25 bg-yellow-300/10 p-5">
           <div>
