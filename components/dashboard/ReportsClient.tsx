@@ -89,7 +89,7 @@ export function ReportsClient({ initialReports, sources, credits, signedIn }: { 
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">Amazon product URL, optional</span>
           <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder="https://www.amazon.com/dp/..." className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-          <span className="text-xs text-white/45">Use URLs and review sources you are permitted to analyze. Leave blank to use the demo dataset.</span>
+          <span className="text-xs text-white/45">Supports Amazon US, Canada, UK, Europe, Australia, Japan, India, Brazil, and Mexico. Use sources you are permitted to analyze.</span>
         </label>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="grid gap-2 text-sm">

@@ -74,7 +74,15 @@ The webhook grants credits idempotently. The checkout success page also grants c
 
 ## 3.1 Apify Amazon Review Actor
 
-Set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID`. If your selected actor does not accept the default `productUrl`, `productUrls`, or `startUrls` input, add an input template like this:
+Set `APIFY_TOKEN` and use the Junipr Amazon reviews actor:
+
+```txt
+APIFY_AMAZON_REVIEWS_ACTOR_ID=junipr/amazon-reviews-scraper
+```
+
+ReviewGap extracts the ASIN from the product URL and automatically selects the matching marketplace for Amazon US, Canada, UK, Germany, France, Italy, Spain, Australia, Japan, India, Brazil, and Mexico. No Canada-only setting is required.
+
+If you later select a different actor that does not accept the built-in input formats, add an input template like this:
 
 ```json
 {"startUrls":[{"url":"{{PRODUCT_URL}}"}],"maxItems":500}

@@ -29,7 +29,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
 
   const apiActorId = normalizeApifyActorId(actorId)
   let lastError = ""
-  for (const actorInput of buildApifyInputs(input)) {
+  for (const actorInput of buildApifyInputs(input, actorId)) {
     const runResponse = await fetch(`https://api.apify.com/v2/acts/${apiActorId}/run-sync-get-dataset-items?token=${apifyToken}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -55,7 +55,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<{ reviews:
   throw new Error(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
 }
 
-function buildApifyInputs(input: ReviewInput) {
+function buildApifyInputs(input: ReviewInput, actorId: string) {
   if (process.env.APIFY_INPUT_TEMPLATE) {
     try {
       const template = JSON.parse(process.env.APIFY_INPUT_TEMPLATE) as Record<string, unknown>
@@ -66,6 +66,18 @@ function buildApifyInputs(input: ReviewInput) {
   }
 
   const asin = extractAmazonAsin(input.productUrl)
+  if (actorId.toLowerCase().includes("junipr/amazon-reviews-scraper") && asin) {
+    return [{
+      asins: [asin],
+      marketplace: amazonMarketplaceCode(input.productUrl),
+      maxReviews: 100,
+      filterRating: "all",
+      sortBy: "recent",
+      includeImages: false,
+      includeProductInfo: true
+    }]
+  }
+
   const common = { maxItems: 500, maxReviews: 500, reviewsCount: 500, proxyConfiguration: { useApifyProxy: true } }
   const reviewCommon = { scrapeMode: "AUTO", sortReview: "Most recent", maxReviewResults: 500, additionalReviewProperties: true, proxyConfiguration: { useApifyProxy: true } }
   const inputs: Array<Record<string, unknown> | null> = [
@@ -139,6 +151,26 @@ async function apifyErrorDetail(response: Response, token: string) {
 
 function extractAmazonAsin(url: string) {
   return url.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase()
+}
+
+function amazonMarketplaceCode(url: string) {
+  const hostname = new URL(url).hostname.toLowerCase()
+  if (hostname.endsWith(".ca")) return "CA"
+  if (hostname.endsWith(".co.uk")) return "UK"
+  if (hostname.endsWith(".de")) return "DE"
+  if (hostname.endsWith(".fr")) return "FR"
+  if (hostname.endsWith(".it")) return "IT"
+  if (hostname.endsWith(".es")) return "ES"
+  if (hostname.endsWith(".com.au")) return "AU"
+  if (hostname.endsWith(".co.jp")) return "JP"
+  if (hostname.endsWith(".in")) return "IN"
+  if (hostname.endsWith(".com.br")) return "BR"
+  if (hostname.endsWith(".com.mx")) return "MX"
+  return "US"
+}
+
+export function amazonMarketplaceLabel(url: string) {
+  return new URL(url).hostname.toLowerCase().replace(/^www\./, "")
 }
 
 function extractReviewTexts(items: Array<Record<string, unknown>>) {

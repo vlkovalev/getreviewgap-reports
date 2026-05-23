@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { generateReviewInsight, fetchAmazonReviews } from "@/lib/ai/service"
+import { amazonMarketplaceLabel, generateReviewInsight, fetchAmazonReviews } from "@/lib/ai/service"
 import { reviewInputSchema } from "@/lib/ai/schemas"
 import { isRateLimited } from "@/lib/rate-limit"
 import { createReportRecord, listReports, logAgentRun } from "@/lib/reports-store"
@@ -28,8 +28,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Thanks." })
     }
 
-    const reviewResult = await fetchAmazonReviews(parsed.data)
-    const { insight, provider, model } = await generateReviewInsight(parsed.data, reviewResult.reviews)
+    const reportInput = { ...parsed.data, marketplace: amazonMarketplaceLabel(parsed.data.productUrl) }
+    const reviewResult = await fetchAmazonReviews(reportInput)
+    const { insight, provider, model } = await generateReviewInsight(reportInput, reviewResult.reviews)
     const report = await createReportRecord({
       productUrl: parsed.data.productUrl,
       productName: parsed.data.productName || "Amazon product",
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       status: "SUCCEEDED",
       provider,
       model,
-      agentInput: { ...parsed.data, pastedReviews: parsed.data.pastedReviews ? "[provided]" : "" },
+      agentInput: { ...reportInput, pastedReviews: parsed.data.pastedReviews ? "[provided]" : "" },
       output: insight
     })
 

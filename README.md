@@ -60,7 +60,7 @@ OWNER_EMAIL="owner@example.com"
 OPENAI_API_KEY=""
 OPENAI_MODEL="gpt-4o-mini"
 APIFY_TOKEN=""
-APIFY_AMAZON_REVIEWS_ACTOR_ID=""
+APIFY_AMAZON_REVIEWS_ACTOR_ID="junipr/amazon-reviews-scraper"
 APIFY_INPUT_TEMPLATE=""
 PAYPAL_MODE="sandbox"
 PAYPAL_CLIENT_ID=""
@@ -77,7 +77,7 @@ Do not commit real secrets. Create a local `.env` file from `.env.example` and p
 ## Setup Checklist
 
 - OpenAI: create or rotate an API key, then set `OPENAI_API_KEY`.
-- Apify: choose an Amazon reviews actor, then set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID`. If the actor needs custom input, set `APIFY_INPUT_TEMPLATE` with `{{PRODUCT_URL}}`.
+- Apify: set `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID="junipr/amazon-reviews-scraper"`. The app infers the marketplace from Amazon URLs across the supported US, Canadian, UK, European, Australian, Japanese, Indian, Brazilian, and Mexican stores. If another actor needs custom input, set `APIFY_INPUT_TEMPLATE` with `{{PRODUCT_URL}}`.
 - Database: create a Supabase or Neon Postgres database and set `DATABASE_URL`.
 - Admin: set `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 - Email: configure Resend later with `RESEND_API_KEY`, `EMAIL_FROM`, and `OWNER_EMAIL`.

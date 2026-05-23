@@ -64,6 +64,7 @@ export function ReportGenerator() {
         <label className="grid gap-2 text-sm font-bold">
           Amazon product URL
           <input name="productUrl" type="url" required placeholder="https://www.amazon.com/dp/..." className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-lime" />
+          <span className="text-xs font-normal text-white/50">Supports Amazon US, Canada, UK, Europe, Australia, Japan, India, Brazil, and Mexico.</span>
         </label>
         <label className="grid gap-2 text-sm font-bold">
           Product name

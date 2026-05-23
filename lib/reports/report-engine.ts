@@ -2,7 +2,7 @@ import { average, isValidHttpUrl, percent, toCsv } from "@/lib/scrapers/parser-u
 import { addReport, getStore } from "@/lib/scrapers/store"
 import type { IntelligenceReport, ProductRecord, ProductSnapshot, ReportFilters, ReportType } from "@/lib/scrapers/types"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
-import { fetchAmazonReviews, generateReviewInsight } from "@/lib/ai/service"
+import { amazonMarketplaceLabel, fetchAmazonReviews, generateReviewInsight } from "@/lib/ai/service"
 
 const reportLabels: Record<ReportType, string> = {
   PRICE_MONITORING: "Price Monitoring Report",
@@ -82,12 +82,13 @@ export async function generateReport(type: ReportType, filters: ReportFilters = 
 async function generateReviewIntelligenceReport(type: ReportType, filters: ReportFilters, customerId?: string) {
   const productUrl = filters.productUrl || "https://www.amazon.com/dp/demo"
   const productName = filters.productName || inferProductName(productUrl)
+  const marketplace = amazonMarketplaceLabel(productUrl)
   const reviewResult = await fetchAmazonReviews({
     productUrl,
     productName,
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
-    marketplace: "amazon.com"
+    marketplace
   })
   if (reviewResult.source === "apify" && reviewResult.reviews.length === 0) {
     throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
@@ -97,7 +98,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     productName,
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
-    marketplace: "amazon.com"
+    marketplace
   }, reviewResult.reviews)
   const now = new Date()
   const insightRows = [
@@ -115,6 +116,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     summary: {
       productName,
       productUrl,
+      marketplace,
       competitorName: filters.competitorName ?? "",
       source: reviewResult.source,
       provider,
