@@ -63,7 +63,7 @@ OWNER_EMAIL="owner@example.com"
 OPENAI_API_KEY=""
 OPENAI_MODEL="gpt-4o-mini"
 CANOPY_API_KEY=""
-CANOPY_REVIEW_PAGE_LIMIT="5"
+CANOPY_REVIEW_PAGE_LIMIT="50"
 APIFY_TOKEN=""
 APIFY_AMAZON_REVIEWS_ACTOR_ID=""
 APIFY_INPUT_TEMPLATE=""
@@ -82,7 +82,7 @@ Do not commit real secrets. Create a local `.env` file from `.env.example` and p
 ## Setup Checklist
 
 - OpenAI: create or rotate an API key, then set `OPENAI_API_KEY`.
-- Amazon reviews: set `CANOPY_API_KEY` for the preferred structured review API workflow. The app infers the Amazon marketplace from the product URL and requests multiple pages of review bodies. `CANOPY_REVIEW_PAGE_LIMIT` defaults to `5` (roughly 50 reviews) and can be set from `1` to `10` to balance report depth against API/AI cost.
+- Amazon reviews: set `CANOPY_API_KEY` for the preferred structured review API workflow. The app infers the Amazon marketplace from the product URL and requests review pages until a page returns no new written review text. `CANOPY_REVIEW_PAGE_LIMIT` defaults to `50` (up to roughly 500 written reviews) and can be lowered from `1` to `50` to balance report depth against API/AI cost.
 - Apify fallback: `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID` remain supported for testing, but Amazon review-page restrictions can cause empty results even on products with visible ratings.
 - Shopify: users can generate reports from pasted/exported Shopify review text now. Direct collection must be added for the store's chosen review provider (for example, a permitted export or API integration) rather than pretending every Shopify storefront exposes reviews in one format.
 - Database: create a Supabase or Neon Postgres database and set `DATABASE_URL`.

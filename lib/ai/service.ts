@@ -134,8 +134,8 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
 }
 
 function canopyReviewPageLimit() {
-  const configured = Number(process.env.CANOPY_REVIEW_PAGE_LIMIT ?? 5)
-  return Number.isFinite(configured) ? Math.max(1, Math.min(10, Math.floor(configured))) : 5
+  const configured = Number(process.env.CANOPY_REVIEW_PAGE_LIMIT ?? 50)
+  return Number.isFinite(configured) ? Math.max(1, Math.min(50, Math.floor(configured))) : 50
 }
 
 function canopyProduct(payload: Record<string, unknown>) {

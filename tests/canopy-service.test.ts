@@ -6,6 +6,7 @@ async function main() {
   const originalKey = process.env.CANOPY_API_KEY
   const originalLimit = process.env.CANOPY_REVIEW_PAGE_LIMIT
   const pagesRequested: number[] = []
+  await assertDefaultPageLimit()
 
   process.env.CANOPY_API_KEY = "test-key"
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "3"
@@ -55,6 +56,35 @@ async function main() {
   }
 
   console.log("Canopy service tests passed for pagination, metadata, deduplication, and canonical URLs.")
+}
+
+async function assertDefaultPageLimit() {
+  process.env.CANOPY_API_KEY = "test-key"
+  delete process.env.CANOPY_REVIEW_PAGE_LIMIT
+  const requestedPages: number[] = []
+  globalThis.fetch = async (input) => {
+    const page = Number(new URL(String(input)).searchParams.get("page"))
+    requestedPages.push(page)
+    return new Response(JSON.stringify({
+      data: {
+        amazonProduct: {
+          title: "Full Depth Product",
+          reviewsPaginated: {
+            reviews: page <= 50 ? [{ body: `Review body number ${page} with enough text to count.` }] : [],
+            pageInfo: { currentPage: page, hasNextPage: true }
+          }
+        }
+      }
+    }), { status: 200, headers: { "content-type": "application/json" } })
+  }
+  const result = await fetchAmazonReviews({
+    productUrl: "https://www.amazon.com/dp/B082Y114TB",
+    platform: "amazon",
+    marketplace: "amazon.com"
+  })
+  assert.equal(result.pagesFetched, 50)
+  assert.equal(result.reviews.length, 50)
+  assert.equal(requestedPages.at(-1), 50)
 }
 
 main().catch((error) => {
