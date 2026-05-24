@@ -11,6 +11,7 @@ async function main() {
   const requestsMade: string[] = []
   await assertDefaultPageLimit()
   await assertRequestedPageLimit()
+  await assertSerpApiFallbackWhenCanopyQuotaFails()
   await assertJudgeMeConnector()
 
   process.env.CANOPY_API_KEY = "test-key"
@@ -139,6 +140,37 @@ async function assertJudgeMeConnector() {
   assert.equal(result.availableReviewCount, 2)
   assert.equal(result.reviews.length, 2)
   assert.equal(requestedUrls.length, 3)
+}
+
+async function assertSerpApiFallbackWhenCanopyQuotaFails() {
+  process.env.CANOPY_API_KEY = "test-key"
+  process.env.SERPAPI_API_KEY = "serpapi-key"
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    if (url.hostname === "rest.canopyapi.co") return new Response(JSON.stringify({ error: "quota exceeded" }), { status: 402 })
+    if (url.hostname === "serpapi.com") {
+      return new Response(JSON.stringify({
+        product_results: { title: "Fallback Balloons", reviewCount: 12456 },
+        reviews_information: {
+          authors_reviews: [
+            { title: "Nice colors", text: "Fallback review text about bright colors and party setup." },
+            { title: "Hard to inflate", text: "Fallback review text about inflation difficulty and durability." }
+          ]
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    return new Response("not found", { status: 404 })
+  }
+  const result = await fetchAmazonReviews({
+    productUrl: "https://www.amazon.ca/dp/B0BZCHMVTK",
+    platform: "amazon",
+    marketplace: "amazon.ca",
+    reviewPageLimit: 10
+  })
+  assert.equal(result.source, "serpapi")
+  assert.equal(result.reviews.length, 2)
+  assert.equal(result.fallbackReviewsAdded, 2)
+  assert.match(result.warning ?? "", /Canopy returned 402/)
 }
 
 async function assertRequestedPageLimit() {

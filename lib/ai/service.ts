@@ -219,6 +219,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   let availableReviewCount: number | undefined
   let marketplaceRatingCount: number | undefined
   let productName: string | undefined
+  let canopyWarning = ""
 
   async function fetchReviewPage(rating: string, page: number) {
     const params = new URLSearchParams({
@@ -238,6 +239,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     }
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) throw new Error("Canopy authentication failed. Check CANOPY_API_KEY in Vercel.")
+      if (response.status === 402) throw new CanopyProviderUnavailableError("Canopy returned 402, which usually means quota, billing, or plan limits. SerpApi fallback will be used if configured.")
       throw new Error(`Canopy review request failed with status ${response.status}.`)
     }
     const payload = await response.json() as Record<string, unknown>
@@ -259,31 +261,36 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     return reviews.size - previousCount
   }
 
-  for (let page = 1; page <= maxPages; page += 1) {
-    await fetchReviewPage("ALL", page)
-  }
+  try {
+    for (let page = 1; page <= maxPages; page += 1) {
+      await fetchReviewPage("ALL", page)
+    }
 
-  if (reviews.size < targetReviews) {
-    const expansionPages = canopyRatingExpansionPages(maxPages)
-    for (const rating of ["FIVE_STAR", "FOUR_STAR", "THREE_STAR", "TWO_STAR", "ONE_STAR"]) {
-      if (reviews.size >= targetReviews) break
-      for (let page = 1; page <= expansionPages; page += 1) {
-        await fetchReviewPage(rating, page)
+    if (reviews.size < targetReviews) {
+      const expansionPages = canopyRatingExpansionPages(maxPages)
+      for (const rating of ["FIVE_STAR", "FOUR_STAR", "THREE_STAR", "TWO_STAR", "ONE_STAR"]) {
         if (reviews.size >= targetReviews) break
+        for (let page = 1; page <= expansionPages; page += 1) {
+          await fetchReviewPage(rating, page)
+          if (reviews.size >= targetReviews) break
+        }
       }
     }
+  } catch (error) {
+    if (!(error instanceof CanopyProviderUnavailableError)) throw error
+    canopyWarning = error.message
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
   let fallbackReviewsAdded = 0
   let source: ReviewSource = "canopy"
-  if (collectedReviews.length < targetReviews) {
+  if (collectedReviews.length < targetReviews || canopyWarning) {
     const serpApiResult = await fetchSerpApiAmazonReviews(input, asin).catch(() => undefined)
     if (serpApiResult?.reviews.length) {
       const beforeFallback = reviews.size
       for (const text of serpApiResult.reviews) reviews.add(text)
       fallbackReviewsAdded = reviews.size - beforeFallback
-      source = fallbackReviewsAdded > 0 ? "canopy+serpapi" : source
+      source = fallbackReviewsAdded > 0 ? (beforeFallback > 0 ? "canopy+serpapi" : "serpapi") : source
       productName = productName || serpApiResult.productName
       marketplaceRatingCount ||= serpApiResult.marketplaceRatingCount
     }
@@ -309,7 +316,14 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     fallbackReviewsAdded,
     targetReviewCount: targetReviews,
     sampleNote,
-    warning: finalReviews.length ? undefined : "Canopy and SerpApi returned no review text for this product and marketplace. Try an authorized review export or a different product."
+    warning: finalReviews.length ? canopyWarning || undefined : canopyWarning || "Canopy and SerpApi returned no review text for this product and marketplace. Try an authorized review export or a different product."
+  }
+}
+
+class CanopyProviderUnavailableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "CanopyProviderUnavailableError"
   }
 }
 
