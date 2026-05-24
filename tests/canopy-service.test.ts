@@ -7,7 +7,7 @@ async function main() {
   const originalLimit = process.env.CANOPY_REVIEW_PAGE_LIMIT
   const originalJudgeMeToken = process.env.JUDGEME_API_TOKEN
   const originalJudgeMeShop = process.env.JUDGEME_SHOP_DOMAIN
-  const pagesRequested: number[] = []
+  const requestsMade: string[] = []
   await assertDefaultPageLimit()
   await assertRequestedPageLimit()
   await assertJudgeMeConnector()
@@ -23,12 +23,15 @@ async function main() {
       }), { status: 200, headers: { "content-type": "application/json" } })
     }
     const page = Number(url.searchParams.get("page"))
-    pagesRequested.push(page)
-    const bodies = page === 1
-      ? ["First useful review body about battery performance.", "Duplicate review body about product size."]
-      : page === 2
-        ? ["Duplicate review body about product size.", "Second page review body about attachment safety."]
-        : []
+    const rating = String(url.searchParams.get("rating"))
+    requestsMade.push(`${rating}:${page}`)
+    const bodies = rating === "ALL"
+      ? page === 1
+        ? ["First useful review body about battery performance.", "Duplicate review body about product size."]
+        : page === 2
+          ? ["Duplicate review body about product size.", "Second page review body about attachment safety."]
+          : []
+      : [`${rating} review body ${page} with distinct customer language about the product.`]
     return new Response(JSON.stringify({
       data: {
         amazonProduct: {
@@ -50,14 +53,17 @@ async function main() {
       reviewPageLimit: 10
     })
 
-    assert.deepEqual(pagesRequested, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    assert.deepEqual(requestsMade.slice(0, 10), ["ALL:1", "ALL:2", "ALL:3", "ALL:4", "ALL:5", "ALL:6", "ALL:7", "ALL:8", "ALL:9", "ALL:10"])
     assert.equal(result.source, "canopy")
     assert.equal(result.productName, "Cordless Massage Gun - Product Details")
-    assert.equal(result.pagesFetched, 10)
+    assert.ok((result.pagesFetched ?? 0) > 10)
+    assert.equal(result.basePagesFetched, 10)
+    assert.ok((result.ratingFilterPagesFetched ?? 0) > 0)
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.marketplaceRatingCount, 12446)
-    assert.equal(result.reviews.length, 3)
-    assert.match(result.sampleNote ?? "", /10 of 10 requested pages/)
+    assert.ok(result.reviews.length > 3)
+    assert.match(result.sampleNote ?? "", /10 of 10 requested base pages/)
+    assert.match(result.sampleNote ?? "", /star-filter page/)
     assert.equal(canonicalAmazonProductUrl("https://www.amazon.ca/example/dp/B082Y114TB/ref=tracking"), "https://www.amazon.ca/dp/B082Y114TB")
   } finally {
     globalThis.fetch = originalFetch
@@ -121,20 +127,21 @@ async function assertJudgeMeConnector() {
 async function assertRequestedPageLimit() {
   process.env.CANOPY_API_KEY = "test-key"
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "50"
-  const requestedPages: number[] = []
+  const requestedPages: string[] = []
   globalThis.fetch = async (input) => {
     const url = new URL(String(input))
     if (!url.searchParams.has("page")) {
       return new Response(JSON.stringify({ title: "Quick Depth Product", reviewCount: 99 }), { status: 200, headers: { "content-type": "application/json" } })
     }
     const page = Number(url.searchParams.get("page"))
-    requestedPages.push(page)
+    const rating = String(url.searchParams.get("rating"))
+    requestedPages.push(`${rating}:${page}`)
     return new Response(JSON.stringify({
       data: {
         amazonProduct: {
           title: "Quick Depth Product",
           reviewsPaginated: {
-            reviews: [{ body: `Quick depth review page ${page} with enough text to count.` }],
+            reviews: rating === "ALL" ? [{ body: `Quick depth review page ${page} with enough text to count.` }] : [],
             pageInfo: { currentPage: page, hasNextPage: true }
           }
         }
@@ -147,28 +154,31 @@ async function assertRequestedPageLimit() {
     marketplace: "amazon.com",
     reviewPageLimit: 5
   })
-  assert.equal(result.pagesFetched, 5)
+  assert.equal(result.pagesFetched, 15)
+  assert.equal(result.basePagesFetched, 5)
+  assert.equal(result.ratingFilterPagesFetched, 10)
   assert.equal(result.reviews.length, 5)
-  assert.deepEqual(requestedPages, [1, 2, 3, 4, 5])
+  assert.deepEqual(requestedPages.slice(0, 5), ["ALL:1", "ALL:2", "ALL:3", "ALL:4", "ALL:5"])
 }
 
 async function assertDefaultPageLimit() {
   process.env.CANOPY_API_KEY = "test-key"
   delete process.env.CANOPY_REVIEW_PAGE_LIMIT
-  const requestedPages: number[] = []
+  const requestedPages: string[] = []
   globalThis.fetch = async (input) => {
     const url = new URL(String(input))
     if (!url.searchParams.has("page")) {
       return new Response(JSON.stringify({ title: "Full Depth Product", reviewCount: 500 }), { status: 200, headers: { "content-type": "application/json" } })
     }
     const page = Number(url.searchParams.get("page"))
-    requestedPages.push(page)
+    const rating = String(url.searchParams.get("rating"))
+    requestedPages.push(`${rating}:${page}`)
     return new Response(JSON.stringify({
       data: {
         amazonProduct: {
           title: "Full Depth Product",
           reviewsPaginated: {
-            reviews: page <= 50 ? [{ body: `Review body number ${page} with enough text to count.` }] : [],
+            reviews: rating === "ALL" && page <= 50 ? [{ body: `Review body number ${page} with enough text to count.` }] : [],
             pageInfo: { currentPage: page, hasNextPage: true }
           }
         }
@@ -180,9 +190,13 @@ async function assertDefaultPageLimit() {
     platform: "amazon",
     marketplace: "amazon.com"
   })
-  assert.equal(result.pagesFetched, 50)
+  assert.equal(result.pagesFetched, 150)
+  assert.equal(result.basePagesFetched, 50)
+  assert.equal(result.ratingFilterPagesFetched, 100)
   assert.equal(result.reviews.length, 50)
-  assert.equal(requestedPages.at(-1), 50)
+  assert.equal(requestedPages[0], "ALL:1")
+  assert.equal(requestedPages[49], "ALL:50")
+  assert.equal(requestedPages.at(-1), "ONE_STAR:20")
 }
 
 main().catch((error) => {

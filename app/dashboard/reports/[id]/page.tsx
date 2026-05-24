@@ -101,7 +101,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
             <Metric label={platform === "shopify" ? "Review app" : "Source"} value={platform === "shopify" ? formatReviewApp(report.summary?.reviewApp) : String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
             <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
-            <Metric label="Sample pages" value={String(report.summary?.pagesFetched ?? "-")} />
+            <Metric label="Provider pages" value={String(report.summary?.pagesFetched ?? "-")} />
             <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
           </div>
         </div>

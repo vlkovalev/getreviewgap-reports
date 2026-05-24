@@ -22,6 +22,9 @@ type ReviewFetchResult = {
   pagesFetched?: number
   availableReviewCount?: number
   marketplaceRatingCount?: number
+  basePagesFetched?: number
+  ratingFilterPagesFetched?: number
+  ratingFiltersUsed?: string[]
   sampleNote?: string
 }
 
@@ -203,19 +206,24 @@ function judgeMeReviewCount(payload: Record<string, unknown>) {
 async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<ReviewFetchResult> {
   const asin = extractAmazonAsin(input.productUrl)
   if (!asin) throw new Error("Could not identify an Amazon ASIN in this URL. Use a product URL containing /dp/ASIN.")
+  const productAsin = asin
   const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
+  const targetReviews = canopyTargetReviewCount(maxPages)
   const reviews = new Set<string>()
   let pagesFetched = 0
+  let basePagesFetched = 0
+  let ratingFilterPagesFetched = 0
+  const ratingFiltersUsed = new Set<string>()
   let availableReviewCount: number | undefined
   let marketplaceRatingCount: number | undefined
   let productName: string | undefined
 
-  while (pagesFetched < maxPages) {
+  async function fetchReviewPage(rating: string, page: number) {
     const params = new URLSearchParams({
-      asin,
+      asin: productAsin,
       domain: amazonMarketplaceCode(input.productUrl),
-      page: String(pagesFetched + 1),
-      rating: "ALL"
+      page: String(page),
+      rating
     })
     let response: Response
     try {
@@ -238,8 +246,30 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     marketplaceRatingCount ||= canopyMarketplaceRatingCount(product) ?? canopyMarketplaceRatingCount(payload)
     const pageReviews = canopyPaginatedReviewTexts(product)
     const usableReviews = pageReviews.length ? pageReviews : extractReviewTexts([payload])
+    const previousCount = reviews.size
     for (const text of usableReviews) reviews.add(text)
     pagesFetched += 1
+    if (rating === "ALL") basePagesFetched += 1
+    else {
+      ratingFilterPagesFetched += 1
+      ratingFiltersUsed.add(rating)
+    }
+    return reviews.size - previousCount
+  }
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    await fetchReviewPage("ALL", page)
+  }
+
+  if (reviews.size < targetReviews) {
+    const expansionPages = canopyRatingExpansionPages(maxPages)
+    for (const rating of ["FIVE_STAR", "FOUR_STAR", "THREE_STAR", "TWO_STAR", "ONE_STAR"]) {
+      if (reviews.size >= targetReviews) break
+      for (let page = 1; page <= expansionPages; page += 1) {
+        await fetchReviewPage(rating, page)
+        if (reviews.size >= targetReviews) break
+      }
+    }
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
@@ -248,7 +278,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     productName = productMetadata?.title || productName
     marketplaceRatingCount ||= productMetadata?.marketplaceRatingCount
   }
-  const sampleNote = amazonSampleNote({ writtenReviews: collectedReviews.length, pagesFetched, requestedPages: maxPages, availableReviewCount, marketplaceRatingCount })
+  const sampleNote = amazonSampleNote({ writtenReviews: collectedReviews.length, pagesFetched, requestedPages: maxPages, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed] })
   return {
     reviews: collectedReviews,
     source: "canopy",
@@ -257,9 +287,24 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     pagesFetched,
     availableReviewCount,
     marketplaceRatingCount,
+    basePagesFetched,
+    ratingFilterPagesFetched,
+    ratingFiltersUsed: [...ratingFiltersUsed],
     sampleNote,
     warning: collectedReviews.length ? undefined : "Canopy returned no review text for this product and marketplace. Try an authorized review export or a different product."
   }
+}
+
+function canopyTargetReviewCount(maxPages: number) {
+  if (maxPages >= 50) return 250
+  if (maxPages >= 10) return 75
+  return 25
+}
+
+function canopyRatingExpansionPages(maxPages: number) {
+  if (maxPages >= 50) return 20
+  if (maxPages >= 10) return 5
+  return 2
 }
 
 async function fetchCanopyProductMetadata(input: ReviewInput, apiKey: string, asin: string) {
@@ -286,14 +331,24 @@ function amazonSampleNote({
   requestedPages,
   availableReviewCount,
   marketplaceRatingCount,
+  basePagesFetched,
+  ratingFilterPagesFetched,
+  ratingFiltersUsed
 }: {
   writtenReviews: number
   pagesFetched: number
   requestedPages: number
   availableReviewCount?: number
   marketplaceRatingCount?: number
+  basePagesFetched?: number
+  ratingFilterPagesFetched?: number
+  ratingFiltersUsed?: string[]
 }) {
-  const pageText = `${pagesFetched} of ${requestedPages} requested page${requestedPages === 1 ? "" : "s"}`
+  const baseText = `${basePagesFetched ?? requestedPages} of ${requestedPages} requested base page${requestedPages === 1 ? "" : "s"}`
+  const expansionText = ratingFilterPagesFetched
+    ? ` plus ${ratingFilterPagesFetched} star-filter page${ratingFilterPagesFetched === 1 ? "" : "s"} across ${ratingFiltersUsed?.length ?? 0} rating bucket${(ratingFiltersUsed?.length ?? 0) === 1 ? "" : "s"}`
+    : ""
+  const pageText = `${baseText}${expansionText}`
   if (marketplaceRatingCount && marketplaceRatingCount > writtenReviews) {
     return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.`
   }
