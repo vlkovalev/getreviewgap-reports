@@ -246,8 +246,10 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
-  if (!productName || productName.toLowerCase().startsWith("amazon product")) {
-    productName = await fetchCanopyProductTitle(input, apiKey, asin).catch(() => productName)
+  if (!productName || productName.toLowerCase().startsWith("amazon product") || !marketplaceRatingCount) {
+    const productMetadata = await fetchCanopyProductMetadata(input, apiKey, asin).catch(() => undefined)
+    productName = productMetadata?.title || productName
+    marketplaceRatingCount ||= productMetadata?.marketplaceRatingCount
   }
   const sampleNote = amazonSampleNote({ writtenReviews: collectedReviews.length, pagesFetched, availableReviewCount, marketplaceRatingCount })
   return {
@@ -263,18 +265,22 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   }
 }
 
-async function fetchCanopyProductTitle(input: ReviewInput, apiKey: string, asin: string) {
+async function fetchCanopyProductMetadata(input: ReviewInput, apiKey: string, asin: string) {
   const params = new URLSearchParams({
     asin,
     domain: amazonMarketplaceCode(input.productUrl)
   })
   const response = await fetch(`https://rest.canopyapi.co/api/amazon/product?${params}`, {
-    headers: { "API-KEY": apiKey },
+    headers: { "API-KEY": apiKey, Accept: "application/json" },
     cache: "no-store"
   })
   if (!response.ok) return undefined
   const payload = await response.json() as Record<string, unknown>
-  return canopyProductTitle(canopyProduct(payload)) || canopyProductTitle(payload)
+  const product = canopyProduct(payload)
+  return {
+    title: canopyProductTitle(product) || canopyProductTitle(payload),
+    marketplaceRatingCount: canopyMarketplaceRatingCount(product) ?? canopyMarketplaceRatingCount(payload)
+  }
 }
 
 function amazonSampleNote({

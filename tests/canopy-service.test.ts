@@ -16,6 +16,12 @@ async function main() {
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "3"
   globalThis.fetch = async (input) => {
     const url = new URL(String(input))
+    if (url.pathname === "/api/amazon/product" && !url.pathname.endsWith("/reviews") && !url.searchParams.has("page")) {
+      return new Response(JSON.stringify({
+        title: "Cordless Massage Gun - Product Details",
+        reviewCount: 12446
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
     const page = Number(url.searchParams.get("page"))
     pagesRequested.push(page)
     const bodies = page === 1
@@ -27,7 +33,6 @@ async function main() {
       data: {
         amazonProduct: {
           title: "Cordless Massage Gun",
-          ratingCount: 12446,
           reviewsPaginated: {
             reviews: bodies.map((body) => ({ body })),
             pageInfo: { currentPage: page, totalPages: 3, totalResults: 42, hasNextPage: false }
@@ -46,7 +51,7 @@ async function main() {
 
     assert.deepEqual(pagesRequested, [1, 2, 3])
     assert.equal(result.source, "canopy")
-    assert.equal(result.productName, "Cordless Massage Gun")
+    assert.equal(result.productName, "Cordless Massage Gun - Product Details")
     assert.equal(result.pagesFetched, 3)
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.marketplaceRatingCount, 12446)
@@ -117,7 +122,11 @@ async function assertRequestedPageLimit() {
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "50"
   const requestedPages: number[] = []
   globalThis.fetch = async (input) => {
-    const page = Number(new URL(String(input)).searchParams.get("page"))
+    const url = new URL(String(input))
+    if (!url.searchParams.has("page")) {
+      return new Response(JSON.stringify({ title: "Quick Depth Product", reviewCount: 99 }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    const page = Number(url.searchParams.get("page"))
     requestedPages.push(page)
     return new Response(JSON.stringify({
       data: {
@@ -147,7 +156,11 @@ async function assertDefaultPageLimit() {
   delete process.env.CANOPY_REVIEW_PAGE_LIMIT
   const requestedPages: number[] = []
   globalThis.fetch = async (input) => {
-    const page = Number(new URL(String(input)).searchParams.get("page"))
+    const url = new URL(String(input))
+    if (!url.searchParams.has("page")) {
+      return new Response(JSON.stringify({ title: "Full Depth Product", reviewCount: 500 }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    const page = Number(url.searchParams.get("page"))
     requestedPages.push(page)
     return new Response(JSON.stringify({
       data: {
