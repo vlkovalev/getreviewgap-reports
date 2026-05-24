@@ -74,8 +74,11 @@ async function assertJudgeMeConnector() {
   globalThis.fetch = async (input) => {
     const url = new URL(String(input))
     requestedUrls.push(url.toString())
+    if (url.pathname === "/products/glow-serum.js") {
+      return new Response(JSON.stringify({ product: { id: 987654321, title: "Glow Serum" } }), { status: 200, headers: { "content-type": "application/json" } })
+    }
     if (url.pathname.includes("/products/-1")) {
-      assert.equal(url.searchParams.get("handle"), "glow-serum")
+      assert.equal(url.searchParams.get("external_id"), "987654321")
       return new Response(JSON.stringify({ product: { id: 321, title: "Glow Serum" } }), { status: 200, headers: { "content-type": "application/json" } })
     }
     if (url.pathname.includes("/reviews")) {
@@ -104,7 +107,7 @@ async function assertJudgeMeConnector() {
   assert.equal(result.pagesFetched, 1)
   assert.equal(result.availableReviewCount, 2)
   assert.equal(result.reviews.length, 2)
-  assert.equal(requestedUrls.length, 2)
+  assert.equal(requestedUrls.length, 3)
 }
 
 async function assertRequestedPageLimit() {

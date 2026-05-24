@@ -87,10 +87,11 @@ async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResul
     throw new Error("Could not identify the Shopify product handle. Use a product URL like https://store.com/products/product-handle or upload a Judge.me export.")
   }
 
-  const product = await fetchJudgeMeProduct({ apiToken, shopDomain, handle })
+  const externalId = await fetchShopifyProductExternalId(input.productUrl)
+  const product = await fetchJudgeMeProduct({ apiToken, shopDomain, externalId })
   const productId = product.id
   if (!productId) {
-    throw new Error("Judge.me could not match that Shopify product handle. Check the product URL or upload a Judge.me export.")
+    throw new Error("Judge.me could not match that Shopify product ID. Check that JUDGEME_SHOP_DOMAIN belongs to the same Shopify store as the product URL, or upload a Judge.me export.")
   }
 
   const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
@@ -108,9 +109,9 @@ async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResul
       per_page: "100",
       page: String(pagesFetched + 1)
     })
-    const response = await fetch(`https://api.judge.me/api/v1/reviews?${params}`, { cache: "no-store" })
+    const response = await fetch(`https://judge.me/api/v1/reviews?${params}`, { cache: "no-store" })
     if (!response.ok) {
-      if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Check JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN.")
+      if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Use the private API token and the exact myshopify.com shop domain shown in Judge.me Settings > Integrations.")
       throw new Error(`Judge.me review request failed with status ${response.status}.`)
     }
     const payload = await response.json() as Record<string, unknown>
@@ -134,15 +135,15 @@ async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResul
   }
 }
 
-async function fetchJudgeMeProduct({ apiToken, shopDomain, handle }: { apiToken: string; shopDomain: string; handle: string }) {
+async function fetchJudgeMeProduct({ apiToken, shopDomain, externalId }: { apiToken: string; shopDomain: string; externalId: string }) {
   const params = new URLSearchParams({
     api_token: apiToken,
     shop_domain: shopDomain,
-    handle
+    external_id: externalId
   })
-  const response = await fetch(`https://api.judge.me/api/v1/products/-1?${params}`, { cache: "no-store" })
+  const response = await fetch(`https://judge.me/api/v1/products/-1?${params}`, { cache: "no-store" })
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Check JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN.")
+    if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Use the private API token and the exact myshopify.com shop domain shown in Judge.me Settings > Integrations.")
     throw new Error(`Judge.me product lookup failed with status ${response.status}.`)
   }
   const payload = await response.json() as Record<string, unknown>
@@ -153,6 +154,31 @@ async function fetchJudgeMeProduct({ apiToken, shopDomain, handle }: { apiToken:
     id: typeof product.id === "number" || typeof product.id === "string" ? product.id : undefined,
     title: typeof product.title === "string" ? product.title.trim() : undefined
   }
+}
+
+async function fetchShopifyProductExternalId(productUrl: string) {
+  const productJsonUrl = shopifyProductJsonUrl(productUrl)
+  const response = await fetch(productJsonUrl, { cache: "no-store" })
+  if (!response.ok) {
+    throw new Error("Could not read the Shopify product JSON needed for Judge.me matching. Check that the product URL is public, or upload a Judge.me export.")
+  }
+  const payload = await response.json() as Record<string, unknown>
+  const product = payload.product && typeof payload.product === "object" && !Array.isArray(payload.product)
+    ? payload.product as Record<string, unknown>
+    : payload
+  const id = product.id
+  if (typeof id !== "number" && typeof id !== "string") {
+    throw new Error("The Shopify product JSON did not include a product ID. Upload a Judge.me export instead.")
+  }
+  return String(id)
+}
+
+function shopifyProductJsonUrl(productUrl: string) {
+  const parsed = new URL(productUrl)
+  parsed.search = ""
+  parsed.hash = ""
+  if (!parsed.pathname.endsWith(".js")) parsed.pathname = `${parsed.pathname.replace(/\/$/, "")}.js`
+  return parsed.toString()
 }
 
 function judgeMeReviewTexts(payload: Record<string, unknown>) {
