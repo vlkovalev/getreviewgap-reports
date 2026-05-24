@@ -46,17 +46,19 @@ async function main() {
     const result = await fetchAmazonReviews({
       productUrl: "https://www.amazon.ca/Massage-Tissue-Percussion-Muscle-Massager/dp/B082Y114TB/ref=tracking",
       platform: "amazon",
-      marketplace: "amazon.ca"
+      marketplace: "amazon.ca",
+      reviewPageLimit: 10
     })
 
-    assert.deepEqual(pagesRequested, [1, 2, 3])
+    assert.deepEqual(pagesRequested, [1, 2, 3, 4, 5])
     assert.equal(result.source, "canopy")
     assert.equal(result.productName, "Cordless Massage Gun - Product Details")
-    assert.equal(result.pagesFetched, 3)
+    assert.equal(result.pagesFetched, 5)
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.marketplaceRatingCount, 12446)
     assert.equal(result.reviews.length, 3)
-    assert.match(result.sampleNote ?? "", /12,446 ratings/)
+    assert.match(result.sampleNote ?? "", /5 of 10 requested pages/)
+    assert.match(result.sampleNote ?? "", /stopped after 3 consecutive pages/)
     assert.equal(canonicalAmazonProductUrl("https://www.amazon.ca/example/dp/B082Y114TB/ref=tracking"), "https://www.amazon.ca/dp/B082Y114TB")
   } finally {
     globalThis.fetch = originalFetch
