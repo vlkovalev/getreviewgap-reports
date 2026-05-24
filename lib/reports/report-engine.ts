@@ -138,6 +138,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
       reviewPageLimit: filters.reviewPageLimit ?? "",
       pagesFetched: reviewResult.pagesFetched ?? "",
       availableReviewCount: reviewResult.availableReviewCount ?? "",
+      marketplaceRatingCount: reviewResult.marketplaceRatingCount ?? "",
       sampleNote: reviewResult.sampleNote ?? "",
       warning: reviewResult.warning ?? "",
       executiveSummary: insight.executiveSummary,
@@ -250,7 +251,7 @@ export function exportReportPdf(report: IntelligenceReport) {
         y -= 18
         return
       }
-      const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Confidence):/.test(line)
+      const isMeta = /^(Product|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Marketplace ratings shown|Confidence):/.test(line)
       const isIndented = line.startsWith("   ")
       contentLines.push(pdfDraw(line, isMeta ? 46 : isIndented ? 62 : 52, y, 9.5, isMeta ? "F2" : "F1", isMeta ? "0.18 0.23 0.27" : "0.26 0.29 0.32"))
       y -= line ? 13 : 7
@@ -306,9 +307,9 @@ function buildPdfLines(report: IntelligenceReport) {
     dataQuality?: { reviewCount?: number; limitations?: string[] }
   } | undefined
   const reviewCount = Number(summary.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
+  const marketplaceRatingCount = Number(summary.marketplaceRatingCount ?? 0)
   return [
     `Product: ${stringifyPdfValue(summary.productName ?? report.title)}`,
-    `URL: ${stringifyPdfValue(summary.productUrl ?? "-")}`,
     `Platform: ${stringifyPdfValue(summary.platform ?? summary.marketplace ?? "-")}`,
     ...(summary.asin ? [`ASIN: ${stringifyPdfValue(summary.asin)}`] : []),
     `Type: ${report.reportType}`,
@@ -318,6 +319,7 @@ function buildPdfLines(report: IntelligenceReport) {
     ...(summary.reviewApp ? [`Review app: ${stringifyPdfValue(formatReviewApp(summary.reviewApp))}`] : []),
     `Depth: ${stringifyPdfValue(summary.reviewDepth ?? "Default")}`,
     `Written reviews analyzed: ${reviewCount}`,
+    ...(marketplaceRatingCount ? [`Marketplace ratings shown: ${marketplaceRatingCount.toLocaleString("en-US")}`] : []),
     `Confidence: ${pdfConfidence(reviewCount).label}`,
     ...(summary.sampleNote ? [`Sample: ${stringifyPdfValue(summary.sampleNote)}`] : []),
     "",
@@ -328,6 +330,7 @@ function buildPdfLines(report: IntelligenceReport) {
     wrapPdfLine(pdfConfidence(reviewCount).note),
     "Marketplace rating counts may include star-only ratings and records the provider cannot return as written text.",
     "Customer-reported complaints are signals for human review, not verified product defects.",
+    ...(summary.productUrl ? ["", "Source URL", wrapPdfLine(stringifyPdfValue(summary.productUrl))] : []),
     ...(summary.warning ? ["", "Data Source Warning", wrapPdfLine(stringifyPdfValue(summary.warning))] : []),
     "",
     "Next Best Actions",
@@ -448,7 +451,7 @@ function splitPdfLine(value: string) {
   if (!value) return [""]
   if (isPdfSectionHeading(value)) return [value]
   const indent = value.match(/^\s*/)?.[0] ?? ""
-  const isMeta = /^(Product|URL|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Confidence|Sample):/.test(value)
+  const isMeta = /^(Product|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Marketplace ratings shown|Confidence|Sample):/.test(value)
   const width = isMeta ? 86 : indent.length ? 80 : 84
   const continuationIndent = indent || (isMeta ? "  " : "   ")
   const words = value.replace(/\s+/g, " ").trim().split(" ")

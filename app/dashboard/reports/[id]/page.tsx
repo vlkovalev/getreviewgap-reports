@@ -44,6 +44,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const headers = Object.keys(rows[0] ?? {})
   const insight = report.data?.insight as ReviewInsightLike | undefined
   const reviewCount = Number(report.summary?.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
+  const marketplaceRatingCount = Number(report.summary?.marketplaceRatingCount ?? 0)
   const dataScore = scoreDataQuality(report.summary ?? {}, insight)
   const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
   const shouldRerun = reviewCount === 0 && Boolean(productUrl)
@@ -93,8 +94,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-7">
+          <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-8">
             <Metric label="Written reviews" value={String(reviewCount)} />
+            <Metric label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
             <Metric label="Depth" value={String(report.summary?.reviewDepth ?? "Default")} />
             <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
             <Metric label={platform === "shopify" ? "Review app" : "Source"} value={platform === "shopify" ? formatReviewApp(report.summary?.reviewApp) : String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
@@ -119,7 +121,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         <section className="mx-6 mb-6 rounded-2xl border border-white/10 bg-black/25 p-5 md:mx-8 md:mb-8">
           <p className="text-sm font-black uppercase text-cyan">Evidence scope</p>
           <p className="mt-2 text-white/74">{String(report.summary?.sampleNote ?? confidenceNote(reviewCount))}</p>
-          <p className="mt-2 text-sm text-white/55">{confidenceNote(reviewCount)} Marketplace rating counts may include star-only ratings or records the provider cannot return as written text. Customer-reported complaints require human review before product or safety decisions.</p>
+          <p className="mt-2 text-sm text-white/55">{confidenceNote(reviewCount)} Marketplace ratings and written review text are different. Ratings can include star-only feedback or records the provider cannot return as text. Customer-reported complaints require human review before product or safety decisions.</p>
         </section>
       </section>
 

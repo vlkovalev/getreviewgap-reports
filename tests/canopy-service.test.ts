@@ -27,6 +27,7 @@ async function main() {
       data: {
         amazonProduct: {
           title: "Cordless Massage Gun",
+          ratingCount: 12446,
           reviewsPaginated: {
             reviews: bodies.map((body) => ({ body })),
             pageInfo: { currentPage: page, totalPages: 3, totalResults: 42, hasNextPage: false }
@@ -48,8 +49,9 @@ async function main() {
     assert.equal(result.productName, "Cordless Massage Gun")
     assert.equal(result.pagesFetched, 3)
     assert.equal(result.availableReviewCount, 42)
+    assert.equal(result.marketplaceRatingCount, 12446)
     assert.equal(result.reviews.length, 3)
-    assert.match(result.sampleNote ?? "", /3 unique written review texts from 42 available review records/)
+    assert.match(result.sampleNote ?? "", /12,446 ratings/)
     assert.equal(canonicalAmazonProductUrl("https://www.amazon.ca/example/dp/B082Y114TB/ref=tracking"), "https://www.amazon.ca/dp/B082Y114TB")
   } finally {
     globalThis.fetch = originalFetch

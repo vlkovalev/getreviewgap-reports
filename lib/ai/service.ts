@@ -21,6 +21,7 @@ type ReviewFetchResult = {
   asin?: string
   pagesFetched?: number
   availableReviewCount?: number
+  marketplaceRatingCount?: number
   sampleNote?: string
 }
 
@@ -206,6 +207,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   const reviews = new Set<string>()
   let pagesFetched = 0
   let availableReviewCount: number | undefined
+  let marketplaceRatingCount: number | undefined
   let productName: string | undefined
   let previousPageAddedReviews = true
 
@@ -232,8 +234,9 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     const payload = await response.json() as Record<string, unknown>
     const product = canopyProduct(payload)
     const pageInfo = canopyPageInfo(product)
-    productName ||= typeof product?.title === "string" ? product.title.trim() : undefined
+    productName ||= canopyProductTitle(product) || canopyProductTitle(payload)
     availableReviewCount ||= typeof pageInfo?.totalResults === "number" ? pageInfo.totalResults : undefined
+    marketplaceRatingCount ||= canopyMarketplaceRatingCount(product) ?? canopyMarketplaceRatingCount(payload)
     const pageReviews = canopyPaginatedReviewTexts(product)
     const usableReviews = pageReviews.length ? pageReviews : extractReviewTexts([payload])
     const previousCount = reviews.size
@@ -243,9 +246,10 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
-  const sampleNote = availableReviewCount && availableReviewCount > collectedReviews.length
-    ? `The provider returned ${collectedReviews.length} unique written review texts from ${availableReviewCount} available review records after checking ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
-    : `The provider returned ${collectedReviews.length} unique written review text${collectedReviews.length === 1 ? "" : "s"} after checking ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}. Marketplace star ratings can be much higher than retrievable written review text.`
+  if (!productName || productName.toLowerCase().startsWith("amazon product")) {
+    productName = await fetchCanopyProductTitle(input, apiKey, asin).catch(() => productName)
+  }
+  const sampleNote = amazonSampleNote({ writtenReviews: collectedReviews.length, pagesFetched, availableReviewCount, marketplaceRatingCount })
   return {
     reviews: collectedReviews,
     source: "canopy",
@@ -253,9 +257,45 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     asin,
     pagesFetched,
     availableReviewCount,
+    marketplaceRatingCount,
     sampleNote,
     warning: collectedReviews.length ? undefined : "Canopy returned no review text for this product and marketplace. Try an authorized review export or a different product."
   }
+}
+
+async function fetchCanopyProductTitle(input: ReviewInput, apiKey: string, asin: string) {
+  const params = new URLSearchParams({
+    asin,
+    domain: amazonMarketplaceCode(input.productUrl)
+  })
+  const response = await fetch(`https://rest.canopyapi.co/api/amazon/product?${params}`, {
+    headers: { "API-KEY": apiKey },
+    cache: "no-store"
+  })
+  if (!response.ok) return undefined
+  const payload = await response.json() as Record<string, unknown>
+  return canopyProductTitle(canopyProduct(payload)) || canopyProductTitle(payload)
+}
+
+function amazonSampleNote({
+  writtenReviews,
+  pagesFetched,
+  availableReviewCount,
+  marketplaceRatingCount
+}: {
+  writtenReviews: number
+  pagesFetched: number
+  availableReviewCount?: number
+  marketplaceRatingCount?: number
+}) {
+  const pageText = `${pagesFetched} page${pagesFetched === 1 ? "" : "s"}`
+  if (marketplaceRatingCount && marketplaceRatingCount > writtenReviews) {
+    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.`
+  }
+  if (availableReviewCount && availableReviewCount > writtenReviews) {
+    return `The provider found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.`
+  }
+  return `The provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.`
 }
 
 function canopyReviewPageLimit(requestedLimit?: number) {
@@ -275,6 +315,44 @@ function canopyPageInfo(product: Record<string, unknown> | undefined) {
   if (!pagination || typeof pagination !== "object" || Array.isArray(pagination)) return undefined
   const info = (pagination as Record<string, unknown>).pageInfo
   return info && typeof info === "object" && !Array.isArray(info) ? info as Record<string, unknown> : undefined
+}
+
+function canopyProductTitle(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  for (const key of ["title", "productTitle", "name"]) {
+    const item = record[key]
+    if (typeof item === "string" && item.trim()) return item.trim()
+  }
+  for (const key of ["amazonProduct", "product", "data"]) {
+    const nested = record[key]
+    const title = canopyProductTitle(nested)
+    if (title) return title
+  }
+  return undefined
+}
+
+function canopyMarketplaceRatingCount(value: unknown): number | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  for (const key of ["ratingCount", "ratingsCount", "totalRatings", "ratingsTotal", "reviewCount", "reviewsCount", "totalReviews"]) {
+    const parsed = parseCount(record[key])
+    if (parsed) return parsed
+  }
+  for (const key of ["rating", "ratings", "reviews", "reviewSummary", "aggregateRating", "amazonProduct", "product", "data"]) {
+    const nested = canopyMarketplaceRatingCount(record[key])
+    if (nested) return nested
+  }
+  return undefined
+}
+
+function parseCount(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return Math.floor(value)
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^\d]/g, ""))
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  }
+  return undefined
 }
 
 function canopyPaginatedReviewTexts(product: Record<string, unknown> | undefined) {
