@@ -26,6 +26,7 @@ type ReviewFetchResult = {
   ratingFilterPagesFetched?: number
   ratingFiltersUsed?: string[]
   fallbackReviewsAdded?: number
+  targetReviewCount?: number
   sampleNote?: string
 }
 
@@ -293,7 +294,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     productName = productMetadata?.title || productName
     marketplaceRatingCount ||= productMetadata?.marketplaceRatingCount
   }
-  const sampleNote = amazonSampleNote({ writtenReviews: finalReviews.length, pagesFetched, requestedPages: maxPages, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed], fallbackReviewsAdded })
+  const sampleNote = amazonSampleNote({ writtenReviews: finalReviews.length, pagesFetched, requestedPages: maxPages, targetReviewCount: targetReviews, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed], fallbackReviewsAdded })
   return {
     reviews: finalReviews,
     source,
@@ -306,6 +307,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     ratingFilterPagesFetched,
     ratingFiltersUsed: [...ratingFiltersUsed],
     fallbackReviewsAdded,
+    targetReviewCount: targetReviews,
     sampleNote,
     warning: finalReviews.length ? undefined : "Canopy and SerpApi returned no review text for this product and marketplace. Try an authorized review export or a different product."
   }
@@ -370,7 +372,7 @@ function serpApiProductTitle(payload: Record<string, unknown>) {
 
 function canopyTargetReviewCount(maxPages: number) {
   if (maxPages >= 50) return 250
-  if (maxPages >= 10) return 75
+  if (maxPages >= 10) return 100
   return 25
 }
 
@@ -402,6 +404,7 @@ function amazonSampleNote({
   writtenReviews,
   pagesFetched,
   requestedPages,
+  targetReviewCount,
   availableReviewCount,
   marketplaceRatingCount,
   basePagesFetched,
@@ -412,6 +415,7 @@ function amazonSampleNote({
   writtenReviews: number
   pagesFetched: number
   requestedPages: number
+  targetReviewCount: number
   availableReviewCount?: number
   marketplaceRatingCount?: number
   basePagesFetched?: number
@@ -424,14 +428,15 @@ function amazonSampleNote({
     ? ` plus ${ratingFilterPagesFetched} star-filter page${ratingFilterPagesFetched === 1 ? "" : "s"} across ${ratingFiltersUsed?.length ?? 0} rating bucket${(ratingFiltersUsed?.length ?? 0) === 1 ? "" : "s"}`
     : ""
   const fallbackText = fallbackReviewsAdded ? ` SerpApi fallback added ${fallbackReviewsAdded} unique written review text${fallbackReviewsAdded === 1 ? "" : "s"}.` : ""
+  const targetText = writtenReviews < targetReviewCount ? ` Target sample was ${targetReviewCount}, but providers exposed ${writtenReviews} unique written texts for this run.` : ` Target sample of ${targetReviewCount} was met.`
   const pageText = `${baseText}${expansionText}`
   if (marketplaceRatingCount && marketplaceRatingCount > writtenReviews) {
-    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.${fallbackText}`
+    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.${fallbackText}${targetText}`
   }
   if (availableReviewCount && availableReviewCount > writtenReviews) {
-    return `The providers found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.${fallbackText}`
+    return `The providers found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.${fallbackText}${targetText}`
   }
-  return `The providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.${fallbackText}`
+  return `The providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.${fallbackText}${targetText}`
 }
 
 function canopyReviewPageLimit(requestedLimit?: number) {

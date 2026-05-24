@@ -44,6 +44,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const headers = Object.keys(rows[0] ?? {})
   const insight = report.data?.insight as ReviewInsightLike | undefined
   const reviewCount = Number(report.summary?.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
+  const targetReviewCount = Number(report.summary?.targetReviewCount ?? 0)
   const marketplaceRatingCount = Number(report.summary?.marketplaceRatingCount ?? 0)
   const dataScore = scoreDataQuality(report.summary ?? {}, insight)
   const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
@@ -105,6 +106,22 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
           </div>
         </div>
+
+        <section className="border-b border-white/10 bg-black/20 p-6 md:p-8">
+          <p className="text-sm font-black uppercase text-cyan">Data coverage</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+            <CoverageItem label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
+            <CoverageItem label="Written reviews" value={`${reviewCount}${targetReviewCount ? ` / ${targetReviewCount} target` : ""}`} />
+            <CoverageItem label="Sources" value={String(report.summary?.source ?? "demo")} />
+            <CoverageItem label="Provider pages" value={String(report.summary?.pagesFetched ?? "-")} />
+            <CoverageItem label="Coverage" value={dataScore.label} tone={dataScore.tone} />
+          </div>
+          {targetReviewCount && reviewCount < targetReviewCount ? (
+            <p className="mt-4 rounded-xl border border-yellow-300/20 bg-yellow-300/10 p-4 text-sm text-yellow-50/80">
+              Target was {targetReviewCount} written reviews. Providers exposed {reviewCount} unique written reviews for this ASIN and marketplace in this run.
+            </p>
+          ) : null}
+        </section>
 
         <div className="grid gap-5 p-6 md:p-8 lg:grid-cols-[1.1fr_.9fr]">
           <section className="rounded-2xl border border-lime/20 bg-lime/10 p-5">
@@ -242,6 +259,16 @@ function Metric({ label, value, tone = "white" }: { label: string; value: string
     <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
       <p className="text-xs font-black uppercase text-white/40">{label}</p>
       <p className={`mt-2 break-words text-xl font-black ${color}`}>{value}</p>
+    </div>
+  )
+}
+
+function CoverageItem({ label, value, tone = "white" }: { label: string; value: string; tone?: "white" | "lime" | "yellow" | "coral" }) {
+  const color = tone === "lime" ? "text-lime" : tone === "yellow" ? "text-yellow-300" : tone === "coral" ? "text-coral" : "text-white"
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-black uppercase text-white/40">{label}</p>
+      <p className={`mt-2 break-words text-2xl font-black ${color}`}>{value}</p>
     </div>
   )
 }

@@ -76,6 +76,7 @@ async function main() {
     assert.equal(result.marketplaceRatingCount, 12446)
     assert.ok(result.reviews.length > 3)
     assert.equal(result.fallbackReviewsAdded, 2)
+    assert.equal(result.targetReviewCount, 100)
     assert.match(result.sampleNote ?? "", /10 of 10 requested base pages/)
     assert.match(result.sampleNote ?? "", /star-filter page/)
     assert.equal(canonicalAmazonProductUrl("https://www.amazon.ca/example/dp/B082Y114TB/ref=tracking"), "https://www.amazon.ca/dp/B082Y114TB")
@@ -173,6 +174,7 @@ async function assertRequestedPageLimit() {
   assert.equal(result.pagesFetched, 15)
   assert.equal(result.basePagesFetched, 5)
   assert.equal(result.ratingFilterPagesFetched, 10)
+  assert.equal(result.targetReviewCount, 25)
   assert.equal(result.reviews.length, 5)
   assert.deepEqual(requestedPages.slice(0, 5), ["ALL:1", "ALL:2", "ALL:3", "ALL:4", "ALL:5"])
 }
@@ -209,6 +211,7 @@ async function assertDefaultPageLimit() {
   assert.equal(result.pagesFetched, 150)
   assert.equal(result.basePagesFetched, 50)
   assert.equal(result.ratingFilterPagesFetched, 100)
+  assert.equal(result.targetReviewCount, 250)
   assert.equal(result.reviews.length, 50)
   assert.equal(requestedPages[0], "ALL:1")
   assert.equal(requestedPages[49], "ALL:50")
