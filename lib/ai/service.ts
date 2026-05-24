@@ -12,7 +12,7 @@ const demoReviews = [
   "Marketing photos made it look bigger. Still a solid product, just expensive."
 ]
 
-type ReviewSource = "canopy" | "apify" | "judgeme" | "pasted" | "demo"
+type ReviewSource = "canopy" | "canopy+serpapi" | "serpapi" | "apify" | "judgeme" | "pasted" | "demo"
 type ReviewFetchResult = {
   reviews: string[]
   source: ReviewSource
@@ -25,6 +25,7 @@ type ReviewFetchResult = {
   basePagesFetched?: number
   ratingFilterPagesFetched?: number
   ratingFiltersUsed?: string[]
+  fallbackReviewsAdded?: number
   sampleNote?: string
 }
 
@@ -273,15 +274,29 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
+  let fallbackReviewsAdded = 0
+  let source: ReviewSource = "canopy"
+  if (collectedReviews.length < targetReviews) {
+    const serpApiResult = await fetchSerpApiAmazonReviews(input, asin).catch(() => undefined)
+    if (serpApiResult?.reviews.length) {
+      const beforeFallback = reviews.size
+      for (const text of serpApiResult.reviews) reviews.add(text)
+      fallbackReviewsAdded = reviews.size - beforeFallback
+      source = fallbackReviewsAdded > 0 ? "canopy+serpapi" : source
+      productName = productName || serpApiResult.productName
+      marketplaceRatingCount ||= serpApiResult.marketplaceRatingCount
+    }
+  }
+  const finalReviews = [...reviews].slice(0, 500)
   if (!productName || productName.toLowerCase().startsWith("amazon product") || !marketplaceRatingCount) {
     const productMetadata = await fetchCanopyProductMetadata(input, apiKey, asin).catch(() => undefined)
     productName = productMetadata?.title || productName
     marketplaceRatingCount ||= productMetadata?.marketplaceRatingCount
   }
-  const sampleNote = amazonSampleNote({ writtenReviews: collectedReviews.length, pagesFetched, requestedPages: maxPages, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed] })
+  const sampleNote = amazonSampleNote({ writtenReviews: finalReviews.length, pagesFetched, requestedPages: maxPages, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed], fallbackReviewsAdded })
   return {
-    reviews: collectedReviews,
-    source: "canopy",
+    reviews: finalReviews,
+    source,
     productName,
     asin,
     pagesFetched,
@@ -290,9 +305,67 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     basePagesFetched,
     ratingFilterPagesFetched,
     ratingFiltersUsed: [...ratingFiltersUsed],
+    fallbackReviewsAdded,
     sampleNote,
-    warning: collectedReviews.length ? undefined : "Canopy returned no review text for this product and marketplace. Try an authorized review export or a different product."
+    warning: finalReviews.length ? undefined : "Canopy and SerpApi returned no review text for this product and marketplace. Try an authorized review export or a different product."
   }
+}
+
+async function fetchSerpApiAmazonReviews(input: ReviewInput, asin: string): Promise<{ reviews: string[]; productName?: string; marketplaceRatingCount?: number }> {
+  const apiKey = cleanEnv(process.env.SERPAPI_API_KEY)
+  if (!apiKey) return { reviews: [] }
+  const params = new URLSearchParams({
+    engine: "amazon_product",
+    amazon_domain: amazonMarketplaceDomain(input.productUrl),
+    asin,
+    api_key: apiKey
+  })
+  const response = await fetch(`https://serpapi.com/search.json?${params}`, { cache: "no-store" })
+  if (!response.ok) return { reviews: [] }
+  const payload = await response.json() as Record<string, unknown>
+  const info = payload.reviews_information && typeof payload.reviews_information === "object" && !Array.isArray(payload.reviews_information)
+    ? payload.reviews_information as Record<string, unknown>
+    : {}
+  return {
+    reviews: extractSerpApiReviewTexts(info),
+    productName: serpApiProductTitle(payload),
+    marketplaceRatingCount: canopyMarketplaceRatingCount(info) ?? canopyMarketplaceRatingCount(payload)
+  }
+}
+
+function extractSerpApiReviewTexts(info: Record<string, unknown>) {
+  const texts = new Set<string>()
+  collectReviewTexts(info, texts)
+  collectSerpApiTextFields(info, texts)
+  const insights = Array.isArray(info.insights) ? info.insights : []
+  for (const insight of insights) {
+    collectReviewTexts(insight, texts)
+    collectSerpApiTextFields(insight, texts)
+  }
+  return [...texts].map((text) => text.replace(/\s+/g, " ").trim()).filter((text) => text.length >= 20).slice(0, 200)
+}
+
+function collectSerpApiTextFields(value: unknown, texts: Set<string>) {
+  if (Array.isArray(value)) {
+    for (const item of value) collectSerpApiTextFields(item, texts)
+    return
+  }
+  if (!value || typeof value !== "object") return
+  for (const [key, child] of Object.entries(value)) {
+    if (typeof child === "string" && ["snippet", "summary", "text", "review"].some((field) => key.toLowerCase().includes(field))) {
+      texts.add(child)
+    }
+    collectSerpApiTextFields(child, texts)
+  }
+}
+
+function serpApiProductTitle(payload: Record<string, unknown>) {
+  const product = payload.product_results
+  if (product && typeof product === "object" && !Array.isArray(product)) {
+    const title = (product as Record<string, unknown>).title
+    if (typeof title === "string" && title.trim()) return title.trim()
+  }
+  return canopyProductTitle(payload)
 }
 
 function canopyTargetReviewCount(maxPages: number) {
@@ -333,7 +406,8 @@ function amazonSampleNote({
   marketplaceRatingCount,
   basePagesFetched,
   ratingFilterPagesFetched,
-  ratingFiltersUsed
+  ratingFiltersUsed,
+  fallbackReviewsAdded
 }: {
   writtenReviews: number
   pagesFetched: number
@@ -343,19 +417,21 @@ function amazonSampleNote({
   basePagesFetched?: number
   ratingFilterPagesFetched?: number
   ratingFiltersUsed?: string[]
+  fallbackReviewsAdded?: number
 }) {
   const baseText = `${basePagesFetched ?? requestedPages} of ${requestedPages} requested base page${requestedPages === 1 ? "" : "s"}`
   const expansionText = ratingFilterPagesFetched
     ? ` plus ${ratingFilterPagesFetched} star-filter page${ratingFilterPagesFetched === 1 ? "" : "s"} across ${ratingFiltersUsed?.length ?? 0} rating bucket${(ratingFiltersUsed?.length ?? 0) === 1 ? "" : "s"}`
     : ""
+  const fallbackText = fallbackReviewsAdded ? ` SerpApi fallback added ${fallbackReviewsAdded} unique written review text${fallbackReviewsAdded === 1 ? "" : "s"}.` : ""
   const pageText = `${baseText}${expansionText}`
   if (marketplaceRatingCount && marketplaceRatingCount > writtenReviews) {
-    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.`
+    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.${fallbackText}`
   }
   if (availableReviewCount && availableReviewCount > writtenReviews) {
-    return `The provider found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.`
+    return `The providers found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.${fallbackText}`
   }
-  return `The provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.`
+  return `The providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.${fallbackText}`
 }
 
 function canopyReviewPageLimit(requestedLimit?: number) {
@@ -559,6 +635,11 @@ function amazonMarketplaceCode(url: string) {
   if (hostname.endsWith(".com.br")) return "BR"
   if (hostname.endsWith(".com.mx")) return "MX"
   return "US"
+}
+
+function amazonMarketplaceDomain(url: string) {
+  const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, "")
+  return hostname.startsWith("amazon.") ? hostname : "amazon.com"
 }
 
 export function amazonMarketplaceLabel(url: string) {

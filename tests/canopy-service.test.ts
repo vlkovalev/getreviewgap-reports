@@ -5,6 +5,7 @@ async function main() {
   const originalFetch = globalThis.fetch
   const originalKey = process.env.CANOPY_API_KEY
   const originalLimit = process.env.CANOPY_REVIEW_PAGE_LIMIT
+  const originalSerpApiKey = process.env.SERPAPI_API_KEY
   const originalJudgeMeToken = process.env.JUDGEME_API_TOKEN
   const originalJudgeMeShop = process.env.JUDGEME_SHOP_DOMAIN
   const requestsMade: string[] = []
@@ -14,12 +15,24 @@ async function main() {
 
   process.env.CANOPY_API_KEY = "test-key"
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "3"
+  process.env.SERPAPI_API_KEY = "serpapi-key"
   globalThis.fetch = async (input) => {
     const url = new URL(String(input))
     if (url.pathname === "/api/amazon/product" && !url.pathname.endsWith("/reviews") && !url.searchParams.has("page")) {
       return new Response(JSON.stringify({
         title: "Cordless Massage Gun - Product Details",
         reviewCount: 12446
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    if (url.hostname === "serpapi.com") {
+      return new Response(JSON.stringify({
+        product_results: { title: "Cordless Massage Gun - SerpApi" },
+        reviews_information: {
+          authors_reviews: [
+            { title: "Helpful", text: "SerpApi fallback review text about quiet operation and strong power." },
+            { snippet: "SerpApi second fallback review mentions battery life and attachments." }
+          ]
+        }
       }), { status: 200, headers: { "content-type": "application/json" } })
     }
     const page = Number(url.searchParams.get("page"))
@@ -54,7 +67,7 @@ async function main() {
     })
 
     assert.deepEqual(requestsMade.slice(0, 10), ["ALL:1", "ALL:2", "ALL:3", "ALL:4", "ALL:5", "ALL:6", "ALL:7", "ALL:8", "ALL:9", "ALL:10"])
-    assert.equal(result.source, "canopy")
+    assert.equal(result.source, "canopy+serpapi")
     assert.equal(result.productName, "Cordless Massage Gun - Product Details")
     assert.ok((result.pagesFetched ?? 0) > 10)
     assert.equal(result.basePagesFetched, 10)
@@ -62,6 +75,7 @@ async function main() {
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.marketplaceRatingCount, 12446)
     assert.ok(result.reviews.length > 3)
+    assert.equal(result.fallbackReviewsAdded, 2)
     assert.match(result.sampleNote ?? "", /10 of 10 requested base pages/)
     assert.match(result.sampleNote ?? "", /star-filter page/)
     assert.equal(canonicalAmazonProductUrl("https://www.amazon.ca/example/dp/B082Y114TB/ref=tracking"), "https://www.amazon.ca/dp/B082Y114TB")
@@ -71,6 +85,8 @@ async function main() {
     else process.env.CANOPY_API_KEY = originalKey
     if (originalLimit === undefined) delete process.env.CANOPY_REVIEW_PAGE_LIMIT
     else process.env.CANOPY_REVIEW_PAGE_LIMIT = originalLimit
+    if (originalSerpApiKey === undefined) delete process.env.SERPAPI_API_KEY
+    else process.env.SERPAPI_API_KEY = originalSerpApiKey
     if (originalJudgeMeToken === undefined) delete process.env.JUDGEME_API_TOKEN
     else process.env.JUDGEME_API_TOKEN = originalJudgeMeToken
     if (originalJudgeMeShop === undefined) delete process.env.JUDGEME_SHOP_DOMAIN

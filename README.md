@@ -64,6 +64,7 @@ OPENAI_API_KEY=""
 OPENAI_MODEL="gpt-4o-mini"
 CANOPY_API_KEY=""
 CANOPY_REVIEW_PAGE_LIMIT="50"
+SERPAPI_API_KEY=""
 JUDGEME_API_TOKEN=""
 JUDGEME_SHOP_DOMAIN=""
 APIFY_TOKEN=""
@@ -85,6 +86,7 @@ Do not commit real secrets. Create a local `.env` file from `.env.example` and p
 
 - OpenAI: create or rotate an API key, then set `OPENAI_API_KEY`.
 - Amazon reviews: set `CANOPY_API_KEY` for the preferred structured review API workflow. The app infers the Amazon marketplace from the product URL and requests review pages until a page returns no new written review text. `CANOPY_REVIEW_PAGE_LIMIT` defaults to `50` (up to roughly 500 written reviews) and can be lowered from `1` to `50` to balance report depth against API/AI cost.
+- Amazon fallback: set `SERPAPI_API_KEY` to let the app call SerpApi's Amazon product endpoint when Canopy returns fewer unique written reviews than the target sample.
 - Apify fallback: `APIFY_TOKEN` and `APIFY_AMAZON_REVIEWS_ACTOR_ID` remain supported for testing, but Amazon review-page restrictions can cause empty results even on products with visible ratings.
 - Shopify: users can generate reports from pasted/exported Shopify review text. Judge.me direct collection is available when `JUDGEME_API_TOKEN` and `JUDGEME_SHOP_DOMAIN` are configured; other Shopify review apps still use CSV/TXT import until their API connectors are added.
 - Database: create a Supabase or Neon Postgres database and set `DATABASE_URL`.

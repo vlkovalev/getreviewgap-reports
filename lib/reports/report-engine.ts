@@ -140,6 +140,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
       basePagesFetched: reviewResult.basePagesFetched ?? "",
       ratingFilterPagesFetched: reviewResult.ratingFilterPagesFetched ?? "",
       ratingFiltersUsed: reviewResult.ratingFiltersUsed ?? [],
+      fallbackReviewsAdded: reviewResult.fallbackReviewsAdded ?? "",
       availableReviewCount: reviewResult.availableReviewCount ?? "",
       marketplaceRatingCount: reviewResult.marketplaceRatingCount ?? "",
       sampleNote: reviewResult.sampleNote ?? "",
