@@ -209,9 +209,8 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
   let availableReviewCount: number | undefined
   let marketplaceRatingCount: number | undefined
   let productName: string | undefined
-  let emptyPages = 0
 
-  while (pagesFetched < maxPages && emptyPages < 3) {
+  while (pagesFetched < maxPages) {
     const params = new URLSearchParams({
       asin,
       domain: amazonMarketplaceCode(input.productUrl),
@@ -239,11 +238,8 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     marketplaceRatingCount ||= canopyMarketplaceRatingCount(product) ?? canopyMarketplaceRatingCount(payload)
     const pageReviews = canopyPaginatedReviewTexts(product)
     const usableReviews = pageReviews.length ? pageReviews : extractReviewTexts([payload])
-    const previousCount = reviews.size
     for (const text of usableReviews) reviews.add(text)
     pagesFetched += 1
-    const addedNewReviews = usableReviews.length > 0 && reviews.size > previousCount
-    emptyPages = addedNewReviews ? 0 : emptyPages + 1
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
@@ -252,7 +248,7 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     productName = productMetadata?.title || productName
     marketplaceRatingCount ||= productMetadata?.marketplaceRatingCount
   }
-  const sampleNote = amazonSampleNote({ writtenReviews: collectedReviews.length, pagesFetched, requestedPages: maxPages, availableReviewCount, marketplaceRatingCount, stoppedAfterEmptyPages: emptyPages >= 3 })
+  const sampleNote = amazonSampleNote({ writtenReviews: collectedReviews.length, pagesFetched, requestedPages: maxPages, availableReviewCount, marketplaceRatingCount })
   return {
     reviews: collectedReviews,
     source: "canopy",
@@ -290,24 +286,21 @@ function amazonSampleNote({
   requestedPages,
   availableReviewCount,
   marketplaceRatingCount,
-  stoppedAfterEmptyPages
 }: {
   writtenReviews: number
   pagesFetched: number
   requestedPages: number
   availableReviewCount?: number
   marketplaceRatingCount?: number
-  stoppedAfterEmptyPages?: boolean
 }) {
   const pageText = `${pagesFetched} of ${requestedPages} requested page${requestedPages === 1 ? "" : "s"}`
-  const stopText = stoppedAfterEmptyPages ? " The scan stopped after 3 consecutive pages returned no new written review text." : ""
   if (marketplaceRatingCount && marketplaceRatingCount > writtenReviews) {
-    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.${stopText}`
+    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.`
   }
   if (availableReviewCount && availableReviewCount > writtenReviews) {
-    return `The provider found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.${stopText}`
+    return `The provider found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.`
   }
-  return `The provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.${stopText}`
+  return `The provider returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.`
 }
 
 function canopyReviewPageLimit(requestedLimit?: number) {

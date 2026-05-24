@@ -50,15 +50,14 @@ async function main() {
       reviewPageLimit: 10
     })
 
-    assert.deepEqual(pagesRequested, [1, 2, 3, 4, 5])
+    assert.deepEqual(pagesRequested, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     assert.equal(result.source, "canopy")
     assert.equal(result.productName, "Cordless Massage Gun - Product Details")
-    assert.equal(result.pagesFetched, 5)
+    assert.equal(result.pagesFetched, 10)
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.marketplaceRatingCount, 12446)
     assert.equal(result.reviews.length, 3)
-    assert.match(result.sampleNote ?? "", /5 of 10 requested pages/)
-    assert.match(result.sampleNote ?? "", /stopped after 3 consecutive pages/)
+    assert.match(result.sampleNote ?? "", /10 of 10 requested pages/)
     assert.equal(canonicalAmazonProductUrl("https://www.amazon.ca/example/dp/B082Y114TB/ref=tracking"), "https://www.amazon.ca/dp/B082Y114TB")
   } finally {
     globalThis.fetch = originalFetch
