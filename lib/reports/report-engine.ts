@@ -98,6 +98,10 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
   if ((reviewResult.source === "apify" || reviewResult.source === "canopy") && reviewResult.reviews.length === 0) {
     throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
   }
+  const targetReviewCount = Number(reviewResult.targetReviewCount ?? 0)
+  if (platform === "amazon" && !filters.pastedReviews && targetReviewCount >= 100 && reviewResult.reviews.length < 100) {
+    throw new NoReviewDataError(`Only ${reviewResult.reviews.length} unique written reviews were retrieved. This report requires at least 100 written reviews. Add YEPAPI_API_KEY for paginated review collection, use Deep depth, or try a product whose written reviews are exposed by the providers.`)
+  }
   const productName = filters.productName || reviewResult.productName || initialProductName
   const { insight, provider, model } = await generateReviewInsight({
     productUrl: cleanProductUrl,
@@ -142,6 +146,8 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
       ratingFilterPagesFetched: reviewResult.ratingFilterPagesFetched ?? "",
       ratingFiltersUsed: reviewResult.ratingFiltersUsed ?? [],
       fallbackReviewsAdded: reviewResult.fallbackReviewsAdded ?? "",
+      yepApiReviewsAdded: reviewResult.yepApiReviewsAdded ?? "",
+      yepApiPagesFetched: reviewResult.yepApiPagesFetched ?? "",
       availableReviewCount: reviewResult.availableReviewCount ?? "",
       marketplaceRatingCount: reviewResult.marketplaceRatingCount ?? "",
       sampleNote: reviewResult.sampleNote ?? "",
@@ -320,14 +326,13 @@ function buildPdfLines(report: IntelligenceReport) {
     `Type: ${report.reportType}`,
     `Status: ${report.status}`,
     `Generated: ${report.generatedAt ?? report.createdAt}`,
-    `Source: ${stringifyPdfValue(summary.source ?? summary.sourceFilter ?? "-")}`,
     ...(summary.reviewApp ? [`Review app: ${stringifyPdfValue(formatReviewApp(summary.reviewApp))}`] : []),
     `Depth: ${stringifyPdfValue(summary.reviewDepth ?? "Default")}`,
     `Written reviews analyzed: ${reviewCount}`,
     ...(summary.targetReviewCount ? [`Target written reviews: ${stringifyPdfValue(summary.targetReviewCount)}`] : []),
     ...(marketplaceRatingCount ? [`Marketplace ratings shown: ${marketplaceRatingCount.toLocaleString("en-US")}`] : []),
     `Confidence: ${pdfConfidence(reviewCount).label}`,
-    ...(summary.sampleNote ? [`Sample: ${stringifyPdfValue(summary.sampleNote)}`] : []),
+    ...(summary.targetReviewCount ? [`Sample: ${reviewCount} written reviews analyzed from a target sample of ${stringifyPdfValue(summary.targetReviewCount)}.`] : []),
     "",
     "Executive Summary",
     wrapPdfLine(stringifyPdfValue(summary.executiveSummary ?? "No executive summary was generated.")),

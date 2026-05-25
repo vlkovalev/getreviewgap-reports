@@ -100,20 +100,18 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             <Metric label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
             <Metric label="Depth" value={String(report.summary?.reviewDepth ?? "Default")} />
             <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
-            <Metric label={platform === "shopify" ? "Review app" : "Source"} value={platform === "shopify" ? formatReviewApp(report.summary?.reviewApp) : String(report.summary?.source ?? report.summary?.sourceFilter ?? "demo")} />
+            {platform === "shopify" ? <Metric label="Review app" value={formatReviewApp(report.summary?.reviewApp)} /> : null}
             <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
-            <Metric label="Provider pages" value={String(report.summary?.pagesFetched ?? "-")} />
             <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
           </div>
         </div>
 
         <section className="border-b border-white/10 bg-black/20 p-6 md:p-8">
           <p className="text-sm font-black uppercase text-cyan">Data coverage</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <CoverageItem label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
-            <CoverageItem label="Written reviews" value={`${reviewCount}${targetReviewCount ? ` / ${targetReviewCount} target` : ""}`} />
-            <CoverageItem label="Sources" value={String(report.summary?.source ?? "demo")} />
-            <CoverageItem label="Provider pages" value={String(report.summary?.pagesFetched ?? "-")} />
+            <CoverageItem label="Written reviews analyzed" value={String(reviewCount)} />
+            <CoverageItem label="Target sample" value={targetReviewCount ? String(targetReviewCount) : "-"} />
             <CoverageItem label="Coverage" value={dataScore.label} tone={dataScore.tone} />
           </div>
           {targetReviewCount && reviewCount < targetReviewCount ? (
@@ -137,7 +135,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         </div>
         <section className="mx-6 mb-6 rounded-2xl border border-white/10 bg-black/25 p-5 md:mx-8 md:mb-8">
           <p className="text-sm font-black uppercase text-cyan">Evidence scope</p>
-          <p className="mt-2 text-white/74">{String(report.summary?.sampleNote ?? confidenceNote(reviewCount))}</p>
+          <p className="mt-2 text-white/74">This brief analyzed {reviewCount} unique written review{reviewCount === 1 ? "" : "s"}{targetReviewCount ? ` against a target sample of ${targetReviewCount}` : ""}.</p>
           <p className="mt-2 text-sm text-white/55">{confidenceNote(reviewCount)} Marketplace ratings and written review text are different. Ratings can include star-only feedback or records the provider cannot return as text. Customer-reported complaints require human review before product or safety decisions.</p>
         </section>
       </section>

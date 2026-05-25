@@ -6,6 +6,7 @@ async function main() {
   const originalKey = process.env.CANOPY_API_KEY
   const originalLimit = process.env.CANOPY_REVIEW_PAGE_LIMIT
   const originalSerpApiKey = process.env.SERPAPI_API_KEY
+  const originalYepApiKey = process.env.YEPAPI_API_KEY
   const originalJudgeMeToken = process.env.JUDGEME_API_TOKEN
   const originalJudgeMeShop = process.env.JUDGEME_SHOP_DOMAIN
   const requestsMade: string[] = []
@@ -17,7 +18,8 @@ async function main() {
   process.env.CANOPY_API_KEY = "test-key"
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "3"
   process.env.SERPAPI_API_KEY = "serpapi-key"
-  globalThis.fetch = async (input) => {
+  process.env.YEPAPI_API_KEY = "yepapi-key"
+  globalThis.fetch = async (input, init) => {
     const url = new URL(String(input))
     if (url.pathname === "/api/amazon/product" && !url.pathname.endsWith("/reviews") && !url.searchParams.has("page")) {
       return new Response(JSON.stringify({
@@ -33,6 +35,24 @@ async function main() {
             { title: "Helpful", text: "SerpApi fallback review text about quiet operation and strong power." },
             { snippet: "SerpApi second fallback review mentions battery life and attachments." }
           ]
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    if (url.hostname === "api.yepapi.com") {
+      const body = JSON.parse(String(init?.body ?? "{}"))
+      const page = typeof body.page === "number" ? body.page : 1
+      return new Response(JSON.stringify({
+        ok: true,
+        data: {
+          status: "OK",
+          data: {
+            total_ratings: 12446,
+            reviews: Array.from({ length: 7 }, (_, index) => ({
+              review_title: `YepAPI review ${page}-${index}`,
+              review_text: `YepAPI detailed review ${page}-${index} with specific customer language about durability, setup, and product expectations.`,
+              review_star_rating: String((index % 5) + 1)
+            }))
+          }
         }
       }), { status: 200, headers: { "content-type": "application/json" } })
     }
@@ -68,15 +88,17 @@ async function main() {
     })
 
     assert.deepEqual(requestsMade.slice(0, 10), ["ALL:1", "ALL:2", "ALL:3", "ALL:4", "ALL:5", "ALL:6", "ALL:7", "ALL:8", "ALL:9", "ALL:10"])
-    assert.equal(result.source, "canopy+serpapi")
+    assert.equal(result.source, "canopy+serpapi+yepapi")
     assert.equal(result.productName, "Cordless Massage Gun - Product Details")
     assert.ok((result.pagesFetched ?? 0) > 10)
     assert.equal(result.basePagesFetched, 10)
     assert.ok((result.ratingFilterPagesFetched ?? 0) > 0)
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.marketplaceRatingCount, 12446)
-    assert.ok(result.reviews.length > 3)
+    assert.equal(result.reviews.length, 100)
     assert.equal(result.fallbackReviewsAdded, 2)
+    assert.equal(result.yepApiReviewsAdded, 70)
+    assert.equal(result.yepApiPagesFetched, 10)
     assert.equal(result.targetReviewCount, 100)
     assert.match(result.sampleNote ?? "", /10 of 10 requested base pages/)
     assert.match(result.sampleNote ?? "", /star-filter page/)
@@ -89,6 +111,8 @@ async function main() {
     else process.env.CANOPY_REVIEW_PAGE_LIMIT = originalLimit
     if (originalSerpApiKey === undefined) delete process.env.SERPAPI_API_KEY
     else process.env.SERPAPI_API_KEY = originalSerpApiKey
+    if (originalYepApiKey === undefined) delete process.env.YEPAPI_API_KEY
+    else process.env.YEPAPI_API_KEY = originalYepApiKey
     if (originalJudgeMeToken === undefined) delete process.env.JUDGEME_API_TOKEN
     else process.env.JUDGEME_API_TOKEN = originalJudgeMeToken
     if (originalJudgeMeShop === undefined) delete process.env.JUDGEME_SHOP_DOMAIN
@@ -145,6 +169,7 @@ async function assertJudgeMeConnector() {
 async function assertSerpApiFallbackWhenCanopyQuotaFails() {
   process.env.CANOPY_API_KEY = "test-key"
   process.env.SERPAPI_API_KEY = "serpapi-key"
+  delete process.env.YEPAPI_API_KEY
   globalThis.fetch = async (input) => {
     const url = new URL(String(input))
     if (url.hostname === "rest.canopyapi.co") return new Response(JSON.stringify({ error: "quota exceeded" }), { status: 402 })

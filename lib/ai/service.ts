@@ -12,7 +12,7 @@ const demoReviews = [
   "Marketing photos made it look bigger. Still a solid product, just expensive."
 ]
 
-type ReviewSource = "canopy" | "canopy+serpapi" | "serpapi" | "apify" | "judgeme" | "pasted" | "demo"
+type ReviewSource = "canopy" | "canopy+serpapi" | "canopy+serpapi+yepapi" | "canopy+yepapi" | "serpapi" | "serpapi+yepapi" | "yepapi" | "apify" | "judgeme" | "pasted" | "demo"
 type ReviewFetchResult = {
   reviews: string[]
   source: ReviewSource
@@ -26,6 +26,8 @@ type ReviewFetchResult = {
   ratingFilterPagesFetched?: number
   ratingFiltersUsed?: string[]
   fallbackReviewsAdded?: number
+  yepApiReviewsAdded?: number
+  yepApiPagesFetched?: number
   targetReviewCount?: number
   sampleNote?: string
 }
@@ -283,25 +285,41 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
 
   const collectedReviews = [...reviews].slice(0, 500)
   let fallbackReviewsAdded = 0
-  let source: ReviewSource = "canopy"
+  let yepApiReviewsAdded = 0
+  let yepApiPagesFetched = 0
+  const sourceParts = new Set<string>()
+  if (collectedReviews.length) sourceParts.add("canopy")
   if (collectedReviews.length < targetReviews || canopyWarning) {
     const serpApiResult = await fetchSerpApiAmazonReviews(input, asin).catch(() => undefined)
     if (serpApiResult?.reviews.length) {
       const beforeFallback = reviews.size
       for (const text of serpApiResult.reviews) reviews.add(text)
       fallbackReviewsAdded = reviews.size - beforeFallback
-      source = fallbackReviewsAdded > 0 ? (beforeFallback > 0 ? "canopy+serpapi" : "serpapi") : source
+      if (fallbackReviewsAdded > 0) sourceParts.add("serpapi")
       productName = productName || serpApiResult.productName
       marketplaceRatingCount ||= serpApiResult.marketplaceRatingCount
     }
   }
+  if (reviews.size < targetReviews) {
+    const yepApiResult = await fetchYepApiAmazonReviews(input, asin, targetReviews - reviews.size).catch(() => undefined)
+    if (yepApiResult?.reviews.length) {
+      const beforeYepApi = reviews.size
+      for (const text of yepApiResult.reviews) reviews.add(text)
+      yepApiReviewsAdded = reviews.size - beforeYepApi
+      yepApiPagesFetched = yepApiResult.pagesFetched
+      if (yepApiReviewsAdded > 0) sourceParts.add("yepapi")
+      productName = productName || yepApiResult.productName
+      marketplaceRatingCount ||= yepApiResult.marketplaceRatingCount
+    }
+  }
   const finalReviews = [...reviews].slice(0, 500)
+  const source = (sourceParts.size ? [...sourceParts].join("+") : "canopy") as ReviewSource
   if (!productName || productName.toLowerCase().startsWith("amazon product") || !marketplaceRatingCount) {
     const productMetadata = await fetchCanopyProductMetadata(input, apiKey, asin).catch(() => undefined)
     productName = productMetadata?.title || productName
     marketplaceRatingCount ||= productMetadata?.marketplaceRatingCount
   }
-  const sampleNote = amazonSampleNote({ writtenReviews: finalReviews.length, pagesFetched, requestedPages: maxPages, targetReviewCount: targetReviews, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed], fallbackReviewsAdded })
+  const sampleNote = amazonSampleNote({ writtenReviews: finalReviews.length, pagesFetched, requestedPages: maxPages, targetReviewCount: targetReviews, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed], fallbackReviewsAdded, yepApiReviewsAdded, yepApiPagesFetched })
   return {
     reviews: finalReviews,
     source,
@@ -314,9 +332,11 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     ratingFilterPagesFetched,
     ratingFiltersUsed: [...ratingFiltersUsed],
     fallbackReviewsAdded,
+    yepApiReviewsAdded,
+    yepApiPagesFetched,
     targetReviewCount: targetReviews,
     sampleNote,
-    warning: finalReviews.length ? canopyWarning || undefined : canopyWarning || "Canopy and SerpApi returned no review text for this product and marketplace. Try an authorized review export or a different product."
+    warning: finalReviews.length ? canopyWarning || undefined : canopyWarning || "The configured Amazon review providers returned no review text for this product and marketplace. Try an authorized review export or a different product."
   }
 }
 
@@ -384,6 +404,83 @@ function serpApiProductTitle(payload: Record<string, unknown>) {
   return canopyProductTitle(payload)
 }
 
+async function fetchYepApiAmazonReviews(input: ReviewInput, asin: string, neededReviews: number): Promise<{ reviews: string[]; productName?: string; marketplaceRatingCount?: number; pagesFetched: number }> {
+  const apiKey = cleanEnv(process.env.YEPAPI_API_KEY)
+  if (!apiKey || neededReviews <= 0) return { reviews: [], pagesFetched: 0 }
+  const reviews = new Set<string>()
+  let marketplaceRatingCount: number | undefined
+  let productName: string | undefined
+  let pagesFetched = 0
+  const maxPages = Math.min(25, Math.ceil(neededReviews / 7) + 4)
+  for (let page = 1; page <= maxPages && reviews.size < neededReviews; page += 1) {
+    const response = await fetch("https://api.yepapi.com/v1/amazon/product-reviews", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        asin,
+        country: amazonMarketplaceCountry(input.productUrl),
+        sort_by: "TOP_REVIEWS",
+        page
+      }),
+      cache: "no-store"
+    })
+    if (!response.ok) break
+    const payload = await response.json() as Record<string, unknown>
+    pagesFetched += 1
+    marketplaceRatingCount ||= canopyMarketplaceRatingCount(payload)
+    productName ||= canopyProductTitle(payload)
+    const pageReviews = extractYepApiReviewTexts(payload)
+    if (!pageReviews.length) break
+    const previousCount = reviews.size
+    for (const text of pageReviews) reviews.add(text)
+    if (reviews.size === previousCount) break
+  }
+  return { reviews: [...reviews], productName, marketplaceRatingCount, pagesFetched }
+}
+
+function extractYepApiReviewTexts(payload: Record<string, unknown>) {
+  const reviews = findArraysByKey(payload, "reviews").flat()
+  return reviews.flatMap((review) => {
+    if (!review || typeof review !== "object" || Array.isArray(review)) return []
+    const row = review as Record<string, unknown>
+    const title = typeof row.review_title === "string" ? row.review_title : typeof row.title === "string" ? row.title : ""
+    const body = typeof row.review_text === "string" ? row.review_text : typeof row.text === "string" ? row.text : typeof row.review_body === "string" ? row.review_body : ""
+    const rating = typeof row.review_star_rating === "string" || typeof row.review_star_rating === "number" ? `Rating: ${row.review_star_rating}.` : ""
+    const text = [rating, title, body].filter(Boolean).join(" ").replace(/\s+/g, " ").trim()
+    return text.length >= 20 ? [text] : []
+  })
+}
+
+function findArraysByKey(value: unknown, keyName: string): unknown[][] {
+  if (Array.isArray(value)) return value.flatMap((item) => findArraysByKey(item, keyName))
+  if (!value || typeof value !== "object") return []
+  const out: unknown[][] = []
+  for (const [key, child] of Object.entries(value)) {
+    if (key === keyName && Array.isArray(child)) out.push(child)
+    out.push(...findArraysByKey(child, keyName))
+  }
+  return out
+}
+
+function amazonMarketplaceCountry(url: string) {
+  const hostname = new URL(url).hostname.toLowerCase()
+  if (hostname.endsWith(".ca")) return "CA"
+  if (hostname.endsWith(".co.uk")) return "GB"
+  if (hostname.endsWith(".de")) return "DE"
+  if (hostname.endsWith(".fr")) return "FR"
+  if (hostname.endsWith(".it")) return "IT"
+  if (hostname.endsWith(".es")) return "ES"
+  if (hostname.endsWith(".com.au")) return "AU"
+  if (hostname.endsWith(".co.jp")) return "JP"
+  if (hostname.endsWith(".in")) return "IN"
+  if (hostname.endsWith(".com.br")) return "BR"
+  if (hostname.endsWith(".com.mx")) return "MX"
+  return "US"
+}
+
 function canopyTargetReviewCount(maxPages: number) {
   if (maxPages >= 50) return 250
   if (maxPages >= 10) return 100
@@ -424,7 +521,9 @@ function amazonSampleNote({
   basePagesFetched,
   ratingFilterPagesFetched,
   ratingFiltersUsed,
-  fallbackReviewsAdded
+  fallbackReviewsAdded,
+  yepApiReviewsAdded,
+  yepApiPagesFetched
 }: {
   writtenReviews: number
   pagesFetched: number
@@ -436,6 +535,8 @@ function amazonSampleNote({
   ratingFilterPagesFetched?: number
   ratingFiltersUsed?: string[]
   fallbackReviewsAdded?: number
+  yepApiReviewsAdded?: number
+  yepApiPagesFetched?: number
 }) {
   const baseText = `${basePagesFetched ?? requestedPages} of ${requestedPages} requested base page${requestedPages === 1 ? "" : "s"}`
   const expansionText = ratingFilterPagesFetched
@@ -444,13 +545,14 @@ function amazonSampleNote({
   const fallbackText = fallbackReviewsAdded ? ` SerpApi fallback added ${fallbackReviewsAdded} unique written review text${fallbackReviewsAdded === 1 ? "" : "s"}.` : ""
   const targetText = writtenReviews < targetReviewCount ? ` Target sample was ${targetReviewCount}, but providers exposed ${writtenReviews} unique written texts for this run.` : ` Target sample of ${targetReviewCount} was met.`
   const pageText = `${baseText}${expansionText}`
+  const yepApiText = yepApiReviewsAdded ? ` YepAPI fallback added ${yepApiReviewsAdded} unique written review text${yepApiReviewsAdded === 1 ? "" : "s"} from ${yepApiPagesFetched ?? 0} page${(yepApiPagesFetched ?? 0) === 1 ? "" : "s"}.` : ""
   if (marketplaceRatingCount && marketplaceRatingCount > writtenReviews) {
-    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.${fallbackText}${targetText}`
+    return `Amazon may show ${marketplaceRatingCount.toLocaleString("en-US")} ratings for this listing, but the providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Ratings and written review text are different data sets.${fallbackText}${yepApiText}${targetText}`
   }
   if (availableReviewCount && availableReviewCount > writtenReviews) {
-    return `The providers found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.${fallbackText}${targetText}`
+    return `The providers found ${availableReviewCount.toLocaleString("en-US")} available review record${availableReviewCount === 1 ? "" : "s"} and returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}.${fallbackText}${yepApiText}${targetText}`
   }
-  return `The providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.${fallbackText}${targetText}`
+  return `The providers returned ${writtenReviews} unique written review text${writtenReviews === 1 ? "" : "s"} after checking ${pageText}. Amazon star ratings can be much higher than retrievable written review text.${fallbackText}${yepApiText}${targetText}`
 }
 
 function canopyReviewPageLimit(requestedLimit?: number) {
