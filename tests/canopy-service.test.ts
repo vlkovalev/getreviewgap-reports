@@ -28,6 +28,15 @@ async function main() {
       }), { status: 200, headers: { "content-type": "application/json" } })
     }
     if (url.hostname === "serpapi.com") {
+      if (url.searchParams.get("engine") === "amazon_reviews") {
+        const page = Number(url.searchParams.get("page"))
+        return new Response(JSON.stringify({
+          reviews: Array.from({ length: 10 }, (_, index) => ({
+            title: `Paged SerpApi review ${page}-${index}`,
+            review: `Paged SerpApi review text ${page}-${index} with enough detailed customer feedback about quality and usage to count.`
+          }))
+        }), { status: 200, headers: { "content-type": "application/json" } })
+      }
       return new Response(JSON.stringify({
         product_results: { title: "Cordless Massage Gun - SerpApi" },
         reviews_information: {
@@ -88,7 +97,7 @@ async function main() {
     })
 
     assert.deepEqual(requestsMade.slice(0, 10), ["ALL:1", "ALL:2", "ALL:3", "ALL:4", "ALL:5", "ALL:6", "ALL:7", "ALL:8", "ALL:9", "ALL:10"])
-    assert.equal(result.source, "canopy+serpapi+yepapi")
+    assert.equal(result.source, "canopy+serpapi")
     assert.equal(result.productName, "Cordless Massage Gun - Product Details")
     assert.ok((result.pagesFetched ?? 0) > 10)
     assert.equal(result.basePagesFetched, 10)
@@ -96,9 +105,9 @@ async function main() {
     assert.equal(result.availableReviewCount, 42)
     assert.equal(result.marketplaceRatingCount, 12446)
     assert.equal(result.reviews.length, 100)
-    assert.equal(result.fallbackReviewsAdded, 2)
-    assert.equal(result.yepApiReviewsAdded, 70)
-    assert.equal(result.yepApiPagesFetched, 10)
+    assert.equal(result.fallbackReviewsAdded, 72)
+    assert.equal(result.yepApiReviewsAdded, 0)
+    assert.equal(result.yepApiPagesFetched, 0)
     assert.equal(result.targetReviewCount, 100)
     assert.match(result.sampleNote ?? "", /10 of 10 requested base pages/)
     assert.match(result.sampleNote ?? "", /star-filter page/)

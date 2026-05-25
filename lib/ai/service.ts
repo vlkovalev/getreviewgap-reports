@@ -301,6 +301,18 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     }
   }
   if (reviews.size < targetReviews) {
+    const serpApiPagedResult = await fetchSerpApiAmazonReviewPages(input, asin, targetReviews - reviews.size).catch(() => undefined)
+    if (serpApiPagedResult?.reviews.length) {
+      const beforePagedFallback = reviews.size
+      for (const text of serpApiPagedResult.reviews) reviews.add(text)
+      const pagedReviewsAdded = reviews.size - beforePagedFallback
+      fallbackReviewsAdded += pagedReviewsAdded
+      if (pagedReviewsAdded > 0) sourceParts.add("serpapi")
+      productName = productName || serpApiPagedResult.productName
+      marketplaceRatingCount ||= serpApiPagedResult.marketplaceRatingCount
+    }
+  }
+  if (reviews.size < targetReviews) {
     const yepApiResult = await fetchYepApiAmazonReviews(input, asin, targetReviews - reviews.size).catch(() => undefined)
     if (yepApiResult?.reviews.length) {
       const beforeYepApi = reviews.size
@@ -367,6 +379,47 @@ async function fetchSerpApiAmazonReviews(input: ReviewInput, asin: string): Prom
     productName: serpApiProductTitle(payload),
     marketplaceRatingCount: canopyMarketplaceRatingCount(info) ?? canopyMarketplaceRatingCount(payload)
   }
+}
+
+async function fetchSerpApiAmazonReviewPages(input: ReviewInput, asin: string, neededReviews: number): Promise<{ reviews: string[]; productName?: string; marketplaceRatingCount?: number }> {
+  const apiKey = cleanEnv(process.env.SERPAPI_API_KEY)
+  if (!apiKey || neededReviews <= 0) return { reviews: [] }
+  const reviews = new Set<string>()
+  let productName: string | undefined
+  let marketplaceRatingCount: number | undefined
+  const maxPages = Math.min(20, Math.ceil(neededReviews / 10) + 4)
+  for (let page = 1; page <= maxPages && reviews.size < neededReviews; page += 1) {
+    const params = new URLSearchParams({
+      engine: "amazon_reviews",
+      amazon_domain: amazonMarketplaceDomain(input.productUrl),
+      asin,
+      page: String(page),
+      api_key: apiKey
+    })
+    const response = await fetch(`https://serpapi.com/search.json?${params}`, { cache: "no-store" })
+    if (!response.ok) break
+    const payload = await response.json() as Record<string, unknown>
+    productName ||= serpApiProductTitle(payload)
+    marketplaceRatingCount ||= canopyMarketplaceRatingCount(payload)
+    const pageReviews = extractSerpApiPagedReviewTexts(payload)
+    if (!pageReviews.length) break
+    const previousCount = reviews.size
+    for (const text of pageReviews) reviews.add(text)
+    if (reviews.size === previousCount) break
+  }
+  return { reviews: [...reviews], productName, marketplaceRatingCount }
+}
+
+function extractSerpApiPagedReviewTexts(payload: Record<string, unknown>) {
+  const reviewArrays = [
+    ...findArraysByKey(payload, "reviews"),
+    ...findArraysByKey(payload, "customer_reviews"),
+    ...findArraysByKey(payload, "top_reviews")
+  ].flat()
+  const texts = new Set<string>()
+  for (const review of reviewArrays) collectReviewTexts(review, texts)
+  collectSerpApiTextFields({ reviews: reviewArrays }, texts)
+  return [...texts].map((text) => text.replace(/\s+/g, " ").trim()).filter((text) => text.length >= 20).slice(0, 300)
 }
 
 function extractSerpApiReviewTexts(info: Record<string, unknown>) {

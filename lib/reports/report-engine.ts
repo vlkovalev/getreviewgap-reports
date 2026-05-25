@@ -100,7 +100,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
   }
   const targetReviewCount = Number(reviewResult.targetReviewCount ?? 0)
   if (platform === "amazon" && !filters.pastedReviews && targetReviewCount >= 100 && reviewResult.reviews.length < 100) {
-    throw new NoReviewDataError(`Only ${reviewResult.reviews.length} unique written reviews were retrieved. This report requires at least 100 written reviews. Add YEPAPI_API_KEY for paginated review collection, use Deep depth, or try a product whose written reviews are exposed by the providers.`)
+    throw new NoReviewDataError(`Only ${reviewResult.reviews.length} unique written reviews were retrieved. This report requires at least 100 written reviews. Try Deep depth or a product whose written reviews are exposed by the connected providers.`)
   }
   const productName = filters.productName || reviewResult.productName || initialProductName
   const { insight, provider, model } = await generateReviewInsight({
