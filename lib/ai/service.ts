@@ -1,5 +1,6 @@
 import { reviewInsightPrompt } from "./prompts"
 import { ReviewInput, ReviewInsight, reviewInsightSchema } from "./schemas"
+import { extractReviewsFromCsv } from "@/lib/scrapers/shopify-csv-parser"
 
 const demoReviews = [
   "Love the texture and the packaging feels premium, but the pump stopped working after two weeks.",
@@ -12,7 +13,7 @@ const demoReviews = [
   "Marketing photos made it look bigger. Still a solid product, just expensive."
 ]
 
-type ReviewSource = "canopy" | "canopy+serpapi" | "canopy+serpapi+yepapi" | "canopy+yepapi" | "serpapi" | "serpapi+yepapi" | "yepapi" | "apify" | "judgeme" | "pasted" | "demo"
+type ReviewSource = "canopy" | "canopy+serpapi" | "canopy+serpapi+yepapi" | "canopy+yepapi" | "serpapi" | "serpapi+yepapi" | "yepapi" | "apify" | "judgeme" | "stamped" | "pasted" | "demo"
 type ReviewFetchResult = {
   reviews: string[]
   source: ReviewSource
@@ -35,13 +36,23 @@ type ReviewFetchResult = {
 export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetchResult> {
   if (input.pastedReviews?.trim()) {
     return {
-      reviews: input.pastedReviews.split(/\n+/).map((line) => line.trim()).filter(Boolean).slice(0, 500),
+      reviews: extractReviewsFromCsv(input.pastedReviews),
       source: "pasted"
     }
   }
 
   if (input.platform === "shopify") {
-    if (input.reviewApp === "judgeme") return fetchJudgeMeReviews(input)
+    const shopDomain = shopDomainFromUrl(input.productUrl) || new URL(input.productUrl).hostname.replace(/^www\./, "")
+    const handle = shopifyProductHandle(input.productUrl)
+
+    if (input.reviewApp === "judgeme") {
+      return fetchJudgeMeReviews(input)
+    }
+
+    if (input.reviewApp === "stamped" && shopDomain) {
+      return fetchStampedPublicReviews(input, shopDomain)
+    }
+
     throw new Error("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
   }
 
@@ -85,14 +96,18 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
 
 async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResult> {
   const apiToken = cleanEnv(process.env.JUDGEME_API_TOKEN)
-  const shopDomain = cleanEnv(process.env.JUDGEME_SHOP_DOMAIN) || shopDomainFromUrl(input.productUrl)
-  if (!apiToken || !shopDomain) {
-    throw new Error("Judge.me direct collection is not configured yet. Add JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN in Vercel, or upload a Judge.me CSV/TXT export.")
-  }
-
+  const shopDomain = cleanEnv(process.env.JUDGEME_SHOP_DOMAIN) || shopDomainFromUrl(input.productUrl) || new URL(input.productUrl).hostname.replace(/^www\./, "")
   const handle = shopifyProductHandle(input.productUrl)
+
   if (!handle) {
     throw new Error("Could not identify the Shopify product handle. Use a product URL like https://store.com/products/product-handle or upload a Judge.me export.")
+  }
+
+  if (!apiToken) {
+    if (shopDomain && handle) {
+      return fetchJudgeMePublicReviews(input, shopDomain, handle)
+    }
+    throw new Error("Judge.me direct collection is not configured yet. Add JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN in Vercel, or upload a Judge.me CSV/TXT export.")
   }
 
   const externalId = await fetchShopifyProductExternalId(input.productUrl)
@@ -938,4 +953,162 @@ function generateDemoInsight(input: ReviewInput, reviews: string[]): ReviewInsig
       limitations: ["Live scraping is disabled until APIFY_TOKEN and APIFY_AMAZON_REVIEWS_ACTOR_ID are configured."]
     }
   }
+}
+
+function parseJudgeMeWidgetHtml(html: string): string[] {
+  const reviews: string[] = [];
+  const blocks = html.split(/<div\s+[^>]*class=['"]jdgm-rev(?:\s+|['"])/);
+
+  for (let i = 1; i < blocks.length; i++) {
+    const block = blocks[i];
+    const ratingMatch = block.match(/data-score=['"](\d+)['"]/);
+    const rating = ratingMatch ? ratingMatch[1] : "";
+
+    const titleMatch = block.match(/<b\s+[^>]*class=['"]jdgm-rev__title['"][^>]*>([\s\S]*?)<\/b>/);
+    const title = titleMatch ? titleMatch[1].trim() : "";
+
+    const bodyMatch = block.match(/<div\s+[^>]*class=['"]jdgm-rev__body['"][^>]*>([\s\S]*?)<\/div>/) ||
+                      block.match(/<p\s+[^>]*class=['"]jdgm-rev__body-text['"][^>]*>([\s\S]*?)<\/p>/);
+    let body = bodyMatch ? bodyMatch[1].trim() : "";
+
+    body = body.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+    const cleanTitle = title.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+
+    if (body) {
+      let text = "";
+      if (rating) text += `Rating: ${rating}. `;
+      if (cleanTitle) text += `${cleanTitle}. `;
+      text += body;
+      reviews.push(text.trim());
+    }
+  }
+  return reviews;
+}
+
+async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string, handle: string): Promise<ReviewFetchResult> {
+  const maxPages = canopyReviewPageLimit(input.reviewPageLimit);
+  const reviews = new Set<string>();
+  let pagesFetched = 0;
+  let totalReviewsCount = 0;
+  let previousPageAddedReviews = true;
+
+  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+    const pageNum = pagesFetched + 1;
+    const params = new URLSearchParams({
+      shop_domain: shopDomain,
+      platform: "shopify",
+      product_handle: handle,
+      page: String(pageNum)
+    });
+
+    const response = await fetch(`https://judge.me/api/v1/widgets/reviews?${params}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`Judge.me public widget request failed with status ${response.status}.`);
+    }
+
+    const payload = await response.json() as Record<string, unknown>;
+    const htmlString = typeof payload.reviews === "string" ? payload.reviews : "";
+    const pageReviews = parseJudgeMeWidgetHtml(htmlString);
+
+    if (typeof payload.total_reviews === "number") {
+      totalReviewsCount = payload.total_reviews;
+    }
+
+    const previousCount = reviews.size;
+    for (const text of pageReviews) reviews.add(text);
+
+    pagesFetched += 1;
+    previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount;
+  }
+
+  const collectedReviews = [...reviews].slice(0, 500);
+  return {
+    reviews: collectedReviews,
+    source: "judgeme",
+    productName: input.productName || `Shopify product ${handle}`,
+    pagesFetched,
+    availableReviewCount: totalReviewsCount || collectedReviews.length,
+    sampleNote: `Judge.me public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"}.`,
+    warning: collectedReviews.length ? undefined : "Judge.me returned no public review text for this product."
+  };
+}
+
+async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string): Promise<ReviewFetchResult> {
+  const externalId = await fetchShopifyProductExternalId(input.productUrl);
+  if (!externalId) {
+    throw new Error("Could not find the Shopify external product ID. Make sure the URL is public or upload a CSV export.");
+  }
+
+  const maxPages = canopyReviewPageLimit(input.reviewPageLimit);
+  const reviews = new Set<string>();
+  let pagesFetched = 0;
+  let totalReviewsCount = 0;
+  let previousPageAddedReviews = true;
+
+  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+    const pageNum = pagesFetched + 1;
+    const params = new URLSearchParams({
+      shopUrl: shopDomain,
+      productId: externalId,
+      page: String(pageNum)
+    });
+
+    const response = await fetch(`https://stamped.io/api/widget/reviews?${params}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`Stamped.io public widget request failed with status ${response.status}.`);
+    }
+
+    const payload = await response.json() as Record<string, unknown>;
+    const dataList = Array.isArray(payload.data) ? payload.data : [];
+
+    if (typeof payload.total === "number") {
+      totalReviewsCount = payload.total;
+    }
+
+    const previousCount = reviews.size;
+    for (const item of dataList) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const rating = row.reviewRating ?? row.rating ?? "";
+      const title = String(row.reviewTitle ?? row.title ?? "").trim();
+      const body = String(row.reviewMessage ?? row.reviewBody ?? row.body ?? "").trim();
+
+      if (!body) continue;
+
+      const cleanBody = body.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+      const cleanTitle = title.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+
+      let text = "";
+      if (rating) text += `Rating: ${rating}. `;
+      if (cleanTitle) text += `${cleanTitle}. `;
+      text += cleanBody;
+      reviews.add(text.trim());
+    }
+
+    pagesFetched += 1;
+    previousPageAddedReviews = dataList.length > 0 && reviews.size > previousCount;
+  }
+
+  const collectedReviews = [...reviews].slice(0, 500);
+  return {
+    reviews: collectedReviews,
+    source: "stamped",
+    productName: input.productName || `Shopify product ${shopifyProductHandle(input.productUrl)}`,
+    pagesFetched,
+    availableReviewCount: totalReviewsCount || collectedReviews.length,
+    sampleNote: `Stamped.io public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"}.`,
+    warning: collectedReviews.length ? undefined : "Stamped.io returned no public review text for this product."
+  };
 }

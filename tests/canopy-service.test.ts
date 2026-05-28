@@ -14,6 +14,9 @@ async function main() {
   await assertRequestedPageLimit()
   await assertSerpApiFallbackWhenCanopyQuotaFails()
   await assertJudgeMeConnector()
+  await assertSmartCsvParser()
+  await assertPublicJudgeMeCrawler()
+  await assertPublicStampedCrawler()
 
   process.env.CANOPY_API_KEY = "test-key"
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "3"
@@ -282,6 +285,113 @@ async function assertDefaultPageLimit() {
   assert.equal(requestedPages[0], "ALL:1")
   assert.equal(requestedPages[49], "ALL:50")
   assert.equal(requestedPages.at(-1), "ONE_STAR:20")
+}
+
+async function assertSmartCsvParser() {
+  const { parseCsv, extractReviewsFromCsv } = await import("../lib/scrapers/shopify-csv-parser")
+
+  // Test raw parseCsv with quoted commas and multiline
+  const csvText = `id,rating,body\n1,5,"This is great, I love it"\n2,4,"It is\nmultiline"\n3,1,"Simple"`
+  const rows = parseCsv(csvText)
+  assert.equal(rows.length, 4)
+  assert.equal(rows[1][2], "This is great, I love it")
+  assert.equal(rows[2][2], "It is\nmultiline")
+  assert.equal(rows[3][2], "Simple")
+
+  // Test extractReviewsFromCsv for Judge.me layout
+  const judgemeCsv = `title,body,rating,reviewer_name\n"Love it","Glow serum is great!",5,"Alice"\n"Not bad","It was ok",3,"Bob"`
+  const reviews = extractReviewsFromCsv(judgemeCsv)
+  assert.equal(reviews.length, 2)
+  assert.equal(reviews[0], "Rating: 5. Love it. Glow serum is great!")
+  assert.equal(reviews[1], "Rating: 3. Not bad. It was ok")
+
+  // Test Yotpo style
+  const yotpoCsv = `"Review Title","Review Body","Score"\n"Awesome","Best ever",5`
+  const yotpoReviews = extractReviewsFromCsv(yotpoCsv)
+  assert.equal(yotpoReviews.length, 1)
+  assert.equal(yotpoReviews[0], "Rating: 5. Awesome. Best ever")
+}
+
+async function assertPublicJudgeMeCrawler() {
+  const originalFetch = globalThis.fetch
+  const originalJudgeMeToken = process.env.JUDGEME_API_TOKEN
+  const originalJudgeMeShop = process.env.JUDGEME_SHOP_DOMAIN
+
+  // Ensure private credentials are unset so it falls back to public crawling
+  delete process.env.JUDGEME_API_TOKEN
+  delete process.env.JUDGEME_SHOP_DOMAIN
+
+  const requestedUrls: string[] = []
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    requestedUrls.push(url.toString())
+    if (url.pathname.includes("/widgets/reviews")) {
+      return new Response(JSON.stringify({
+        reviews: `<div class="jdgm-rev"><span class="jdgm-rev__rating" data-score="5"></span><b class="jdgm-rev__title">Amazing</b><div class="jdgm-rev__body"><p>This is a great product!</p></div></div>`,
+        total_reviews: 1
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    return new Response("not found", { status: 404 })
+  }
+
+  try {
+    const result = await fetchAmazonReviews({
+      productUrl: "https://competitor-shop.com/products/cool-product",
+      platform: "shopify",
+      reviewApp: "judgeme",
+      reviewPageLimit: 5
+    })
+
+    assert.equal(result.source, "judgeme")
+    assert.equal(result.reviews.length, 1)
+    assert.equal(result.reviews[0], "Rating: 5. Amazing. This is a great product!")
+    assert.ok(requestedUrls[0].includes("shop_domain=competitor-shop.com"))
+    assert.ok(requestedUrls[0].includes("product_handle=cool-product"))
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalJudgeMeToken !== undefined) process.env.JUDGEME_API_TOKEN = originalJudgeMeToken
+    if (originalJudgeMeShop !== undefined) process.env.JUDGEME_SHOP_DOMAIN = originalJudgeMeShop
+  }
+}
+
+async function assertPublicStampedCrawler() {
+  const originalFetch = globalThis.fetch
+  const requestedUrls: string[] = []
+
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    requestedUrls.push(url.toString())
+    if (url.pathname.endsWith(".js")) {
+      return new Response(JSON.stringify({ id: 12345, title: "Mock Product" }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    if (url.pathname.includes("/widget/reviews")) {
+      return new Response(JSON.stringify({
+        data: [
+          { reviewRating: 5, reviewTitle: "Perfect", reviewMessage: "Highly recommend!" }
+        ],
+        total: 1
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    return new Response("not found", { status: 404 })
+  }
+
+  try {
+    const result = await fetchAmazonReviews({
+      productUrl: "https://stamped-shop.com/products/awesome-product",
+      platform: "shopify",
+      reviewApp: "stamped",
+      reviewPageLimit: 5
+    })
+
+    assert.equal(result.source, "stamped" as any)
+    assert.equal(result.reviews.length, 1)
+    assert.equal(result.reviews[0], "Rating: 5. Perfect. Highly recommend!")
+    assert.ok(requestedUrls[0].includes("/products/awesome-product.js"))
+    assert.ok(requestedUrls[1].includes("productId=12345"))
+    assert.ok(requestedUrls[1].includes("shopUrl=stamped-shop.com"))
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 }
 
 main().catch((error) => {
