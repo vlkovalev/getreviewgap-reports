@@ -99,8 +99,9 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
   }
   const targetReviewCount = Number(reviewResult.targetReviewCount ?? 0)
-  if (platform === "amazon" && !filters.pastedReviews && targetReviewCount >= 100 && reviewResult.reviews.length < 100) {
-    throw new NoReviewDataError(`Only ${reviewResult.reviews.length} unique written reviews were retrieved. This report requires at least 100 written reviews. Try Deep depth or a product whose written reviews are exposed by the connected providers.`)
+  const minReviewsRequired = 20
+  if (platform === "amazon" && !filters.pastedReviews && targetReviewCount >= 100 && reviewResult.reviews.length < minReviewsRequired) {
+    throw new NoReviewDataError(`Only ${reviewResult.reviews.length} unique written reviews were retrieved. This report requires at least ${minReviewsRequired} written reviews to ensure directional patterns. Try a product whose written reviews are exposed by the connected providers.`)
   }
   const productName = filters.productName || reviewResult.productName || initialProductName
   const { insight, provider, model } = await generateReviewInsight({

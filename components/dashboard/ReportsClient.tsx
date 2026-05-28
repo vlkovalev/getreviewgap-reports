@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { IntelligenceReport, ReportType, ScraperSource } from "@/lib/scrapers/types"
 import { trackClientEvent } from "@/components/AnalyticsBeacon"
 
@@ -61,6 +61,21 @@ export function ReportsClient({
   const [busyReportId, setBusyReportId] = useState("")
   const canGenerate = signedIn && creditCount > 0
   const visibleReports = reports.filter((report) => isArchived(report) === showArchived)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("reviewgap_report_preferences")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed.reportType) setReportType(parsed.reportType)
+        if (parsed.platform && !initialProductUrl) setPlatform(parsed.platform)
+        if (parsed.reviewPageLimit) setReviewPageLimit(Number(parsed.reviewPageLimit) as 5 | 10 | 50)
+        if (parsed.reviewApp) setReviewApp(parsed.reviewApp)
+      }
+    } catch (e) {
+      console.error("Failed to load presets from local storage", e)
+    }
+  }, [initialProductUrl])
 
   async function importReviews(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0]

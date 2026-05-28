@@ -257,3 +257,30 @@ export async function getCustomerPurchases(customerId: string, limit = 8): Promi
     .slice(0, limit)
     .map(({ customerId: _customerId, ...item }) => item)
 }
+
+export async function validateCustomerPasswordById(id: string, password: string): Promise<boolean> {
+  if (hasRealDatabaseUrl()) {
+    const customer = await withDbRetry(() => getDb().customerAccount.findUnique({ where: { id } }))
+    if (!customer) return false
+    return await bcrypt.compare(password, customer.passwordHash)
+  }
+  const customer = memoryCustomers().find((item) => item.id === id)
+  return customer?.password === password || false
+}
+
+export async function updateCustomerPassword(id: string, newPassword: string): Promise<boolean> {
+  if (hasRealDatabaseUrl()) {
+    const passwordHash = await bcrypt.hash(newPassword, 10)
+    await withDbRetry(() => getDb().customerAccount.update({
+      where: { id },
+      data: { passwordHash }
+    }))
+    return true
+  }
+
+  const customer = memoryCustomers().find((item) => item.id === id)
+  if (!customer) return false
+  customer.password = newPassword
+  return true
+}
+

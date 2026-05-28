@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsx tests/report-engine.test.ts && tsx tests/canopy-service.test.ts",
+    "test": "tsx tests/report-engine.test.ts && tsx tests/canopy-service.test.ts && tsx tests/auth-service.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
