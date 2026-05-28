@@ -317,6 +317,7 @@ function formatPdfDate(dateStr: string) {
 }
 
 function buildPdfLines(report: IntelligenceReport) {
+  const isSingle = Boolean(report.filters?.productUrl || report.filters?.pastedReviews || report.summary?.productUrl)
   const rows = reportRowsForExport(report).filter((row) => row.section !== "Ad hook").slice(0, 8)
   const summary = report.summary ?? {}
   const insight = report.data?.insight as {
@@ -329,60 +330,98 @@ function buildPdfLines(report: IntelligenceReport) {
     assumptions?: string[]
     dataQuality?: { reviewCount?: number; limitations?: string[] }
   } | undefined
-  const reviewCount = Number(summary.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
-  const marketplaceRatingCount = Number(summary.marketplaceRatingCount ?? 0)
+
+  if (isSingle) {
+    const reviewCount = Number(summary.reviewCount ?? insight?.dataQuality?.reviewCount ?? 0)
+    const marketplaceRatingCount = Number(summary.marketplaceRatingCount ?? 0)
+    return [
+      `Product: ${stringifyPdfValue(summary.productName ?? report.title)}`,
+      `Platform: ${stringifyPdfValue(summary.platform ?? summary.marketplace ?? "-")}`,
+      ...(summary.asin ? [`ASIN: ${stringifyPdfValue(summary.asin)}`] : []),
+      `Type: ${report.reportType}`,
+      `Status: ${report.status}`,
+      `Generated: ${formatPdfDate(report.generatedAt ?? report.createdAt)}`,
+      ...(summary.reviewApp ? [`Review app: ${stringifyPdfValue(formatReviewApp(summary.reviewApp))}`] : []),
+      `Depth: ${stringifyPdfValue(summary.reviewDepth ?? "Default")}`,
+      `Written reviews analyzed: ${reviewCount}`,
+      ...(summary.targetReviewCount ? [`Target written reviews: ${stringifyPdfValue(summary.targetReviewCount)}`] : []),
+      ...(marketplaceRatingCount ? [`Marketplace ratings shown: ${marketplaceRatingCount.toLocaleString("en-US")}`] : []),
+      `Confidence: ${pdfConfidence(reviewCount).label}`,
+      ...(summary.targetReviewCount ? [`Sample: ${reviewCount} written reviews analyzed from a target sample of ${stringifyPdfValue(summary.targetReviewCount)}.`] : []),
+      "",
+      "Executive Summary",
+      wrapPdfLine(stringifyPdfValue(summary.executiveSummary ?? "No executive summary was generated.")),
+      "",
+      "Interpretation Note",
+      wrapPdfLine(pdfConfidence(reviewCount).note),
+      "Marketplace rating counts may include star-only ratings and records the provider cannot return as written text.",
+      "Customer-reported complaints are signals for human review, not verified product defects.",
+      ...(summary.targetReviewCount && reviewCount < Number(summary.targetReviewCount) ? [
+        `Amazon Review Cap Note: Target was ${summary.targetReviewCount} written reviews, but only ${reviewCount} were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily limits public written review retrieval. The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.`
+      ] : []),
+      ...(summary.productUrl ? ["", "Source URL", wrapPdfLine(stringifyPdfValue(summary.productUrl))] : []),
+      ...(summary.warning ? ["", "Data Source Warning", wrapPdfLine(stringifyPdfValue(summary.warning))] : []),
+      "",
+      "Next Best Actions",
+      ...pdfActions(insight).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
+      "",
+      "Top Complaints",
+      ...pdfComplaintLines(insight).slice(0, 9),
+      "",
+      "Top Compliments",
+      ...pdfComplimentLines(insight).slice(0, 9),
+      "",
+      "Buyer Language",
+      wrapPdfLine((insight?.buyerLanguage ?? []).slice(0, 16).join("; ") || "No buyer language available."),
+      "",
+      "Ad Hooks",
+      ...(insight?.adHooks?.length ? insight.adHooks.slice(0, 3).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No ad hooks available."]),
+      "",
+      "Positioning Angles",
+      ...(insight?.positioningAngles?.length ? insight.positioningAngles.slice(0, 3).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No positioning angles available."]),
+      "",
+      "Assumptions and Limitations",
+      ...[...(insight?.assumptions ?? []), ...(insight?.dataQuality?.limitations ?? [])].slice(0, 8).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
+      "",
+      "Appendix Rows",
+      ...rows.flatMap((row, index) => [
+        `${index + 1}. ${stringifyPdfValue(row.theme ?? row.productName ?? row.title ?? row.source ?? "Report row")}`,
+        ...Object.entries(row).filter(([, value]) => value !== "" && value !== null && value !== undefined).slice(0, 5).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
+      ])
+    ].flatMap((line) => splitPdfLine(String(line)))
+  }
+
+  // Otherwise, it is a Watchlist/Catalog Report!
+  const productCount = summary.productCount ?? summary.totalProductsTracked ?? rows.length
+  const sourceFilter = summary.sourceFilter ?? "All"
   return [
-    `Product: ${stringifyPdfValue(summary.productName ?? report.title)}`,
-    `Platform: ${stringifyPdfValue(summary.platform ?? summary.marketplace ?? "-")}`,
-    ...(summary.asin ? [`ASIN: ${stringifyPdfValue(summary.asin)}`] : []),
+    `Report: ${report.title.replace("Review and Rating Report", "Review Intelligence Brief")}`,
+    `Platform: Watchlist Catalog`,
     `Type: ${report.reportType}`,
     `Status: ${report.status}`,
     `Generated: ${formatPdfDate(report.generatedAt ?? report.createdAt)}`,
-    ...(summary.reviewApp ? [`Review app: ${stringifyPdfValue(formatReviewApp(summary.reviewApp))}`] : []),
-    `Depth: ${stringifyPdfValue(summary.reviewDepth ?? "Default")}`,
-    `Written reviews analyzed: ${reviewCount}`,
-    ...(summary.targetReviewCount ? [`Target written reviews: ${stringifyPdfValue(summary.targetReviewCount)}`] : []),
-    ...(marketplaceRatingCount ? [`Marketplace ratings shown: ${marketplaceRatingCount.toLocaleString("en-US")}`] : []),
-    `Confidence: ${pdfConfidence(reviewCount).label}`,
-    ...(summary.targetReviewCount ? [`Sample: ${reviewCount} written reviews analyzed from a target sample of ${stringifyPdfValue(summary.targetReviewCount)}.`] : []),
+    `Products Monitored: ${productCount}`,
+    `Source Filter: ${sourceFilter}`,
+    ...(summary.averageCurrentPrice || summary.averageProductPrice ? [`Avg Product Price: $${summary.averageCurrentPrice ?? summary.averageProductPrice}`] : []),
+    ...(summary.inStockPercentage ? [`In-Stock Rate: ${summary.inStockPercentage}%`] : []),
+    ...(summary.sourceLevelCompletenessScore ? [`Data Completeness: ${summary.sourceLevelCompletenessScore}%`] : []),
     "",
     "Executive Summary",
-    wrapPdfLine(stringifyPdfValue(summary.executiveSummary ?? "No executive summary was generated.")),
+    wrapPdfLine(stringifyPdfValue(summary.executiveSummary ?? "This watchlist catalog report aggregates price, stock, and metadata across your tracked competitor listings.")),
     "",
     "Interpretation Note",
-    wrapPdfLine(pdfConfidence(reviewCount).note),
-    "Marketplace rating counts may include star-only ratings and records the provider cannot return as written text.",
-    "Customer-reported complaints are signals for human review, not verified product defects.",
-    ...(summary.targetReviewCount && reviewCount < Number(summary.targetReviewCount) ? [
-      `Amazon Review Cap Note: Target was ${summary.targetReviewCount} written reviews, but only ${reviewCount} were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily limits public written review retrieval. The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.`
-    ] : []),,
-    ...(summary.productUrl ? ["", "Source URL", wrapPdfLine(stringifyPdfValue(summary.productUrl))] : []),
-    ...(summary.warning ? ["", "Data Source Warning", wrapPdfLine(stringifyPdfValue(summary.warning))] : []),
+    "This watchlist catalog report aggregates price, stock, and metadata across your tracked competitor listings.",
+    "Data snapshots are recorded periodically from connected merchant feeds and public listing scrapers.",
     "",
     "Next Best Actions",
-    ...pdfActions(insight).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
-    "",
-    "Top Complaints",
-    ...pdfComplaintLines(insight).slice(0, 9),
-    "",
-    "Top Compliments",
-    ...pdfComplimentLines(insight).slice(0, 9),
-    "",
-    "Buyer Language",
-    wrapPdfLine((insight?.buyerLanguage ?? []).slice(0, 16).join("; ") || "No buyer language available."),
-    "",
-    "Ad Hooks",
-    ...(insight?.adHooks?.length ? insight.adHooks.slice(0, 3).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No ad hooks available."]),
-    "",
-    "Positioning Angles",
-    ...(insight?.positioningAngles?.length ? insight.positioningAngles.slice(0, 3).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`) : ["No positioning angles available."]),
-    "",
-    "Assumptions and Limitations",
-    ...[...(insight?.assumptions ?? []), ...(insight?.dataQuality?.limitations ?? [])].slice(0, 8).map((item, index) => `${index + 1}. ${wrapPdfLine(item)}`),
+    "1. Review price trends and competitive drops in the appendix table below.",
+    "2. Monitor out-of-stock variations and Restock alerts.",
+    "3. Audit listings with low completeness scores or missing fields.",
+    "4. Expand your watchlist catalog to track more competitor ASINs.",
     "",
     "Appendix Rows",
     ...rows.flatMap((row, index) => [
-      `${index + 1}. ${stringifyPdfValue(row.theme ?? row.productName ?? row.title ?? row.source ?? "Report row")}`,
+      `${index + 1}. ${stringifyPdfValue(row.productName ?? row.title ?? row.source ?? "Catalog item")}`,
       ...Object.entries(row).filter(([, value]) => value !== "" && value !== null && value !== undefined).slice(0, 5).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
     ])
   ].flatMap((line) => splitPdfLine(String(line)))
