@@ -517,7 +517,7 @@ function splitPdfLine(value: string) {
   if (isPdfSectionHeading(value)) return [value]
   const indent = value.match(/^\s*/)?.[0] ?? ""
   const isMeta = /^(Product|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Marketplace ratings shown|Confidence|Sample):/.test(value)
-  const width = isMeta ? 86 : indent.length ? 80 : 84
+  const width = isMeta ? 100 : indent.length ? 98 : 102
   const continuationIndent = indent || (isMeta ? "  " : "   ")
   const words = value.replace(/\s+/g, " ").trim().split(" ")
   const lines: string[] = []
