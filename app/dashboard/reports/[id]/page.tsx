@@ -57,6 +57,8 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       ? (String(report.summary.marketplace).toLowerCase().includes("shopify") ? "shopify" : "amazon")
       : "mixed"
 
+  const isSingleProductReport = Boolean(report.filters?.productUrl || report.filters?.pastedReviews || report.summary?.productUrl)
+
   return (
     <DashboardShell title={cleanReportTitle(report.title)} description="Executive review intelligence brief with actions, proof points, and export-ready appendix.">
       {archivedAt ? (
@@ -82,11 +84,19 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
                 <StatusBadge status={report.status} />
                 <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-black uppercase text-white/55">{String(report.reportType).replaceAll("_", " ")}</span>
               </div>
-              <p className="mt-6 text-sm font-black uppercase text-lime">ReviewGap brief</p>
-              <h1 className="mt-2 text-4xl font-black leading-none md:text-6xl">{String(report.summary?.productName ?? "Product review analysis")}</h1>
-              <p className="mt-4 max-w-2xl text-white/70">
-                {report.summary?.productUrl ? <a href={String(report.summary.productUrl)} target="_blank" rel="noreferrer" className="hover:text-lime">{displayUrl(String(report.summary.productUrl))}</a> : "No product URL supplied"}
-              </p>
+              <p className="mt-6 text-sm font-black uppercase text-lime">{isSingleProductReport ? "ReviewGap brief" : "Watchlist report"}</p>
+              <h1 className="mt-2 text-4xl font-black leading-none md:text-6xl">
+                {String(isSingleProductReport ? (report.summary?.productName ?? "Product review analysis") : cleanReportTitle(report.title))}
+              </h1>
+              {isSingleProductReport ? (
+                <p className="mt-4 max-w-2xl text-white/70">
+                  {report.summary?.productUrl ? <a href={String(report.summary.productUrl)} target="_blank" rel="noreferrer" className="hover:text-lime">{displayUrl(String(report.summary.productUrl))}</a> : "No product URL supplied"}
+                </p>
+              ) : (
+                <p className="mt-4 max-w-2xl text-white/70">
+                  Tracked catalog watchlist monitor report
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full bg-lime px-4 py-2 text-sm font-black text-black">PDF</a>
@@ -95,31 +105,50 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-8">
-            <Metric label="Written reviews" value={String(reviewCount)} />
-            <Metric label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
-            <Metric label="Depth" value={String(report.summary?.reviewDepth ?? "Default")} />
-            <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
-            {platform === "shopify" ? <Metric label="Review app" value={formatReviewApp(report.summary?.reviewApp)} /> : null}
-            <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
-            <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
-          </div>
+          {isSingleProductReport ? (
+            <div className="mt-7 grid gap-3 md:grid-cols-3 lg:grid-cols-8">
+              <Metric label="Written reviews" value={String(reviewCount)} />
+              <Metric label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
+              <Metric label="Depth" value={String(report.summary?.reviewDepth ?? "Default")} />
+              <Metric label="Platform" value={platform === "shopify" ? "Shopify / DTC" : platform === "amazon" ? "Amazon" : "Mixed / demo"} />
+              {platform === "shopify" ? <Metric label="Review app" value={formatReviewApp(report.summary?.reviewApp)} /> : null}
+              <Metric label="Confidence" value={dataScore.label} tone={dataScore.tone} />
+              <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
+            </div>
+          ) : (
+            <div className="mt-7 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Products Monitored" value={String(report.summary?.productCount ?? report.summary?.totalProductsTracked ?? rows.length)} />
+              <Metric label="Source Filter" value={formatHeader(String(report.summary?.sourceFilter ?? "All"))} />
+              {report.summary?.averageCurrentPrice || report.summary?.averageProductPrice ? (
+                <Metric label="Avg Product Price" value={`$${report.summary.averageCurrentPrice ?? report.summary.averageProductPrice}`} />
+              ) : null}
+              {report.summary?.inStockPercentage ? (
+                <Metric label="In-Stock Rate" value={`${report.summary.inStockPercentage}%`} tone="lime" />
+              ) : null}
+              {report.summary?.sourceLevelCompletenessScore ? (
+                <Metric label="Data Completeness" value={`${report.summary.sourceLevelCompletenessScore}%`} tone="lime" />
+              ) : null}
+              <Metric label="Generated" value={String(report.generatedAt ? new Date(report.generatedAt).toLocaleDateString() : "-")} />
+            </div>
+          )}
         </div>
 
-        <section className="border-b border-white/10 bg-black/20 p-6 md:p-8">
-          <p className="text-sm font-black uppercase text-cyan">Data coverage</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <CoverageItem label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
-            <CoverageItem label="Written reviews analyzed" value={String(reviewCount)} />
-            <CoverageItem label="Target sample" value={targetReviewCount ? String(targetReviewCount) : "-"} />
-            <CoverageItem label="Coverage" value={dataScore.label} tone={dataScore.tone} />
-          </div>
-          {targetReviewCount && reviewCount < targetReviewCount ? (
-            <div className="mt-4 rounded-xl border border-yellow-300/20 bg-yellow-300/5 p-4 text-sm text-yellow-100/90 leading-relaxed">
-              <span className="font-bold text-yellow-300">⚠️ Amazon Review Retrieval Note:</span> Target was {targetReviewCount} written reviews, but only {reviewCount} unique written text reviews were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily caps the public page retrieval of written review texts (often limiting it to ~60-100 reviews). The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.
+        {isSingleProductReport ? (
+          <section className="border-b border-white/10 bg-black/20 p-6 md:p-8">
+            <p className="text-sm font-black uppercase text-cyan">Data coverage</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <CoverageItem label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
+              <CoverageItem label="Written reviews analyzed" value={String(reviewCount)} />
+              <CoverageItem label="Target sample" value={targetReviewCount ? String(targetReviewCount) : "-"} />
+              <CoverageItem label="Coverage" value={dataScore.label} tone={dataScore.tone} />
             </div>
-          ) : null}
-        </section>
+            {targetReviewCount && reviewCount < targetReviewCount ? (
+              <div className="mt-4 rounded-xl border border-yellow-300/20 bg-yellow-300/5 p-4 text-sm text-yellow-100/90 leading-relaxed">
+                <span className="font-bold text-yellow-300">⚠️ Amazon Review Retrieval Note:</span> Target was {targetReviewCount} written reviews, but only {reviewCount} unique written text reviews were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily caps the public page retrieval of written review texts (often limiting it to ~60-100 reviews). The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <div className="grid gap-5 p-6 md:p-8 lg:grid-cols-[1.1fr_.9fr]">
           <section className="rounded-2xl border border-lime/20 bg-lime/10 p-5">
@@ -129,15 +158,17 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           <section className="rounded-2xl border border-white/10 bg-black/25 p-5">
             <p className="text-sm font-black uppercase text-cyan">Next best actions</p>
             <div className="mt-4 grid gap-3">
-              {nextActions(insight).map((item) => <ActionItem key={item} text={item} />)}
+              {nextActions(insight, isSingleProductReport).map((item) => <ActionItem key={item} text={item} />)}
             </div>
           </section>
         </div>
-        <section className="mx-6 mb-6 rounded-2xl border border-white/10 bg-black/25 p-5 md:mx-8 md:mb-8">
-          <p className="text-sm font-black uppercase text-cyan">Evidence scope</p>
-          <p className="mt-2 text-white/74">This brief analyzed {reviewCount} unique written review{reviewCount === 1 ? "" : "s"}{targetReviewCount ? ` against a target sample of ${targetReviewCount}` : ""}.</p>
-          <p className="mt-2 text-sm text-white/55">{confidenceNote(reviewCount)} Marketplace ratings and written review text are different. Ratings can include star-only feedback or records the provider cannot return as text. Customer-reported complaints require human review before product or safety decisions.</p>
-        </section>
+        {isSingleProductReport ? (
+          <section className="mx-6 mb-6 rounded-2xl border border-white/10 bg-black/25 p-5 md:mx-8 md:mb-8">
+            <p className="text-sm font-black uppercase text-cyan">Evidence scope</p>
+            <p className="mt-2 text-white/74">This brief analyzed {reviewCount} unique written review{reviewCount === 1 ? "" : "s"}{targetReviewCount ? ` against a target sample of ${targetReviewCount}` : ""}.</p>
+            <p className="mt-2 text-sm text-white/55">{confidenceNote(reviewCount)} Marketplace ratings and written review text are different. Ratings can include star-only feedback or records the provider cannot return as text. Customer-reported complaints require human review before product or safety decisions.</p>
+          </section>
+        ) : null}
       </section>
 
       {report.summary?.warning ? (
@@ -326,14 +357,22 @@ function EmptyText({ text }: { text: string }) {
   return <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-white/45">{text}</p>
 }
 
-function nextActions(insight: ReviewInsightLike | undefined) {
-  const ideas = insight?.productImprovementIdeas?.map((item) => item.idea) ?? []
-  const complaints = insight?.topComplaints?.map((item) => `Address "${item.theme}" in product, listing, or support copy.`) ?? []
-  const hooks = insight?.adHooks?.map((item) => `Test hook: ${item}`) ?? []
-  return [...ideas, ...complaints, ...hooks].slice(0, 4).length ? [...ideas, ...complaints, ...hooks].slice(0, 4) : [
-    "Collect more review data before making product decisions.",
-    "Paste reviews manually if the connector returns no text.",
-    "Use the data warning to decide whether this report is ready to share."
+function nextActions(insight: ReviewInsightLike | undefined, isSingle: boolean) {
+  if (isSingle) {
+    const ideas = insight?.productImprovementIdeas?.map((item) => item.idea) ?? []
+    const complaints = insight?.topComplaints?.map((item) => `Address "${item.theme}" in product, listing, or support copy.`) ?? []
+    const hooks = insight?.adHooks?.map((item) => `Test hook: ${item}`) ?? []
+    return [...ideas, ...complaints, ...hooks].slice(0, 4).length ? [...ideas, ...complaints, ...hooks].slice(0, 4) : [
+      "Collect more review data before making product decisions.",
+      "Paste reviews manually if the connector returns no text.",
+      "Use the data warning to decide whether this report is ready to share."
+    ]
+  }
+  return [
+    "Review price trends and competitive drops in the appendix table below.",
+    "Monitor out-of-stock variations and Restock alerts.",
+    "Audit listings with low completeness scores or missing fields.",
+    "Expand your watchlist catalog to track more competitor ASINs."
   ]
 }
 
