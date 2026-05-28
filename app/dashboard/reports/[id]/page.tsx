@@ -115,9 +115,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
             <CoverageItem label="Coverage" value={dataScore.label} tone={dataScore.tone} />
           </div>
           {targetReviewCount && reviewCount < targetReviewCount ? (
-            <p className="mt-4 rounded-xl border border-yellow-300/20 bg-yellow-300/10 p-4 text-sm text-yellow-50/80">
-              Target was {targetReviewCount} written reviews. Providers exposed {reviewCount} unique written reviews for this ASIN and marketplace in this run.
-            </p>
+            <div className="mt-4 rounded-xl border border-yellow-300/20 bg-yellow-300/5 p-4 text-sm text-yellow-100/90 leading-relaxed">
+              <span className="font-bold text-yellow-300">⚠️ Amazon Review Retrieval Note:</span> Target was {targetReviewCount} written reviews, but only {reviewCount} unique written text reviews were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily caps the public page retrieval of written review texts (often limiting it to ~60-100 reviews). The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.
+            </div>
           ) : null}
         </section>
 

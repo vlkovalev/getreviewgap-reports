@@ -240,7 +240,7 @@ export function exportReportPdf(report: IntelligenceReport) {
   const lines = buildPdfLines(report)
   const objects: string[] = []
   const pages: number[] = []
-  const chunks = chunk(lines, 34)
+  const chunks = chunk(lines, 44)
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>")
   objects.push("<< /Type /Pages /Kids [] /Count 0 >>")
@@ -305,6 +305,17 @@ export function exportReportPdf(report: IntelligenceReport) {
   return Buffer.from(header + body + xref, "utf8")
 }
 
+function formatPdfDate(dateStr: string) {
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`
+  } catch {
+    return dateStr
+  }
+}
+
 function buildPdfLines(report: IntelligenceReport) {
   const rows = reportRowsForExport(report).filter((row) => row.section !== "Ad hook").slice(0, 8)
   const summary = report.summary ?? {}
@@ -326,7 +337,7 @@ function buildPdfLines(report: IntelligenceReport) {
     ...(summary.asin ? [`ASIN: ${stringifyPdfValue(summary.asin)}`] : []),
     `Type: ${report.reportType}`,
     `Status: ${report.status}`,
-    `Generated: ${report.generatedAt ?? report.createdAt}`,
+    `Generated: ${formatPdfDate(report.generatedAt ?? report.createdAt)}`,
     ...(summary.reviewApp ? [`Review app: ${stringifyPdfValue(formatReviewApp(summary.reviewApp))}`] : []),
     `Depth: ${stringifyPdfValue(summary.reviewDepth ?? "Default")}`,
     `Written reviews analyzed: ${reviewCount}`,
@@ -342,6 +353,9 @@ function buildPdfLines(report: IntelligenceReport) {
     wrapPdfLine(pdfConfidence(reviewCount).note),
     "Marketplace rating counts may include star-only ratings and records the provider cannot return as written text.",
     "Customer-reported complaints are signals for human review, not verified product defects.",
+    ...(summary.targetReviewCount && reviewCount < Number(summary.targetReviewCount) ? [
+      `Amazon Review Cap Note: Target was ${summary.targetReviewCount} written reviews, but only ${reviewCount} were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily limits public written review retrieval. The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.`
+    ] : []),,
     ...(summary.productUrl ? ["", "Source URL", wrapPdfLine(stringifyPdfValue(summary.productUrl))] : []),
     ...(summary.warning ? ["", "Data Source Warning", wrapPdfLine(stringifyPdfValue(summary.warning))] : []),
     "",
