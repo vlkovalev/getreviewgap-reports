@@ -225,7 +225,22 @@ function judgeMeReviewTexts(payload: Record<string, unknown>) {
     const title = typeof row.title === "string" ? row.title.trim() : ""
     const body = typeof row.body === "string" ? row.body.trim() : ""
     const rating = typeof row.rating === "number" || typeof row.rating === "string" ? `Rating: ${row.rating}.` : ""
-    const text = [rating, title, body].filter(Boolean).join(" ").replace(/\s+/g, " ").trim()
+
+    // Extract real date
+    let dateStr = ""
+    if (typeof row.created_at === "string") {
+      const yyyymmdd = row.created_at.match(/^(\d{4}-\d{2}-\d{2})/)
+      if (yyyymmdd) dateStr = yyyymmdd[1]
+    }
+
+    // Extract real verified status
+    const verified = row.verified === true || row.verified === "true" || row.is_verified_buyer === true || row.is_verified_buyer === "true"
+
+    let prefix = ""
+    if (dateStr) prefix += `[Date: ${dateStr}] `
+    prefix += `[Verified: ${verified}] `
+
+    const text = (prefix + [rating, title, body].filter(Boolean).join(" ")).replace(/\s+/g, " ").trim()
     return text.length >= 20 ? [text] : []
   })
 }
@@ -1070,7 +1085,18 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
     dataQuality: {
       reviewCount: typeof metaCount === 'number' ? metaCount : reviews.length,
       limitations: limitationsList.length ? limitationsList : ["Live reviews analyzed using senior model constraints."]
-    }
+    },
+    competitiveGap: parsedJson.competitive_gap && typeof parsedJson.competitive_gap === 'object' ? {
+      competitorsAnalyzed: Array.isArray(parsedJson.competitive_gap.competitors_analyzed) ? parsedJson.competitive_gap.competitors_analyzed : [],
+      primaryWins: Array.isArray(parsedJson.competitive_gap.primary_wins) ? parsedJson.competitive_gap.primary_wins : [],
+      primaryLosses: Array.isArray(parsedJson.competitive_gap.primary_losses) ? parsedJson.competitive_gap.primary_losses : [],
+      openGaps: Array.isArray(parsedJson.competitive_gap.open_gaps) ? parsedJson.competitive_gap.open_gaps : []
+    } : null,
+    emergingSignals: Array.isArray(parsedJson.emerging_signals) ? parsedJson.emerging_signals.map((sig: any) => ({
+      theme: String(sig.theme || ""),
+      count: Number(sig.count || 0),
+      firstSeen: String(sig.first_seen || "")
+    })) : null
   }
 
   return { insight: reviewInsightSchema.parse(mappedInsight), provider: "openai", model }
@@ -1100,7 +1126,9 @@ function generateDemoInsight(input: ReviewInput, reviews: string[]): ReviewInsig
     dataQuality: {
       reviewCount: reviews.length,
       limitations: ["Live scraping is disabled until APIFY_TOKEN and APIFY_AMAZON_REVIEWS_ACTOR_ID are configured."]
-    }
+    },
+    competitiveGap: null,
+    emergingSignals: null
   }
 }
 
@@ -1123,8 +1151,29 @@ function parseJudgeMeWidgetHtml(html: string): string[] {
     body = body.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
     const cleanTitle = title.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
 
+    const verifiedMatch = block.match(/data-verified-buyer=['"](true|false)['"]/) ||
+                          block.match(/class=['"]jdgm-rev__buyer-badge['"]/) || 
+                          block.match(/class=['"]jdgm-rev__verified-buyer-badge['"]/) || 
+                          block.includes("jdgm-verified-buyer-badge") ||
+                          block.includes("jdgm-rev__verified-buyer-badge");
+    const verified = verifiedMatch ? (verifiedMatch[1] ? verifiedMatch[1] === "true" : true) : false;
+
+    const dateMatch = block.match(/data-timestamp=['"](.*?)['"]/) ||
+                      block.match(/class=['"]jdgm-rev__timestamp[^'"]*['"]\s+data-content=['"](.*?)['"]/) ||
+                      block.match(/class=['"]jdgm-rev__timestamp[^'"]*['"][^>]*>([\s\S]*?)<\/span>/);
+    let dateStr = "";
+    if (dateMatch) {
+      const rawDate = dateMatch[1].trim();
+      const yyyymmdd = rawDate.match(/^(\d{4}-\d{2}-\d{2})/);
+      dateStr = yyyymmdd ? yyyymmdd[1] : rawDate.replace(/<\/?[^>]+(>|$)/g, "").trim();
+    }
+
     if (body) {
-      let text = "";
+      let prefix = "";
+      if (dateStr) prefix += `[Date: ${dateStr}] `;
+      prefix += `[Verified: ${verified}] `;
+
+      let text = prefix;
       if (rating) text += `Rating: ${rating}. `;
       if (cleanTitle) text += `${cleanTitle}. `;
       text += body;

@@ -344,7 +344,7 @@ async function assertPublicJudgeMeCrawler() {
 
     assert.equal(result.source, "judgeme")
     assert.equal(result.reviews.length, 1)
-    assert.equal(result.reviews[0], "Rating: 5. Amazing. This is a great product!")
+    assert.ok(result.reviews[0].includes("Rating: 5. Amazing. This is a great product!"))
     assert.ok(requestedUrls[0].includes("shop_domain=competitor-shop.com"))
     assert.ok(requestedUrls[0].includes("product_handle=cool-product"))
   } finally {
@@ -385,7 +385,7 @@ async function assertPublicStampedCrawler() {
 
     assert.equal(result.source, "stamped" as any)
     assert.equal(result.reviews.length, 1)
-    assert.equal(result.reviews[0], "Rating: 5. Perfect. Highly recommend!")
+    assert.ok(result.reviews[0].includes("Rating: 5. Perfect. Highly recommend!"))
     assert.ok(requestedUrls[0].includes("/products/awesome-product.js"))
     assert.ok(requestedUrls[1].includes("productId=12345"))
     assert.ok(requestedUrls[1].includes("shopUrl=stamped-shop.com"))

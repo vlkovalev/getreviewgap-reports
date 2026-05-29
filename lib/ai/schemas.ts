@@ -38,7 +38,18 @@ export const reviewInsightSchema = z.object({
   dataQuality: z.object({
     reviewCount: z.number(),
     limitations: z.array(z.string())
-  })
+  }),
+  competitiveGap: z.object({
+    competitorsAnalyzed: z.array(z.string()),
+    primaryWins: z.array(z.string()),
+    primaryLosses: z.array(z.string()),
+    openGaps: z.array(z.string())
+  }).optional().nullable(),
+  emergingSignals: z.array(z.object({
+    theme: z.string(),
+    count: z.number(),
+    firstSeen: z.string()
+  })).optional().nullable()
 })
 
 export type ReviewInsight = z.infer<typeof reviewInsightSchema>

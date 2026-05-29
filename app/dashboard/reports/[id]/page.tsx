@@ -180,68 +180,203 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
 
       {insight ? (
         <>
-          <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-sm font-black uppercase text-lime">Decision snapshot</p>
-                <h2 className="mt-2 text-2xl font-black">What to act on first</h2>
-              </div>
-              <p className="text-sm text-white/45">Evidence-led findings from {reviewCount} review{reviewCount === 1 ? "" : "s"}</p>
-            </div>
-            <div className="mt-5 grid gap-3 lg:grid-cols-3">
-              <SnapshotItem label="Main friction" title={insight.topComplaints?.[0]?.theme ?? "No complaint signal"} body={insight.topComplaints?.[0]?.productImplication ?? "Collect more reviews before choosing a product response."} tone="coral" />
-              <SnapshotItem label="Winning signal" title={insight.topCompliments?.[0]?.theme ?? "No positive signal"} body={insight.topCompliments?.[0]?.marketingImplication ?? "No validated marketing claim is available yet."} tone="lime" />
-              <SnapshotItem label="Recommended move" title={insight.productImprovementIdeas?.[0]?.idea ?? "Increase evidence"} body={insight.productImprovementIdeas?.[0]?.whyItMatters ?? "Add more customer review text to increase confidence."} tone="cyan" />
-            </div>
-          </section>
+          {(() => {
+            const competitiveGap = getCompetitiveGap(insight)
+            const emergingSignals = getEmergingSignals(insight)
+            const cleanAssumptions = (insight.assumptions ?? []).filter(
+              (item) => !item.startsWith("[Competitor Moat Analysis]") && !item.startsWith("[Moat Analysis]")
+            )
+            const cleanLimitations = (insight.dataQuality?.limitations ?? []).filter(
+              (item) => !item.startsWith("[Emerging Signal]")
+            )
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-2">
-            <EvidenceList title="Top complaints to exploit or avoid" items={insight.topComplaints?.map((item) => ({
-              title: item.theme,
-              eyebrow: `Severity: ${item.severity}`,
-              body: item.evidence,
-              footer: item.productImplication
-            })) ?? []} tone="coral" />
-            <EvidenceList title="Strengths customers already value" items={insight.topCompliments?.map((item) => ({
-              title: item.theme,
-              eyebrow: "Positive signal",
-              body: item.evidence,
-              footer: item.marketingImplication
-            })) ?? []} tone="lime" />
-          </section>
-
-          <section className="mt-6 grid gap-4 lg:grid-cols-[.9fr_1.1fr]">
-            <BriefPanel title="Buyer language" tone="cyan">
-              <div className="flex flex-wrap gap-2">
-                {insight.buyerLanguage?.length ? insight.buyerLanguage.slice(0, 16).map((item) => (
-                  <span key={item} className="rounded-full border border-cyan/20 bg-cyan/10 px-3 py-2 text-sm font-bold text-cyan">{item}</span>
-                )) : <EmptyText text="No buyer phrases were available in this report." />}
-              </div>
-            </BriefPanel>
-            <BriefPanel title="Product improvement ideas" tone="yellow">
-              <div className="grid gap-3">
-                {insight.productImprovementIdeas?.length ? insight.productImprovementIdeas.slice(0, 5).map((item) => (
-                  <div key={item.idea} className="rounded-xl bg-black/25 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-black">{item.idea}</p>
-                      <span className="rounded-full bg-yellow-300/15 px-2 py-1 text-xs font-black uppercase text-yellow-300">{item.confidence}</span>
+            return (
+              <>
+                <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black uppercase text-lime">Decision snapshot</p>
+                      <h2 className="mt-2 text-2xl font-black">What to act on first</h2>
                     </div>
-                    <p className="mt-2 text-sm text-white/64">{item.whyItMatters}</p>
+                    <p className="text-sm text-white/45">Evidence-led findings from {reviewCount} review{reviewCount === 1 ? "" : "s"}</p>
                   </div>
-                )) : <EmptyText text="No product ideas were available in this report." />}
-              </div>
-            </BriefPanel>
-          </section>
+                  <div className="mt-5 grid gap-3 lg:grid-cols-3">
+                    <SnapshotItem label="Main friction" title={insight.topComplaints?.[0]?.theme ?? "No complaint signal"} body={insight.topComplaints?.[0]?.productImplication ?? "Collect more reviews before choosing a product response."} tone="coral" />
+                    <SnapshotItem label="Winning signal" title={insight.topCompliments?.[0]?.theme ?? "No positive signal"} body={insight.topCompliments?.[0]?.marketingImplication ?? "No validated marketing claim is available yet."} tone="lime" />
+                    <SnapshotItem label="Recommended move" title={insight.productImprovementIdeas?.[0]?.idea ?? "Increase evidence"} body={insight.productImprovementIdeas?.[0]?.whyItMatters ?? "Add more customer review text to increase confidence."} tone="cyan" />
+                  </div>
+                </section>
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-2">
-            <SimpleList title="Ad hooks" items={insight.adHooks ?? []} tone="lime" />
-            <SimpleList title="Positioning angles" items={insight.positioningAngles ?? []} tone="cyan" />
-          </section>
+                {(!isEmpty(insight.topComplaints) || !isEmpty(insight.topCompliments)) && (
+                  <section className={`mt-6 grid gap-4 ${(!isEmpty(insight.topComplaints) && !isEmpty(insight.topCompliments)) ? "lg:grid-cols-2" : "grid-cols-1"}`}>
+                    {!isEmpty(insight.topComplaints) && (
+                      <EvidenceList title="Top complaints to exploit or avoid" items={insight.topComplaints?.map((item) => ({
+                        title: item.theme,
+                        eyebrow: `Severity: ${item.severity}`,
+                        body: item.evidence,
+                        footer: item.productImplication
+                      })) ?? []} tone="coral" />
+                    )}
+                    {!isEmpty(insight.topCompliments) && (
+                      <EvidenceList title="Strengths customers already value" items={insight.topCompliments?.map((item) => ({
+                        title: item.theme,
+                        eyebrow: "Positive signal",
+                        body: item.evidence,
+                        footer: item.marketingImplication
+                      })) ?? []} tone="lime" />
+                    )}
+                  </section>
+                )}
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-2">
-            <SimpleList title="Assumptions" items={insight.assumptions ?? []} tone="yellow" />
-            <SimpleList title="Data limitations" items={insight.dataQuality?.limitations ?? []} tone="coral" />
-          </section>
+                <section className="mt-6 grid gap-4 lg:grid-cols-[.9fr_1.1fr]">
+                  <BriefPanel title="Buyer language" tone="cyan">
+                    {(() => {
+                      const phrases = insight.buyerLanguage ?? []
+                      if (phrases.length === 0) {
+                        return <EmptyText text="No buyer phrases were available in this report." />
+                      }
+                      const groups = groupBuyerLanguage(phrases)
+                      const categories = [
+                        { label: "Outcomes", items: groups.outcomes },
+                        { label: "Objections", items: groups.objections },
+                        { label: "Comparisons", items: groups.comparisons },
+                        { label: "Unexpected uses", items: groups.unexpectedUses }
+                      ]
+                      const activeCategories = categories.filter(c => !isEmpty(c.items))
+
+                      if (activeCategories.length === 0) {
+                        return <EmptyText text="No buyer phrases were available in this report." />
+                      }
+
+                      return (
+                        <div className="grid gap-4">
+                          {activeCategories.map(({ label, items }) => (
+                            <div key={label} className="rounded-xl bg-black/25 p-4 border border-white/5">
+                              <h4 className="text-sm font-black uppercase text-cyan/95 tracking-wider mb-2">{label}</h4>
+                              <div className="flex flex-wrap gap-2">
+                                {items.map((item, idx) => (
+                                  <span key={idx} className="rounded-full border border-cyan/20 bg-cyan/[0.04] px-3 py-1.5 text-sm font-medium text-cyan/90">
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </BriefPanel>
+
+                  <BriefPanel title="Product improvement ideas" tone="yellow">
+                    <div className="grid gap-3">
+                      {insight.productImprovementIdeas?.length ? insight.productImprovementIdeas.slice(0, 5).map((item) => (
+                        <div key={item.idea} className="rounded-xl bg-black/25 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-black">{item.idea}</p>
+                            <span className="rounded-full bg-yellow-300/15 px-2 py-1 text-xs font-black uppercase text-yellow-300">{item.confidence}</span>
+                          </div>
+                          <p className="mt-2 text-sm text-white/64">{item.whyItMatters}</p>
+                        </div>
+                      )) : <EmptyText text="No product ideas were available in this report." />}
+                    </div>
+                  </BriefPanel>
+                </section>
+
+                {!isEmpty(competitiveGap) && (
+                  <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+                    <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+                      <div>
+                        <p className="text-sm font-black uppercase text-yellow-300">Competitive Moat Analysis</p>
+                        <h2 className="mt-2 text-2xl font-black">Competitive Gap</h2>
+                      </div>
+                      {competitiveGap?.competitorsAnalyzed?.length ? (
+                        <p className="text-sm text-white/55">
+                          Competitors: {competitiveGap.competitorsAnalyzed.join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3 mt-4">
+                      {!isEmpty(competitiveGap?.primaryWins) && (
+                        <div className="rounded-xl bg-black/20 p-4 border border-lime/10">
+                          <h4 className="text-sm font-black uppercase text-lime mb-2">Our Wins & Advantages</h4>
+                          <ul className="list-disc pl-4 text-sm text-white/70 space-y-1">
+                            {competitiveGap?.primaryWins?.map((win, idx) => (
+                              <li key={idx}>{win}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {!isEmpty(competitiveGap?.primaryLosses) && (
+                        <div className="rounded-xl bg-black/20 p-4 border border-coral/10">
+                          <h4 className="text-sm font-black uppercase text-coral mb-2">Competitor Moats</h4>
+                          <ul className="list-disc pl-4 text-sm text-white/70 space-y-1">
+                            {competitiveGap?.primaryLosses?.map((loss, idx) => (
+                              <li key={idx}>{loss}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {!isEmpty(competitiveGap?.openGaps) && (
+                        <div className="rounded-xl bg-black/20 p-4 border border-cyan/10">
+                          <h4 className="text-sm font-black uppercase text-cyan mb-2">Open Gaps & Opportunities</h4>
+                          <ul className="list-disc pl-4 text-sm text-white/70 space-y-1">
+                            {competitiveGap?.openGaps?.map((gapItem, idx) => (
+                              <li key={idx}>{gapItem}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                )}
+
+                {!isEmpty(emergingSignals) && (
+                  <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+                    <p className="text-sm font-black uppercase text-cyan">Market Trends</p>
+                    <h2 className="mt-2 text-2xl font-black mb-4">Emerging Signals</h2>
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {emergingSignals?.map((sig, idx) => (
+                        <div key={idx} className="rounded-xl bg-black/25 p-4 border border-white/5 flex flex-col justify-between">
+                          <div>
+                            <h4 className="font-bold text-white text-base">{sig.theme}</h4>
+                            <p className="mt-2 text-sm text-white/55">First detected: {sig.firstSeen || "recent reviews"}</p>
+                          </div>
+                          <div className="mt-4 flex items-center justify-between">
+                            <span className="text-xs font-black uppercase text-cyan">Early Signal</span>
+                            <span className="rounded-full bg-cyan/10 px-2.5 py-1 text-xs font-black text-cyan border border-cyan/20">
+                              {sig.count} Mentions
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {(!isEmpty(insight.adHooks) || !isEmpty(insight.positioningAngles)) && (
+                  <section className={`mt-6 grid gap-4 ${(!isEmpty(insight.adHooks) && !isEmpty(insight.positioningAngles)) ? "lg:grid-cols-2" : "grid-cols-1"}`}>
+                    {!isEmpty(insight.adHooks) && (
+                      <SimpleList title="Ad hooks" items={insight.adHooks ?? []} tone="lime" />
+                    )}
+                    {!isEmpty(insight.positioningAngles) && (
+                      <SimpleList title="Positioning angles" items={insight.positioningAngles ?? []} tone="cyan" />
+                    )}
+                  </section>
+                )}
+
+                {(!isEmpty(cleanAssumptions) || !isEmpty(cleanLimitations)) && (
+                  <section className={`mt-6 grid gap-4 ${(!isEmpty(cleanAssumptions) && !isEmpty(cleanLimitations)) ? "lg:grid-cols-2" : "grid-cols-1"}`}>
+                    {!isEmpty(cleanAssumptions) && (
+                      <SimpleList title="Assumptions" items={cleanAssumptions} tone="yellow" />
+                    )}
+                    {!isEmpty(cleanLimitations) && (
+                      <SimpleList title="Data limitations" items={cleanLimitations} tone="coral" />
+                    )}
+                  </section>
+                )}
+              </>
+            )
+          })()}
         </>
       ) : null}
 
@@ -280,6 +415,117 @@ type ReviewInsightLike = {
   positioningAngles?: string[]
   assumptions?: string[]
   dataQuality?: { reviewCount?: number; limitations?: string[] }
+  competitiveGap?: {
+    competitorsAnalyzed?: string[]
+    primaryWins?: string[]
+    primaryLosses?: string[]
+    openGaps?: string[]
+  } | null
+  emergingSignals?: Array<{
+    theme: string
+    count: number
+    firstSeen: string
+  }> | null
+}
+
+function isEmpty(v: unknown): boolean {
+  if (v == null) return true
+  if (typeof v === "string") return v.trim() === "" || v.trim().toUpperCase() === "N/A"
+  if (Array.isArray(v)) return v.length === 0 || v.every(isEmpty)
+  if (typeof v === "object") return Object.values(v).every(isEmpty)
+  return false
+}
+
+function groupBuyerLanguage(phrases: string[]) {
+  const groups: {
+    outcomes: string[]
+    objections: string[]
+    comparisons: string[]
+    unexpectedUses: string[]
+  } = {
+    outcomes: [],
+    objections: [],
+    comparisons: [],
+    unexpectedUses: []
+  }
+
+  phrases.forEach((phrase) => {
+    const trimmed = phrase.trim()
+    const clean = trimmed
+      .replaceAll("[Outcome]", "")
+      .replaceAll("[Objection]", "")
+      .replaceAll("[Comparison]", "")
+      .replaceAll("[Unexpected Use]", "")
+      .replaceAll("[Unexpected]", "")
+      .replace(/\s+/g, " ")
+      .trim()
+
+    if (trimmed.includes("[Outcome]")) {
+      groups.outcomes.push(clean)
+    } else if (trimmed.includes("[Objection]")) {
+      groups.objections.push(clean)
+    } else if (trimmed.includes("[Comparison]")) {
+      groups.comparisons.push(clean)
+    } else if (trimmed.includes("[Unexpected Use]") || trimmed.includes("[Unexpected]")) {
+      groups.unexpectedUses.push(clean)
+    } else {
+      groups.outcomes.push(clean)
+    }
+  })
+
+  return groups
+}
+
+function getCompetitiveGap(insight: ReviewInsightLike) {
+  if (insight.competitiveGap) return insight.competitiveGap
+
+  const assumptions = insight.assumptions ?? []
+  const competitorsLine = assumptions.find(item => item.startsWith("[Competitor Moat Analysis]"))
+  const winsLine = assumptions.find(item => item.startsWith("[Moat Analysis] Primary Wins:"))
+  const lossesLine = assumptions.find(item => item.startsWith("[Moat Analysis] Primary Losses:"))
+  const gapsLine = assumptions.find(item => item.startsWith("[Moat Analysis] Open Gaps/Unmet Needs:"))
+
+  if (!competitorsLine && !winsLine && !lossesLine && !gapsLine) return null
+
+  const cleanList = (line: string | undefined, prefix: string) => {
+    if (!line) return []
+    const rawContent = line.substring(prefix.length).trim()
+    if (rawContent === "N/A" || rawContent === "") return []
+    return rawContent.split(";").map(s => s.trim()).filter(Boolean)
+  }
+
+  return {
+    competitorsAnalyzed: competitorsLine ? competitorsLine.substring("[Competitor Moat Analysis] Competitors Analyzed:".length).trim().split(",").map(s => s.trim()).filter(Boolean) : [],
+    primaryWins: cleanList(winsLine, "[Moat Analysis] Primary Wins:"),
+    primaryLosses: cleanList(lossesLine, "[Moat Analysis] Primary Losses:"),
+    openGaps: cleanList(gapsLine, "[Moat Analysis] Open Gaps/Unmet Needs:")
+  }
+}
+
+function getEmergingSignals(insight: ReviewInsightLike) {
+  if (insight.emergingSignals) return insight.emergingSignals
+
+  const limitations = insight.dataQuality?.limitations ?? []
+  const signalLines = limitations.filter(item => item.startsWith("[Emerging Signal]"))
+
+  if (signalLines.length === 0) return null
+
+  return signalLines.map(line => {
+    const withoutPrefix = line.substring("[Emerging Signal]".length).trim()
+    const match = withoutPrefix.match(/^(.*?)\s*\(Count:\s*(\d+),\s*First seen:\s*(.*?)\)$/i)
+    if (match) {
+      return {
+        theme: match[1].trim(),
+        count: parseInt(match[2], 10),
+        firstSeen: match[3].trim()
+      }
+    }
+    return {
+      theme: withoutPrefix,
+      count: 0,
+      firstSeen: ""
+    }
+  })
 }
 
 function Metric({ label, value, tone = "white" }: { label: string; value: string; tone?: "white" | "lime" | "yellow" | "coral" }) {

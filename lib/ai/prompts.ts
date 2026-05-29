@@ -27,7 +27,25 @@ SAMPLE METADATA
 - Rating distribution: 5★ ${rating5}, 4★ ${rating4}, 3★ ${rating3}, 2★ ${rating2}, 1★ ${rating1}
 
 REVIEWS (newline-delimited review JSON)
-${reviews.map((r, i) => JSON.stringify({ id: `rev_${i}`, rating: Number(r.match(/Rating:\s*(\d)/)?.[1] || 5), date: new Date().toISOString().split('T')[0], verified: true, title: "Review Title", body: r })).join("\n")}
+${reviews.map((r, i) => {
+  const dateMatch = r.match(/^\[Date:\s*([^\]]+)\]/);
+  const verifiedMatch = r.match(/\[Verified:\s*(true|false)\]/);
+  const cleanBody = r.replace(/^\[Date:[^\]]+\]\s*/, "").replace(/\[Verified:[^\]]+\]\s*/, "");
+  const ratingMatch = cleanBody.match(/Rating:\s*(\d)/);
+
+  const date = dateMatch ? dateMatch[1] : new Date().toISOString().split('T')[0];
+  const verified = verifiedMatch ? verifiedMatch[1] === "true" : true;
+  const rating = ratingMatch ? Number(ratingMatch[1]) : 5;
+
+  return JSON.stringify({
+    id: `rev_${i}`,
+    rating,
+    date,
+    verified,
+    title: "Review Title",
+    body: cleanBody
+  });
+}).join("\n")}
 
 OUTPUT
 Return a single valid JSON object per the schema. No prose outside the JSON.
@@ -42,10 +60,11 @@ Return a single valid JSON object per the schema. No prose outside the JSON.
       "QUANTIFY EVERY CLAIM: Every theme, complaint, and compliment must include a count and percentage of the review sample in the format '{count} of {total} reviews ({pct}%)'. FORBIDDEN phrases: 'some users', 'several customers', 'many buyers', 'a number of', 'frequently mentioned', 'often', 'commonly' - replace with exact counts.",
       "CITE VERBATIM EVIDENCE: Every theme must include 2-3 short verbatim quotes (max 25 words each) with the review's star rating, date, and verified-purchase status if available. Quote EXACTLY as written - preserve typos, casing, punctuation. Do not paraphrase.",
       "SEVERITY JUSTIFIED BY FREQUENCY: Severity must be 'high' if mentioned in >=20% of reviews, 'medium' 10-19%, 'low' 5-9%. Do not surface themes in <5% of reviews as top items.",
-      "AD HOOKS MUST BE REVIEW-DERIVED: Every ad hook must either: (a) neutralize a top complaint in the form 'Finally — a [product] that doesn't [complaint]' or similar, or (b) reuse a verbatim buyer phrase. Declare the source of each hook. Generic ad hooks are FORBIDDEN.",
+      "AD HOOKS MUST BE REVIEW-DERIVED: Every ad hook must do ONE of: (a) neutralize a top complaint, e.g. 'Finally — a [product] that doesn't [complaint]'; or (b) reuse a verbatim buyer phrase from the outcomes, objections, or unexpected_uses buckets. Hooks that could have been written from the product title alone are FORBIDDEN (e.g. 'Stay cool this summer', 'Perfect for relaxation'). Each hook must declare its source in `source_evidence`. MINIMUM OUTPUT REQUIREMENT: You must return at least one ad hook unless BOTH conditions hold: (i) `top_complaints` is empty, AND (ii) `buyer_language.outcomes`, `buyer_language.objections`, and `buyer_language.unexpected_uses` are ALL empty. If even one phrase exists in any of those buckets, you must produce at least one buyer-phrase-derived hook. The hook may be short and direct (e.g. 'Non-greasy. Absorbs in seconds.' is acceptable if 'non-greasy' and 'absorbs well' appear in the buyer language).",
       "BUYER LANGUAGE IS GROUPED AND RICH: Produce 20-40 verbatim phrases categorized into outcomes (what buyers felt/got), objections (what disappointed them), comparisons (what they compared it to), and unexpected_uses (uses you didn't anticipate). Format as '[Category] phrase' (e.g. '[Outcome] nice glow', '[Objection] smaller than expected', '[Comparison] better than brand X', '[Unexpected Use] used for eczema'). Each phrase must appear in at least 2 reviews.",
       "SURFACE TEMPORAL SIGNALS: If complaint rates differ between recent (<=90 days) and older reviews, flag this in the theme's evidence or implications.",
       "RECOMMENDATIONS ARE EVIDENCE-SPECIFIC: Defect recommendations must specify the defect, specific count, and timeframe/variant if discernible. FORBIDDEN: generic 'Improve quality control'.",
+      "COMPETITIVE GAP: If competitor reviews are provided in the input, produce the `competitive_gap` section. If not, OMIT the field entirely from your JSON output. Do not return it with null or 'N/A' values. Its absence from the JSON is the signal to the renderer that this section should not appear in the report.",
       "NO INVENTED FACTS: Do not infer features, competitors, prices, or events not present in the reviews. If a section has no supporting evidence, return an empty array.",
       "Tone: Senior consultant briefing a client - direct, evidence-bound, willing to say 'the data does not support a strong conclusion'. No marketing language, do not flatter the product."
     ],
