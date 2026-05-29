@@ -910,8 +910,8 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: `${prompt.role}\nObjective: ${prompt.objective}\nQuality rules: ${prompt.qualityRules.join(" ")}` },
-        { role: "user", content: JSON.stringify(prompt) }
+        { role: "system", content: `${prompt.role}\nObjective: ${prompt.objective}\nQuality rules:\n${prompt.qualityRules.map((rule, idx) => `${idx + 1}. ${rule}`).join("\n")}\n\nRequired JSON Output Schema:\n${JSON.stringify(prompt.outputSchema, null, 2)}` },
+        { role: "user", content: prompt.userMessage }
       ]
     })
   })
@@ -924,7 +924,143 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
   const content = data.choices?.[0]?.message?.content
   if (!content) throw new Error("OpenAI returned an empty response")
 
-  return { insight: reviewInsightSchema.parse(JSON.parse(content)), provider: "openai", model }
+  const parsedJson = JSON.parse(content) as Record<string, any>
+
+  // Map insufficient data format
+  if (parsedJson.insufficient_data) {
+    const fallbackInsight = {
+      executiveSummary: `Insufficient data: ${parsedJson.reason || "Not enough reviews provided"}. Analyzed ${parsedJson.reviews_provided || 0} reviews, but require at least ${parsedJson.reviews_required || 15} to establish high-confidence patterns.`,
+      topComplaints: [],
+      topCompliments: [],
+      buyerLanguage: [],
+      productImprovementIdeas: [],
+      adHooks: [],
+      positioningAngles: [],
+      assumptions: [`Insufficient reviews provided: ${parsedJson.reviews_provided || 0} (Required: ${parsedJson.reviews_required || 15})`],
+      dataQuality: {
+        reviewCount: parsedJson.reviews_provided || 0,
+        limitations: [`Insufficient data: ${parsedJson.reason || "Sparse customer reviews available."}`]
+      }
+    }
+    return { insight: reviewInsightSchema.parse(fallbackInsight), provider: "openai", model }
+  }
+
+  // Map the new high-fidelity schema to our standard ReviewInsight schema
+  const executiveSummary = parsedJson.executive_summary
+    ? `${parsedJson.executive_summary.headline || ""} ${parsedJson.executive_summary.context || ""}`.trim()
+    : "Review analysis complete."
+
+  const topComplaints = Array.isArray(parsedJson.top_complaints)
+    ? parsedJson.top_complaints.map((item: any) => {
+        const pctStr = typeof item.percentage === 'number' ? ` (${item.percentage}%)` : ""
+        const subPatternsStr = Array.isArray(item.sub_patterns) && item.sub_patterns.length ? ` Sub-patterns: ${item.sub_patterns.join(", ")}.` : ""
+        const quotesStr = Array.isArray(item.verbatim_quotes) && item.verbatim_quotes.length
+          ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}★, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
+          : ""
+        const temporalStr = item.temporal_signal ? ` Temporal shift noted: ${item.temporal_signal}.` : ""
+
+        return {
+          theme: item.theme || "Complaint theme",
+          severity: item.severity === 'high' || item.severity === 'medium' || item.severity === 'low' ? item.severity : "medium",
+          evidence: `${item.count || 0} of ${item.total || reviews.length} reviews${pctStr}.${subPatternsStr}${quotesStr}${temporalStr}`,
+          productImplication: item.action || "No recommendation specified."
+        }
+      })
+    : []
+
+  const topCompliments = Array.isArray(parsedJson.top_compliments)
+    ? parsedJson.top_compliments.map((item: any) => {
+        const pctStr = typeof item.percentage === 'number' ? ` (${item.percentage}%)` : ""
+        const subPatternsStr = Array.isArray(item.sub_patterns) && item.sub_patterns.length ? ` Sub-patterns: ${item.sub_patterns.join(", ")}.` : ""
+        const quotesStr = Array.isArray(item.verbatim_quotes) && item.verbatim_quotes.length
+          ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}★, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
+          : ""
+
+        return {
+          theme: item.theme || "Compliment theme",
+          evidence: `${item.count || 0} of ${item.total || reviews.length} reviews${pctStr}.${subPatternsStr}${quotesStr}`,
+          marketingImplication: item.action || "No marketing angle specified."
+        }
+      })
+    : []
+
+  // Grouped buyer language extraction
+  const buyerLang: string[] = []
+  if (parsedJson.buyer_language && typeof parsedJson.buyer_language === 'object') {
+    const { outcomes, objections, comparisons, unexpected_uses } = parsedJson.buyer_language
+    if (Array.isArray(outcomes)) outcomes.forEach((p: string) => buyerLang.push(`[Outcome] ${p}`))
+    if (Array.isArray(objections)) objections.forEach((p: string) => buyerLang.push(`[Objection] ${p}`))
+    if (Array.isArray(comparisons)) comparisons.forEach((p: string) => buyerLang.push(`[Comparison] ${p}`))
+    if (Array.isArray(unexpected_uses)) unexpected_uses.forEach((p: string) => buyerLang.push(`[Unexpected Use] ${p}`))
+  }
+
+  const finalBuyerLanguage = buyerLang.length ? buyerLang : (Array.isArray(parsedJson.buyer_language) ? parsedJson.buyer_language : [])
+
+  const productImprovementIdeas = topComplaints.map((item) => ({
+    idea: item.productImplication,
+    whyItMatters: `Mitigates top complaint theme: ${item.theme}. Evidence: ${item.evidence.split(".")[0]}`,
+    confidence: item.severity
+  }))
+
+  const adHooks = Array.isArray(parsedJson.ad_hooks)
+    ? parsedJson.ad_hooks.map((item: any) => {
+        if (typeof item === 'object' && item !== null) {
+          return `${item.hook || ""} (Source: ${item.source_type || ""} - ${item.source_evidence || ""})`.trim()
+        }
+        return String(item)
+      })
+    : []
+
+  const positioningAngles = Array.isArray(parsedJson.positioning_angles)
+    ? parsedJson.positioning_angles.map((item: any) => {
+        if (typeof item === 'object' && item !== null) {
+          return `${item.angle || ""} (Evidence: ${item.supported_by || ""})`.trim()
+        }
+        return String(item)
+      })
+    : []
+
+  const assumptions: string[] = []
+  if (Array.isArray(parsedJson.assumptions_and_limitations)) {
+    assumptions.push(...parsedJson.assumptions_and_limitations)
+  }
+  if (parsedJson.competitive_gap && typeof parsedJson.competitive_gap === 'object') {
+    const gap = parsedJson.competitive_gap
+    assumptions.push(
+      `[Competitor Moat Analysis] Competitors Analyzed: ${(gap.competitors_analyzed || []).join(", ") || "N/A"}`,
+      `[Moat Analysis] Primary Wins: ${(gap.primary_wins || []).join("; ") || "N/A"}`,
+      `[Moat Analysis] Primary Losses: ${(gap.primary_losses || []).join("; ") || "N/A"}`,
+      `[Moat Analysis] Open Gaps/Unmet Needs: ${(gap.open_gaps || []).join("; ") || "N/A"}`
+    )
+  }
+
+  const metaCount = parsedJson.report_meta?.reviews_analyzed
+  const limitationsList: string[] = []
+  if (parsedJson.report_meta) {
+    limitationsList.push(`Confidence Level: ${parsedJson.report_meta.confidence || "Medium"} - ${parsedJson.report_meta.confidence_reason || "Analyzed provided sample."}`)
+  }
+  if (Array.isArray(parsedJson.emerging_signals)) {
+    parsedJson.emerging_signals.forEach((sig: any) => {
+      limitationsList.push(`[Emerging Signal] ${sig.theme || ""} (Count: ${sig.count || 0}, First seen: ${sig.first_seen || ""})`)
+    })
+  }
+
+  const mappedInsight = {
+    executiveSummary,
+    topComplaints,
+    topCompliments,
+    buyerLanguage: finalBuyerLanguage,
+    productImprovementIdeas,
+    adHooks,
+    positioningAngles,
+    assumptions: assumptions.length ? assumptions : ["Standard review intelligence assumptions applied."],
+    dataQuality: {
+      reviewCount: typeof metaCount === 'number' ? metaCount : reviews.length,
+      limitations: limitationsList.length ? limitationsList : ["Live reviews analyzed using senior model constraints."]
+    }
+  }
+
+  return { insight: reviewInsightSchema.parse(mappedInsight), provider: "openai", model }
 }
 
 function generateDemoInsight(input: ReviewInput, reviews: string[]): ReviewInsight {
