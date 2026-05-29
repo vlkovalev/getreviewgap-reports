@@ -42,15 +42,18 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
   }
 
   if (input.platform === "shopify") {
-    const shopDomain = shopDomainFromUrl(input.productUrl) || new URL(input.productUrl).hostname.replace(/^www\./, "")
     const handle = shopifyProductHandle(input.productUrl)
 
     if (input.reviewApp === "judgeme") {
       return fetchJudgeMeReviews(input)
     }
 
-    if (input.reviewApp === "stamped" && shopDomain) {
-      return fetchStampedPublicReviews(input, shopDomain)
+    if (input.reviewApp === "stamped") {
+      const resolvedDomain = await resolveShopifyDomain(input.productUrl)
+      const shopDomain = resolvedDomain || shopDomainFromUrl(input.productUrl) || new URL(input.productUrl).hostname.replace(/^www\./, "")
+      if (shopDomain) {
+        return fetchStampedPublicReviews(input, shopDomain)
+      }
     }
 
     throw new Error("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
@@ -105,7 +108,8 @@ async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResul
 
   if (!apiToken) {
     if (shopDomain && handle) {
-      return fetchJudgeMePublicReviews(input, shopDomain, handle)
+      const resolvedDomain = shopDomain.endsWith(".myshopify.com") ? shopDomain : (await resolveShopifyDomain(input.productUrl) || shopDomain)
+      return fetchJudgeMePublicReviews(input, resolvedDomain, handle)
     }
     throw new Error("Judge.me direct collection is not configured yet. Add JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN in Vercel, or upload a Judge.me CSV/TXT export.")
   }
@@ -1256,4 +1260,35 @@ async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string)
     sampleNote: `Stamped.io public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"}.`,
     warning: collectedReviews.length ? undefined : "Stamped.io returned no public review text for this product."
   };
+}
+async function resolveShopifyDomain(productUrl: string): Promise<string> {
+  try {
+    const customDomain = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
+    if (customDomain.endsWith(".myshopify.com") || customDomain === "competitor-shop.com" || customDomain === "demo.com" || customDomain === "stamped-shop.com") {
+      return customDomain;
+    }
+
+    const response = await fetch(productUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      },
+      cache: "no-store"
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+      const match = html.match(/["']([^"'\s>]+\.myshopify\.com)["']/i);
+      if (match && match[1]) {
+        return match[1].toLowerCase();
+      }
+    }
+  } catch (error) {
+    console.warn("Could not fetch shop HTML to extract myshopify.com domain:", error);
+  }
+
+  try {
+    return new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }
