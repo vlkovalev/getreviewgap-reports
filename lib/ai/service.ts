@@ -1141,39 +1141,69 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
   let totalReviewsCount = 0;
   let previousPageAddedReviews = true;
 
-  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
-    const pageNum = pagesFetched + 1;
-    const params = new URLSearchParams({
-      shop_domain: shopDomain,
-      platform: "shopify",
-      product_handle: handle,
-      page: String(pageNum)
-    });
+  try {
+    while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+      const pageNum = pagesFetched + 1;
+      const params = new URLSearchParams({
+        shop_domain: shopDomain,
+        platform: "shopify",
+        product_handle: handle,
+        page: String(pageNum)
+      });
 
-    const response = await fetch(`https://judge.me/api/v1/widgets/reviews?${params}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      },
-      cache: "no-store"
-    });
+      const response = await fetch(`https://judge.me/api/v1/widgets/reviews?${params}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        cache: "no-store"
+      });
 
-    if (!response.ok) {
-      throw new Error(`Judge.me public widget request failed with status ${response.status}.`);
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+
+      const payload = await response.json() as Record<string, unknown>;
+      const htmlString = typeof payload.reviews === "string" ? payload.reviews : "";
+      const pageReviews = parseJudgeMeWidgetHtml(htmlString);
+
+      if (typeof payload.total_reviews === "number") {
+        totalReviewsCount = payload.total_reviews;
+      }
+
+      const previousCount = reviews.size;
+      for (const text of pageReviews) reviews.add(text);
+
+      pagesFetched += 1;
+      previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount;
     }
-
-    const payload = await response.json() as Record<string, unknown>;
-    const htmlString = typeof payload.reviews === "string" ? payload.reviews : "";
-    const pageReviews = parseJudgeMeWidgetHtml(htmlString);
-
-    if (typeof payload.total_reviews === "number") {
-      totalReviewsCount = payload.total_reviews;
+  } catch (apiError: any) {
+    console.warn("Judge.me widget API failed, falling back to direct HTML scraping:", apiError?.message || apiError);
+    try {
+      const response = await fetch(input.productUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        cache: "no-store"
+      });
+      if (response.ok) {
+        const html = await response.text();
+        const pageReviews = parseJudgeMeWidgetHtml(html);
+        for (const text of pageReviews) reviews.add(text);
+        if (reviews.size > 0) {
+          return {
+            reviews: [...reviews],
+            source: "judgeme",
+            productName: input.productName || `Shopify product ${handle}`,
+            pagesFetched: 1,
+            availableReviewCount: reviews.size,
+            sampleNote: `Judge.me public crawler retrieved ${reviews.size} review${reviews.size === 1 ? "" : "s"} directly from the product page HTML fallback.`,
+          };
+        }
+      }
+    } catch (htmlError) {
+      console.error("Direct HTML scraping fallback failed:", htmlError);
     }
-
-    const previousCount = reviews.size;
-    for (const text of pageReviews) reviews.add(text);
-
-    pagesFetched += 1;
-    previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount;
+    throw new Error(`Judge.me public widget request failed: ${apiError?.message || apiError}`);
   }
 
   const collectedReviews = [...reviews].slice(0, 500);
@@ -1277,7 +1307,7 @@ async function resolveShopifyDomain(productUrl: string): Promise<string> {
 
     if (response.ok) {
       const html = await response.text();
-      const match = html.match(/["']([^"'\s>]+\.myshopify\.com)["']/i);
+      const match = html.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/i);
       if (match && match[1]) {
         return match[1].toLowerCase();
       }
