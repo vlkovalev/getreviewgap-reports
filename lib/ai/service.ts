@@ -110,51 +110,60 @@ async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResul
     throw new Error("Judge.me direct collection is not configured yet. Add JUDGEME_API_TOKEN and JUDGEME_SHOP_DOMAIN in Vercel, or upload a Judge.me CSV/TXT export.")
   }
 
-  const externalId = await fetchShopifyProductExternalId(input.productUrl)
-  const product = await fetchJudgeMeProduct({ apiToken, shopDomain, externalId })
-  const productId = product.id
-  if (!productId) {
-    throw new Error("Judge.me could not match that Shopify product ID. Check that JUDGEME_SHOP_DOMAIN belongs to the same Shopify store as the product URL, or upload a Judge.me export.")
-  }
-
-  const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
-  const reviews = new Set<string>()
-  let pagesFetched = 0
-  let availableReviewCount: number | undefined
-  let previousPageAddedReviews = true
-
-  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
-    const params = new URLSearchParams({
-      api_token: apiToken,
-      shop_domain: shopDomain,
-      product_id: String(productId),
-      published: "true",
-      per_page: "100",
-      page: String(pagesFetched + 1)
-    })
-    const response = await fetch(`https://judge.me/api/v1/reviews?${params}`, { cache: "no-store" })
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Use the private API token and the exact myshopify.com shop domain shown in Judge.me Settings > Integrations.")
-      throw new Error(`Judge.me review request failed with status ${response.status}.`)
+  try {
+    const externalId = await fetchShopifyProductExternalId(input.productUrl)
+    const product = await fetchJudgeMeProduct({ apiToken, shopDomain, externalId })
+    const productId = product.id
+    if (!productId) {
+      throw new Error("Judge.me could not match that Shopify product ID. Check that JUDGEME_SHOP_DOMAIN belongs to the same Shopify store as the product URL, or upload a Judge.me export.")
     }
-    const payload = await response.json() as Record<string, unknown>
-    const pageReviews = judgeMeReviewTexts(payload)
-    const previousCount = reviews.size
-    for (const text of pageReviews) reviews.add(text)
-    availableReviewCount ||= judgeMeReviewCount(payload)
-    pagesFetched += 1
-    previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount && pageReviews.length >= 100
-  }
 
-  const collectedReviews = [...reviews].slice(0, 500)
-  return {
-    reviews: collectedReviews,
-    source: "judgeme",
-    productName: product.title || input.productName || `Shopify product ${handle}`,
-    pagesFetched,
-    availableReviewCount,
-    sampleNote: `Judge.me returned ${collectedReviews.length} published written review text${collectedReviews.length === 1 ? "" : "s"} after checking ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`,
-    warning: collectedReviews.length ? undefined : "Judge.me returned no published review text for this product. Upload a Judge.me export or verify the product handle."
+    const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
+    const reviews = new Set<string>()
+    let pagesFetched = 0
+    let availableReviewCount: number | undefined
+    let previousPageAddedReviews = true
+
+    while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+      const params = new URLSearchParams({
+        api_token: apiToken,
+        shop_domain: shopDomain,
+        product_id: String(productId),
+        published: "true",
+        per_page: "100",
+        page: String(pagesFetched + 1)
+      })
+      const response = await fetch(`https://judge.me/api/v1/reviews?${params}`, { cache: "no-store" })
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) throw new Error("Judge.me authentication failed. Use the private API token and the exact myshopify.com shop domain shown in Judge.me Settings > Integrations.")
+        throw new Error(`Judge.me review request failed with status ${response.status}.`)
+      }
+      const payload = await response.json() as Record<string, unknown>
+      const pageReviews = judgeMeReviewTexts(payload)
+      const previousCount = reviews.size
+      for (const text of pageReviews) reviews.add(text)
+      availableReviewCount ||= judgeMeReviewCount(payload)
+      pagesFetched += 1
+      previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount && pageReviews.length >= 100
+    }
+
+    const collectedReviews = [...reviews].slice(0, 500)
+    return {
+      reviews: collectedReviews,
+      source: "judgeme",
+      productName: product.title || input.productName || `Shopify product ${handle}`,
+      pagesFetched,
+      availableReviewCount,
+      sampleNote: `Judge.me returned ${collectedReviews.length} published written review text${collectedReviews.length === 1 ? "" : "s"} after checking ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`,
+      warning: collectedReviews.length ? undefined : "Judge.me returned no published review text for this product. Upload a Judge.me export or verify the product handle."
+    }
+  } catch (error: any) {
+    console.warn("Judge.me private API fetch failed, falling back to public widget crawler:", error?.message || error)
+    const fallbackShopDomain = shopDomainFromUrl(input.productUrl) || new URL(input.productUrl).hostname.replace(/^www\./, "")
+    if (fallbackShopDomain && handle) {
+      return fetchJudgeMePublicReviews(input, fallbackShopDomain, handle)
+    }
+    throw error
   }
 }
 
