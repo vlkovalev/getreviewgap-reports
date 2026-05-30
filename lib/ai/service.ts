@@ -56,6 +56,18 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
       }
     }
 
+    if (input.reviewApp === "loox") {
+      return fetchLooxPublicReviews(input)
+    }
+
+    if (input.reviewApp === "yotpo") {
+      return fetchYotpoPublicReviews(input)
+    }
+
+    if (input.reviewApp === "okendo") {
+      return fetchOkendoPublicReviews(input)
+    }
+
     throw new Error("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
   }
 
@@ -1394,4 +1406,374 @@ async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string)
     }
 
     const previousCount = reviews.size;
-   
+    for (const item of dataList) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const rating = row.reviewRating ?? row.rating ?? "";
+      const title = String(row.reviewTitle ?? row.title ?? "").trim();
+      const body = String(row.reviewMessage ?? row.reviewBody ?? row.body ?? "").trim();
+
+      if (!body) continue;
+
+      const cleanBody = body.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+      const cleanTitle = title.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+
+      let text = "";
+      if (rating) text += `Rating: ${rating}. `;
+      if (cleanTitle) text += `${cleanTitle}. `;
+      text += cleanBody;
+      reviews.add(text.trim());
+    }
+
+    pagesFetched += 1;
+    previousPageAddedReviews = dataList.length > 0 && reviews.size > previousCount;
+  }
+
+  const collectedReviews = [...reviews].slice(0, 500);
+  return {
+    reviews: collectedReviews,
+    source: "stamped",
+    productName: resolvedProductName,
+    pagesFetched,
+    availableReviewCount: totalReviewsCount || collectedReviews.length,
+    sampleNote: `Stamped.io public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"}.`,
+    warning: collectedReviews.length ? undefined : "Stamped.io returned no public review text for this product."
+  };
+}
+// ─── Loox ────────────────────────────────────────────────────────────────────
+// Loox widget API: GET https://loox.io/app/loox/api/reviews
+// Required params: shopId (myshopify domain), productId (Shopify numeric ID)
+// The shopId and product id are embedded in the page source.
+
+async function fetchLooxPageMeta(productUrl: string): Promise<{ shopId: string; productId: string; productTitle: string }> {
+  const [pageHtml, productData] = await Promise.all([
+    fetch(productUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+      cache: "no-store"
+    }).then(r => r.ok ? r.text() : "").catch(() => ""),
+    fetchShopifyProductData(productUrl).catch(() => ({ id: "", title: "" }))
+  ])
+
+  // shopId: the myshopify.com domain, visible as Shopify.shop or in Loox script src
+  const shopId =
+    pageHtml.match(/loox\.io[^"']*[?&]shop=([^&"'\s]+)/i)?.[1]?.toLowerCase() ||
+    pageHtml.match(/Shopify\.shop\s*=\s*["']([^"']+\.myshopify\.com)["']/i)?.[1]?.toLowerCase() ||
+    pageHtml.match(/"myshopify_domain"\s*:\s*"([^"]+)"/i)?.[1]?.toLowerCase() ||
+    pageHtml.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/i)?.[1]?.toLowerCase() || ""
+
+  return { shopId, productId: productData.id, productTitle: productData.title }
+}
+
+async function fetchLooxPublicReviews(input: ReviewInput): Promise<ReviewFetchResult> {
+  const { shopId, productId, productTitle } = await fetchLooxPageMeta(input.productUrl)
+  const resolvedProductName = input.productName || productTitle || `Shopify product ${shopifyProductHandle(input.productUrl)}`
+
+  if (!shopId || !productId) {
+    throw new Error("Could not detect the Loox store ID or product ID from the page. Make sure the URL is a public Shopify product page, or upload a Loox CSV export.")
+  }
+
+  console.log(`[Loox] shopId=${shopId} productId=${productId}`)
+
+  const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
+  const reviews = new Set<string>()
+  let pagesFetched = 0
+  let totalReviewsCount = 0
+  let previousPageAddedReviews = true
+
+  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+    const params = new URLSearchParams({
+      shopId,
+      productId,
+      page: String(pagesFetched + 1)
+    })
+    const response = await fetch(`https://loox.io/app/loox/api/reviews?${params}`, {
+      headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
+      cache: "no-store"
+    })
+
+    console.log(`[Loox] response: ${response.status} page=${pagesFetched + 1}`)
+    if (!response.ok) throw new Error(`Loox API returned status ${response.status}. Upload a Loox CSV export instead.`)
+
+    const payload = await response.json() as Record<string, unknown>
+    const reviewList = Array.isArray(payload.reviews) ? payload.reviews : []
+    if (typeof payload.totalReviews === "number") totalReviewsCount = payload.totalReviews
+
+    const previousCount = reviews.size
+    for (const r of reviewList) {
+      const body = String((r as any).body || (r as any).reviewBody || "").trim()
+      if (!body) continue
+      const rating = (r as any).rating ?? (r as any).score ?? ""
+      const title = String((r as any).title || "").trim()
+      let text = ""
+      if (rating) text += `Rating: ${rating}. `
+      if (title) text += `${title}. `
+      text += body
+      reviews.add(text.trim())
+    }
+
+    pagesFetched++
+    previousPageAddedReviews = reviewList.length > 0 && reviews.size > previousCount
+  }
+
+  const collectedReviews = [...reviews].slice(0, 500)
+  if (!collectedReviews.length) throw new Error("Loox returned no written reviews for this product. Upload a Loox CSV export instead.")
+
+  return {
+    reviews: collectedReviews,
+    source: "judgeme", // maps to existing source type
+    productName: resolvedProductName,
+    pagesFetched,
+    availableReviewCount: totalReviewsCount || collectedReviews.length,
+    sampleNote: `Loox public widget retrieved ${collectedReviews.length} review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
+  }
+}
+
+// ─── Yotpo ───────────────────────────────────────────────────────────────────
+// Yotpo widget API: GET https://api-cdn.yotpo.com/v1/widget/{APP_KEY}/products/{PRODUCT_ID}/reviews.json
+// APP_KEY is the public Yotpo app key embedded in page source.
+
+async function fetchYotpoPageMeta(productUrl: string): Promise<{ appKey: string; productId: string; productTitle: string }> {
+  const [pageHtml, productData] = await Promise.all([
+    fetch(productUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+      cache: "no-store"
+    }).then(r => r.ok ? r.text() : "").catch(() => ""),
+    fetchShopifyProductData(productUrl).catch(() => ({ id: "", title: "" }))
+  ])
+
+  // Yotpo app key appears in script src or window.yotpoConfig or data-appkey
+  const appKey =
+    pageHtml.match(/api-cdn\.yotpo\.com\/v1\/widget\/([A-Za-z0-9_-]{20,})/i)?.[1] ||
+    pageHtml.match(/yotpo\.com[^"']*\/([A-Za-z0-9_-]{20,})\/widget/i)?.[1] ||
+    pageHtml.match(/data-appkey=["']([^"']+)["']/i)?.[1] ||
+    pageHtml.match(/appKey\s*[=:]\s*["']([A-Za-z0-9_-]{20,})["']/i)?.[1] ||
+    pageHtml.match(/yotpoConfig[^}]*appKey["']\s*:\s*["']([^"']+)["']/i)?.[1] || ""
+
+  return { appKey, productId: productData.id, productTitle: productData.title }
+}
+
+async function fetchYotpoPublicReviews(input: ReviewInput): Promise<ReviewFetchResult> {
+  const { appKey, productId, productTitle } = await fetchYotpoPageMeta(input.productUrl)
+  const resolvedProductName = input.productName || productTitle || `Shopify product ${shopifyProductHandle(input.productUrl)}`
+
+  if (!appKey || !productId) {
+    throw new Error("Could not detect the Yotpo app key or product ID from the page. Upload a Yotpo CSV export instead.")
+  }
+
+  console.log(`[Yotpo] appKey=${appKey.slice(0, 8)}... productId=${productId}`)
+
+  const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
+  const reviews = new Set<string>()
+  let pagesFetched = 0
+  let totalReviewsCount = 0
+  let previousPageAddedReviews = true
+
+  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+    const params = new URLSearchParams({ per_page: "100", page: String(pagesFetched + 1) })
+    const url = `https://api-cdn.yotpo.com/v1/widget/${appKey}/products/${productId}/reviews.json?${params}`
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
+      cache: "no-store"
+    })
+
+    console.log(`[Yotpo] response: ${response.status} page=${pagesFetched + 1}`)
+    if (!response.ok) throw new Error(`Yotpo API returned status ${response.status}. Upload a Yotpo CSV export instead.`)
+
+    const payload = await response.json() as Record<string, unknown>
+    const responseData = (payload.response as any) ?? {}
+    const reviewList: any[] = Array.isArray(responseData.reviews) ? responseData.reviews : []
+    const pagination = (responseData.pagination as any) ?? {}
+    if (typeof pagination.total === "number") totalReviewsCount = pagination.total
+
+    const previousCount = reviews.size
+    for (const r of reviewList) {
+      const body = String(r.content || r.body || "").trim()
+      if (!body) continue
+      const rating = r.score ?? r.rating ?? ""
+      const title = String(r.title || "").trim()
+      let text = ""
+      if (rating) text += `Rating: ${rating}. `
+      if (title) text += `${title}. `
+      text += body
+      reviews.add(text.trim())
+    }
+
+    pagesFetched++
+    previousPageAddedReviews = reviewList.length > 0 && reviews.size > previousCount
+  }
+
+  const collectedReviews = [...reviews].slice(0, 500)
+  if (!collectedReviews.length) throw new Error("Yotpo returned no written reviews for this product. Upload a Yotpo CSV export instead.")
+
+  return {
+    reviews: collectedReviews,
+    source: "judgeme",
+    productName: resolvedProductName,
+    pagesFetched,
+    availableReviewCount: totalReviewsCount || collectedReviews.length,
+    sampleNote: `Yotpo public widget retrieved ${collectedReviews.length} review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} page${pagesFetched === 1 ? "" : "s"}.`
+  }
+}
+
+// ─── Okendo ──────────────────────────────────────────────────────────────────
+// Okendo API: GET https://api.okendo.io/v1/stores/{STORE_ID}/products/{PRODUCT_ID}/reviews
+// STORE_ID is a UUID embedded in page source.
+
+async function fetchOkendoPageMeta(productUrl: string): Promise<{ storeId: string; productId: string; productTitle: string }> {
+  const [pageHtml, productData] = await Promise.all([
+    fetch(productUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+      cache: "no-store"
+    }).then(r => r.ok ? r.text() : "").catch(() => ""),
+    fetchShopifyProductData(productUrl).catch(() => ({ id: "", title: "" }))
+  ])
+
+  // Okendo store ID is a UUID like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  const storeId =
+    pageHtml.match(/okendo\.io\/v1\/stores\/([0-9a-f-]{36})/i)?.[1] ||
+    pageHtml.match(/storeId["']\s*:\s*["']([0-9a-f-]{36})["']/i)?.[1] ||
+    pageHtml.match(/okendo[^"']*["']([0-9a-f-]{36})["']/i)?.[1] || ""
+
+  return { storeId, productId: productData.id, productTitle: productData.title }
+}
+
+async function fetchOkendoPublicReviews(input: ReviewInput): Promise<ReviewFetchResult> {
+  const { storeId, productId, productTitle } = await fetchOkendoPageMeta(input.productUrl)
+  const resolvedProductName = input.productName || productTitle || `Shopify product ${shopifyProductHandle(input.productUrl)}`
+
+  if (!storeId || !productId) {
+    throw new Error("Could not detect the Okendo store ID or product ID from the page. Upload an Okendo CSV export instead.")
+  }
+
+  console.log(`[Okendo] storeId=${storeId} productId=${productId}`)
+
+  const maxReviews = canopyReviewPageLimit(input.reviewPageLimit) * 50
+  const reviews = new Set<string>()
+  let offset = 0
+  let totalReviewsCount = 0
+  let hasMore = true
+  const limit = 100
+
+  while (reviews.size < Math.min(maxReviews, 500) && hasMore) {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset), orderBy: "date_created desc" })
+    const url = `https://api.okendo.io/v1/stores/${storeId}/products/shopify-${productId}/reviews?${params}`
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
+      cache: "no-store"
+    })
+
+    console.log(`[Okendo] response: ${response.status} offset=${offset}`)
+    if (!response.ok) throw new Error(`Okendo API returned status ${response.status}. Upload an Okendo CSV export instead.`)
+
+    const payload = await response.json() as Record<string, unknown>
+    const reviewList: any[] = Array.isArray(payload.reviews) ? payload.reviews : []
+    if (typeof (payload.pagination as any)?.total === "number") totalReviewsCount = (payload.pagination as any).total
+
+    const previousCount = reviews.size
+    for (const r of reviewList) {
+      const body = String(r.body || r.reviewBody || "").trim()
+      if (!body) continue
+      const rating = r.rating ?? ""
+      const title = String(r.title || "").trim()
+      let text = ""
+      if (rating) text += `Rating: ${rating}. `
+      if (title) text += `${title}. `
+      text += body
+      reviews.add(text.trim())
+    }
+
+    offset += limit
+    hasMore = reviewList.length === limit && reviews.size > previousCount
+  }
+
+  const collectedReviews = [...reviews].slice(0, 500)
+  if (!collectedReviews.length) throw new Error("Okendo returned no written reviews for this product. Upload an Okendo CSV export instead.")
+
+  return {
+    reviews: collectedReviews,
+    source: "judgeme",
+    productName: resolvedProductName,
+    pagesFetched: Math.ceil(offset / limit),
+    availableReviewCount: totalReviewsCount || collectedReviews.length,
+    sampleNote: `Okendo public API retrieved ${collectedReviews.length} review${collectedReviews.length === 1 ? "" : "s"}.`
+  }
+}
+
+export async function resolveShopifyDomain(productUrl: string): Promise<string> {
+  try {
+    const customDomain = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
+    if (customDomain.endsWith(".myshopify.com") || customDomain === "competitor-shop.com" || customDomain === "demo.com" || customDomain === "stamped-shop.com") {
+      return customDomain;
+    }
+
+    // Strategy 1: Shopify's public shop.json endpoint — always exposes myshopify_domain
+    // regardless of theme or bot protection on the product page.
+    try {
+      const shopJsonUrl = `https://${customDomain}/meta.json`;
+      const metaRes = await fetch(shopJsonUrl, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        cache: "no-store"
+      });
+      if (metaRes.ok) {
+        const meta = await metaRes.json() as Record<string, unknown>;
+        // /meta.json returns { myshopify_domain: "store.myshopify.com", ... }
+        if (typeof meta.myshopify_domain === "string" && meta.myshopify_domain.endsWith(".myshopify.com")) {
+          console.log(`[resolveShopifyDomain] Found via /meta.json: ${meta.myshopify_domain}`);
+          return meta.myshopify_domain.toLowerCase();
+        }
+      }
+    } catch {
+      // non-Shopify store or domain unreachable
+    }
+
+    // Strategy 2: Fetch the product page HTML and extract from known patterns
+    const response = await fetch(productUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      },
+      cache: "no-store"
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+
+      // Direct .myshopify.com reference anywhere in the HTML
+      const directMatch = html.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/i);
+      if (directMatch?.[1]) {
+        console.log(`[resolveShopifyDomain] Found via HTML direct match: ${directMatch[1]}`);
+        return directMatch[1].toLowerCase();
+      }
+
+      // Shopify globals: "myshopify_domain" JSON key or Shopify.shop variable
+      const shopNameMeta =
+        html.match(/"myshopify_domain"\s*:\s*"([^"]+)"/i) ||
+        html.match(/Shopify\.shop\s*=\s*["']([^"']+\.myshopify\.com)["']/i) ||
+        html.match(/<meta[^>]+name=["']shopify-[^"']*["'][^>]+content=["']([^"']+)["']/i);
+      if (shopNameMeta?.[1]) {
+        console.log(`[resolveShopifyDomain] Found via HTML meta/global: ${shopNameMeta[1]}`);
+        return shopNameMeta[1].toLowerCase();
+      }
+
+      // Judge.me embed script ?shop= param
+      const judgeMeScript = html.match(/cdn\.judge\.me[^"']*shop=([^&"'\s]+)/i);
+      if (judgeMeScript?.[1]) {
+        const decoded = decodeURIComponent(judgeMeScript[1]);
+        if (decoded.endsWith(".myshopify.com")) {
+          console.log(`[resolveShopifyDomain] Found via Judge.me script tag: ${decoded}`);
+          return decoded.toLowerCase();
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("[resolveShopifyDomain] Failed:", error);
+  }
+
+  // Last resort: return the custom domain. The caller tries a guessed
+  // .myshopify.com prefix as a second attempt.
+  try {
+    return new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
