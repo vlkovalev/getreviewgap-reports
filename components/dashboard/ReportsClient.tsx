@@ -50,6 +50,8 @@ export function ReportsClient({
   const [platform, setPlatform] = useState<"amazon" | "shopify">(initialPlatform)
   const [reviewPageLimit, setReviewPageLimit] = useState<5 | 10 | 50>(10)
   const [reviewApp, setReviewApp] = useState<typeof shopifyReviewApps[number]["value"]>("judgeme")
+  const [detectedApp, setDetectedApp] = useState<string | null>(null)
+  const [detecting, setDetecting] = useState(false)
   const [sourceId, setSourceId] = useState("")
   const [productUrl, setProductUrl] = useState(initialProductUrl)
   const [productName, setProductName] = useState(initialProductName)
@@ -76,6 +78,33 @@ export function ReportsClient({
       console.error("Failed to load presets from local storage", e)
     }
   }, [initialProductUrl])
+
+  async function detectReviewApp(url: string) {
+    if (!url.trim() || platform !== "shopify") return
+    try {
+      new URL(url)
+    } catch {
+      return
+    }
+    setDetecting(true)
+    setDetectedApp(null)
+    try {
+      const res = await fetch(`/api/scraper/detect-review-app?url=${encodeURIComponent(url)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.app && shopifyReviewApps.some((a) => a.value === data.app)) {
+          setDetectedApp(data.app)
+          setReviewApp(data.app as typeof shopifyReviewApps[number]["value"])
+        } else {
+          setDetectedApp(null)
+        }
+      }
+    } catch {
+      // silent — detection is best-effort
+    } finally {
+      setDetecting(false)
+    }
+  }
 
   async function importReviews(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0]
@@ -221,9 +250,30 @@ export function ReportsClient({
           </div>
         </div>
         <label className="mt-4 grid gap-2 text-sm">
-          <span className="text-white/70">{platform === "amazon" ? "Amazon product URL, optional" : "Shopify product URL, optional"}</span>
-          <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} type="url" placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-          <span className="text-xs text-white/45">{platform === "amazon" ? "Automatic Amazon collection uses the configured structured API; import a review export when a marketplace limits access." : "Optional. The report can use this for context, but Shopify analysis comes from the review export you upload or paste below."}</span>
+          <span className="text-white/70">{platform === "amazon" ? "Amazon product URL, optional" : "Shopify product URL"}</span>
+          <div className="relative">
+            <input
+              value={productUrl}
+              onChange={(event) => { setProductUrl(event.target.value); setDetectedApp(null) }}
+              onBlur={(event) => detectReviewApp(event.target.value)}
+              type="url"
+              placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."}
+              className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white"
+            />
+            {platform === "shopify" && detecting && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">Detecting…</span>
+            )}
+          </div>
+          {platform === "shopify" && detectedApp && (
+            <span className="flex items-center gap-1.5 text-xs text-lime">
+              <span>✓</span>
+              <span>Detected <strong>{shopifyReviewApps.find(a => a.value === detectedApp)?.label ?? detectedApp}</strong> — review app auto-selected</span>
+            </span>
+          )}
+          {platform === "shopify" && !detectedApp && !detecting && productUrl && (
+            <span className="text-xs text-white/40">Review app not auto-detected — select it manually below.</span>
+          )}
+          <span className="text-xs text-white/45">{platform === "amazon" ? "Automatic Amazon collection uses the configured structured API; import a review export when a marketplace limits access." : "Paste the product URL and we'll detect the review app automatically."}</span>
         </label>
         {platform === "shopify" ? (
           <div className="mt-4 rounded-2xl border border-cyan/20 bg-cyan/10 p-4">
@@ -341,38 +391,4 @@ export function ReportsClient({
                 <div className="flex flex-wrap gap-2">
                   {isEmptyReport(report) && productHref(report) ? (
                     <Link href={productHref(report)!} className="rounded-full bg-lime px-3 py-2 text-xs font-black text-black">Run fresh analysis</Link>
-                  ) : null}
-                  <Link href={`/dashboard/reports/${report.id}`} className="rounded-full bg-white px-3 py-2 text-xs font-black text-black">View</Link>
-                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "csv" })} href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">CSV</a>
-                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "json" })} href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">JSON</a>
-                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "pdf" })} href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">PDF</a>
-                  <button type="button" disabled={busyReportId === report.id} onClick={() => setArchived(report, showArchived ? "restore" : "archive")} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black disabled:opacity-40">{showArchived ? "Restore" : "Archive"}</button>
-                  <button type="button" disabled={busyReportId === report.id} onClick={() => deleteReport(report)} className="rounded-full border border-coral/30 px-3 py-2 text-xs font-black text-coral disabled:opacity-40">Delete</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function isEmptyReport(report: IntelligenceReport) {
-  return Number(report.summary?.reviewCount ?? 0) === 0
-}
-
-function isArchived(report: IntelligenceReport) {
-  return Boolean(report.summary?.archivedAt)
-}
-
-function productHref(report: IntelligenceReport) {
-  const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
-  if (!productUrl) return null
-  const params = new URLSearchParams({
-    productUrl,
-    productName: String(report.summary?.productName ?? report.filters?.productName ?? ""),
-    platform: String(report.summary?.platform ?? report.filters?.platform ?? "amazon")
-  })
-  return `/dashboard/reports?${params.toString()}`
-}
+ 
