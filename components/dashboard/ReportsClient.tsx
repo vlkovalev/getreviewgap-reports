@@ -362,4 +362,17 @@ function isEmptyReport(report: IntelligenceReport) {
   return Number(report.summary?.reviewCount ?? 0) === 0
 }
 
-function isArchived(report: IntelligenceRep
+function isArchived(report: IntelligenceReport) {
+  return Boolean(report.summary?.archivedAt)
+}
+
+function productHref(report: IntelligenceReport) {
+  const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
+  if (!productUrl) return null
+  const params = new URLSearchParams({
+    productUrl,
+    productName: String(report.summary?.productName ?? report.filters?.productName ?? ""),
+    platform: String(report.summary?.platform ?? report.filters?.platform ?? "amazon")
+  })
+  return `/dashboard/reports?${params.toString()}`
+}
