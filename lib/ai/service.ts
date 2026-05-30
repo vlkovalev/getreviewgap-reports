@@ -1650,7 +1650,27 @@ async function fetchOkendoPageMeta(productUrl: string): Promise<{ storeId: strin
       return window.match(new RegExp(UUID, "i"))?.[1] ?? ""
     })() || ""
 
-  return { storeId, productId: productData.id, productTitle: productData.title }
+  // Fallback: try Okendo's store lookup API using the myshopify domain
+  let resolvedStoreId = storeId
+  if (!resolvedStoreId && productData.id) {
+    try {
+      const myshopifyDomain = await resolveShopifyDomain(productUrl)
+      if (myshopifyDomain.endsWith(".myshopify.com")) {
+        const lookupRes = await fetch(`https://api.okendo.io/v1/stores?shopifyDomain=${encodeURIComponent(myshopifyDomain)}`, {
+          headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store"
+        })
+        if (lookupRes.ok) {
+          const data = await lookupRes.json() as any
+          const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+          const found = JSON.stringify(data).match(UUID)?.[0] ?? ""
+          if (found) { resolvedStoreId = found; console.log(`[Okendo] storeId via lookup API: ${found}`) }
+        }
+      }
+    } catch { /* silent */ }
+  }
+
+  console.log(`[Okendo] storeId=${resolvedStoreId || "not found"} productId=${productData.id || "not found"} htmlLen=${pageHtml.length}`)
+  return { storeId: resolvedStoreId, productId: productData.id, productTitle: productData.title }
 }
 
 async function fetchOkendoPublicReviews(input: ReviewInput): Promise<ReviewFetchResult> {
@@ -1658,7 +1678,7 @@ async function fetchOkendoPublicReviews(input: ReviewInput): Promise<ReviewFetch
   const resolvedProductName = input.productName || productTitle || `Shopify product ${shopifyProductHandle(input.productUrl)}`
 
   if (!storeId || !productId) {
-    throw new Error("Could not detect the Okendo store ID or product ID from the page. Upload an Okendo CSV export instead.")
+    throw new Error("Could not detect the Okendo store ID or product ID from the page. This store may use a headless setup where Okendo loads client-side only. Upload an Okendo CSV export instead.")
   }
 
   console.log(`[Okendo] storeId=${storeId} productId=${productId}`)
