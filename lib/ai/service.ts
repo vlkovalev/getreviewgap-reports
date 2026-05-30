@@ -1451,7 +1451,7 @@ async function fetchLooxPageMeta(productUrl: string): Promise<{ shopId: string; 
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       cache: "no-store"
     }).then(r => r.ok ? r.text() : "").catch(() => ""),
-    fetchShopifyProductData(productUrl).catch(() => ({ id: "", title: "" }))
+    fetchShopifyProductData(productUrl)
   ])
 
   // shopId: the myshopify.com domain, visible as Shopify.shop or in Loox script src
@@ -1538,7 +1538,7 @@ async function fetchYotpoPageMeta(productUrl: string): Promise<{ appKey: string;
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       cache: "no-store"
     }).then(r => r.ok ? r.text() : "").catch(() => ""),
-    fetchShopifyProductData(productUrl).catch(() => ({ id: "", title: "" }))
+    fetchShopifyProductData(productUrl)
   ])
 
   // Yotpo app key appears in script src or window.yotpoConfig or data-appkey
@@ -1625,7 +1625,7 @@ async function fetchOkendoPageMeta(productUrl: string): Promise<{ storeId: strin
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       cache: "no-store"
     }).then(r => r.ok ? r.text() : "").catch(() => ""),
-    fetchShopifyProductData(productUrl).catch(() => ({ id: "", title: "" }))
+    fetchShopifyProductData(productUrl)
   ])
 
   // Okendo store ID is a UUID — try every known embed format
@@ -1640,6 +1640,10 @@ async function fetchOkendoPageMeta(productUrl: string): Promise<{ storeId: strin
     pageHtml.match(new RegExp(`data-store-id=["']${UUID}["']`, "i"))?.[1] ||
     // JS config objects: storeId: "UUID" or store_id: "UUID"
     pageHtml.match(new RegExp(`store[_-]?[Ii]d["']?\\s*[=:]\\s*["']${UUID}["']`, "i"))?.[1] ||
+    // subscriberId JSON pattern (NEW)
+    pageHtml.match(new RegExp(`["']subscriberId["']\\s*:\\s*["']${UUID}["']`, "i"))?.[1] ||
+    // Cloudfront asset path (NEW)
+    pageHtml.match(new RegExp(`cloudfront\\.net/${UUID}`, "i"))?.[1] ||
     // okeWidgetOptions or similar global config
     pageHtml.match(new RegExp(`oke[^}]*?${UUID}`, "i"))?.[1] ||
     // Generic: any UUID that appears near the word "okendo"
