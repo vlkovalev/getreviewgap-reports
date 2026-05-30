@@ -1628,12 +1628,27 @@ async function fetchOkendoPageMeta(productUrl: string): Promise<{ storeId: strin
     fetchShopifyProductData(productUrl).catch(() => ({ id: "", title: "" }))
   ])
 
-  // Okendo store ID is a UUID like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  // Okendo store ID is a UUID — try every known embed format
+  const UUID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
   const storeId =
-    pageHtml.match(/okendo\.io\/v1\/stores\/([0-9a-f-]{36})/i)?.[1] ||
-    pageHtml.match(/storeId["']\s*:\s*["']([0-9a-f-]{36})["']/i)?.[1] ||
-    pageHtml.match(/okendo[^"']*["']([0-9a-f-]{36})["']/i)?.[1] || ""
+    // API URL embedded directly in HTML (most reliable)
+    pageHtml.match(new RegExp(`okendo\\.io/v1/stores/${UUID}`, "i"))?.[1] ||
+    // CDN script tag: d3hw6dc1ow8pp2.cloudfront.net/reviewsWidget.min.js?shop=UUID
+    pageHtml.match(new RegExp(`cloudfront\\.net[^"'?]*[?&]shop=${UUID}`, "i"))?.[1] ||
+    // Custom element attributes: data-oke-store-id or oke-store-id
+    pageHtml.match(new RegExp(`oke[^"']*store[^"']*id=["']${UUID}["']`, "i"))?.[1] ||
+    pageHtml.match(new RegExp(`data-store-id=["']${UUID}["']`, "i"))?.[1] ||
+    // JS config objects: storeId: "UUID" or store_id: "UUID"
+    pageHtml.match(new RegExp(`store[_-]?[Ii]d["']?\\s*[=:]\\s*["']${UUID}["']`, "i"))?.[1] ||
+    // okeWidgetOptions or similar global config
+    pageHtml.match(new RegExp(`oke[^}]*?${UUID}`, "i"))?.[1] ||
+    // Generic: any UUID that appears near the word "okendo"
+    (() => {
+      const okeIdx = pageHtml.toLowerCase().indexOf("okendo")
+      if (okeIdx === -1) return ""
+      const window = pageHtml.slice(Math.max(0, okeIdx - 200), okeIdx + 500)
+      return window.match(new RegExp(UUID, "i"))?.[1] ?? ""
+    })() || ""
 
   return { storeId, productId: productData.id, productTitle: productData.title }
 }
