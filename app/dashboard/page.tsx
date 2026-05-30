@@ -59,4 +59,7 @@ export default function DashboardPage() {
             Last analysis: {lastRun ? <StatusBadge status={lastRun.status} /> : "No runs yet"}
           </div>
         </div>
-      </sectio
+      </section>
+    </DashboardShell>
+  )
+}

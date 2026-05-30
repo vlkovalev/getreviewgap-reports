@@ -30,4 +30,8 @@ export default async function OnboardingPage() {
         <div className="mt-10 flex flex-wrap gap-3">
           <Link href="/dashboard/reports" className="btn-primary">Generate first report</Link>
           <Link href="/dashboard/billing" className="btn-secondary">View credits</Link>
-     
+        </div>
+      </div>
+    </main>
+  )
+}

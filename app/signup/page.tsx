@@ -34,4 +34,8 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             <Link href="/login" className="font-bold text-lime">Already have an account?</Link>
             <Link href="/onboarding" className="font-bold text-white/70">View onboarding</Link>
           </div>
-      
+        </section>
+      </div>
+    </main>
+  )
+}

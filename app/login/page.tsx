@@ -36,4 +36,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/signup" className="font-bold text-lime">Create account</Link>
             <Link href="/dashboard/reports" className="font-bold text-white/70">Go to my reports</Link>
-          </d
+          </div>
+        </section>
+      </div>
+    </main>
+  )
+}

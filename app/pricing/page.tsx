@@ -110,4 +110,6 @@ function PricingCard({ planId, isSignedIn }: { planId: PlanId; isSignedIn: boole
           <Link href="/login" className="w-full rounded-full border border-white/15 px-5 py-3 text-center font-black text-white hover:bg-white/10">Sign in</Link>
         </div>
       )}
-    </a
+    </article>
+  )
+}

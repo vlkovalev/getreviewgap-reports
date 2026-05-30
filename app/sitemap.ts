@@ -7,4 +7,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes = ["", "/pricing", "/about", "/resources", "/contact", "/compliance", "/privacy", "/terms"]
   return [
     ...staticRoutes.map((route) => ({ url: `${base}${route}`, lastModified: new Date() })),
-    ...resources.map((post) => ({ url: `${base}/re
+    ...resources.map((post) => ({ url: `${base}/resources/${post.slug}`, lastModified: new Date() }))
+  ]
+}

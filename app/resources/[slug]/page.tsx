@@ -44,4 +44,13 @@ export default async function ResourceDetailPage({ params }: { params: Promise<{
 
   return (
     <main className="px-5 py-20">
-      
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <article className="mx-auto max-w-3xl">
+        <div className="flex flex-wrap gap-2">{post.tags.map((tag) => <span key={tag} className="rounded-full bg-lime px-3 py-1 text-xs font-black text-ink">{tag}</span>)}</div>
+        <h1 className="mt-6 text-5xl font-black leading-tight md:text-7xl">{post.title}</h1>
+        <p className="mt-6 text-xl text-white/70">{post.excerpt}</p>
+        <div className="mt-10 rounded-3xl bg-white/8 p-8 text-lg leading-8 text-white/78">{post.content}</div>
+      </article>
+    </main>
+  )
+}

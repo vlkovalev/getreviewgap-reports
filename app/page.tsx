@@ -161,4 +161,31 @@ export default function HomePage() {
             <h2 className="mt-3 text-4xl font-black md:text-6xl">Built for teams who need insights, not another giant dashboard.</h2>
           </div>
           <div className="grid gap-3">
-            {["Amazon sellers validating product improvements", "Shopify brands researching competitor weaknesses", "Agencies preparing listing copy and ad angles", "DTC teams monitoring rat
+            {["Amazon sellers validating product improvements", "Shopify brands researching competitor weaknesses", "Agencies preparing listing copy and ad angles", "DTC teams monitoring ratings and sentiment changes"].map((item) => (
+              <div key={item} className="rounded-2xl border border-white/10 bg-white/7 p-4 font-bold">{item}</div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 py-20">
+        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1.1fr_.9fr]">
+          <div className="rounded-3xl border border-lime/30 bg-lime/10 p-8">
+            <p className="font-black uppercase text-lime">Simple pricing</p>
+            <h2 className="mt-3 text-4xl font-black md:text-5xl">Start at $5. Upgrade when reports become a workflow.</h2>
+            <p className="mt-5 text-white/70">Buy one report, grab a one-time pack, or use monthly credits that roll over up to 3x. All prices are USD.</p>
+            <Link href="/pricing" className="btn-primary mt-7">View pricing</Link>
+          </div>
+          <div className="grid gap-3">
+            {trustNotes.map((note) => (
+              <div key={note} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 font-bold text-white/78">{note}</div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <FAQSection />
+      <CTASection />
+    </main>
+  )
+}
