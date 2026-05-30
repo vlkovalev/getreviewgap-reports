@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import type { IntelligenceReport, ReportType, ScraperSource } from "@/lib/scrapers/types"
 import { trackClientEvent } from "@/components/AnalyticsBeacon"
 
@@ -424,22 +424,115 @@ export function ReportsClient({
                   <p className="text-xs text-white/50">{report.status} - {report.generatedAt}</p>
                   {isEmptyReport(report) ? <p className="mt-2 text-xs font-bold text-yellow-300">Saved empty report - it does not update automatically.</p> : null}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {isEmptyReport(report) && productHref(report) ? (
-                    <Link href={productHref(report)!} className="rounded-full bg-lime px-3 py-2 text-xs font-black text-black">Run fresh analysis</Link>
-                  ) : null}
+                <div className="flex items-center gap-2">
                   <Link href={`/dashboard/reports/${report.id}`} className="rounded-full bg-white px-3 py-2 text-xs font-black text-black">View</Link>
-                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "csv" })} href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">CSV</a>
-                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "json" })} href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">JSON</a>
-                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "pdf" })} href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">PDF</a>
-                  <button type="button" disabled={busyReportId === report.id} onClick={() => setArchived(report, showArchived ? "restore" : "archive")} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black disabled:opacity-40">{showArchived ? "Restore" : "Archive"}</button>
-                  <button type="button" disabled={busyReportId === report.id} onClick={() => deleteReport(report)} className="rounded-full border border-coral/30 px-3 py-2 text-xs font-black text-coral disabled:opacity-40">Delete</button>
+                  <ReportActionsMenu
+                    report={report}
+                    showArchived={showArchived}
+                    busy={busyReportId === report.id}
+                    onArchive={() => setArchived(report, showArchived ? "restore" : "archive")}
+                    onDelete={() => deleteReport(report)}
+                  />
                 </div>
               </div>
             </div>
           ))}
         </div>
       </section>
+    </div>
+  )
+}
+
+function ReportActionsMenu({
+  report,
+  showArchived,
+  busy,
+  onArchive,
+  onDelete,
+}: {
+  report: IntelligenceReport
+  showArchived: boolean
+  busy: boolean
+  onArchive: () => void
+  onDelete: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const freshHref = isEmptyReport(report) ? productHref(report) : null
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 hover:border-white/30 hover:text-white disabled:opacity-40"
+        aria-label="Report actions"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+          <circle cx="7" cy="2" r="1.4" />
+          <circle cx="7" cy="7" r="1.4" />
+          <circle cx="7" cy="12" r="1.4" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-10 z-50 min-w-[160px] rounded-xl border border-white/10 bg-[#111] py-1 shadow-xl">
+          {freshHref && (
+            <Link
+              href={freshHref}
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-bold text-lime hover:bg-white/5"
+            >
+              ↻ Run fresh analysis
+            </Link>
+          )}
+          <a
+            href={`/api/scraper/reports/${report.id}/export?format=csv`}
+            onClick={() => { trackClientEvent("report_export_started", { reportId: report.id, format: "csv" }); setOpen(false) }}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-bold hover:bg-white/5"
+          >
+            ↓ Export CSV
+          </a>
+          <a
+            href={`/api/scraper/reports/${report.id}/export?format=json`}
+            onClick={() => { trackClientEvent("report_export_started", { reportId: report.id, format: "json" }); setOpen(false) }}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-bold hover:bg-white/5"
+          >
+            ↓ Export JSON
+          </a>
+          <a
+            href={`/api/scraper/reports/${report.id}/export?format=pdf`}
+            onClick={() => { trackClientEvent("report_export_started", { reportId: report.id, format: "pdf" }); setOpen(false) }}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-bold hover:bg-white/5"
+          >
+            ↓ Export PDF
+          </a>
+          <div className="my-1 border-t border-white/10" />
+          <button
+            type="button"
+            onClick={() => { onArchive(); setOpen(false) }}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-bold hover:bg-white/5"
+          >
+            {showArchived ? "↑ Restore" : "⊙ Archive"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { onDelete(); setOpen(false) }}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-white/5"
+          >
+            ✕ Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 }

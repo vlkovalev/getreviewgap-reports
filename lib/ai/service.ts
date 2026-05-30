@@ -1520,8 +1520,17 @@ async function fetchLooxPageMeta(productUrl: string): Promise<{ shopId: string; 
 }
 
 async function fetchLooxPublicReviews(input: ReviewInput): Promise<ReviewFetchResult> {
-  const { shopId, productId, productTitle } = await fetchLooxPageMeta(input.productUrl)
+  let { shopId, productId, productTitle } = await fetchLooxPageMeta(input.productUrl)
   const resolvedProductName = input.productName || productTitle || `Shopify product ${shopifyProductHandle(input.productUrl)}`
+
+  if (!shopId) {
+    const resolved = await resolveShopifyDomain(input.productUrl);
+    if (resolved && resolved.endsWith(".myshopify.com")) {
+      shopId = resolved;
+      console.log(`[Loox] Resolved shopId via resolveShopifyDomain fallback: ${shopId}`);
+    }
+  }
+
   if (shopId === "competitor-shop.com" || shopId === "stamped-shop.com" || shopId === "demo.com" || !shopId) {
     // If shopId was not found because we bypassed it in mock product data
     const mockId = shopId || "demo.com"
@@ -1616,12 +1625,39 @@ async function fetchYotpoPageMeta(productUrl: string): Promise<{ appKey: string;
   ])
 
   // Yotpo app key appears in script src or window.yotpoConfig or data-appkey
-  const appKey =
+  let appKey =
     pageHtml.match(/api-cdn\.yotpo\.com\/v1\/widget\/([A-Za-z0-9_-]{20,})/i)?.[1] ||
     pageHtml.match(/yotpo\.com[^"']*\/([A-Za-z0-9_-]{20,})\/widget/i)?.[1] ||
     pageHtml.match(/data-appkey=["']([^"']+)["']/i)?.[1] ||
     pageHtml.match(/appKey\s*[=:]\s*["']([A-Za-z0-9_-]{20,})["']/i)?.[1] ||
     pageHtml.match(/yotpoConfig[^}]*appKey["']\s*:\s*["']([^"']+)["']/i)?.[1] || ""
+
+  // Fallback: Headless setups load Yotpo globally on the homepage.
+  // If appKey is missing from the product page HTML, fetch the store origin homepage and scan it.
+  if (!appKey) {
+    try {
+      const origin = new URL(productUrl).origin;
+      console.log(`[Yotpo] appKey not found on product page. Trying homepage fallback: ${origin}`);
+      const homepageHtml = await fetch(origin, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+        cache: "no-store"
+      }).then(r => r.ok ? r.text() : "").catch(() => "");
+
+      if (homepageHtml) {
+        appKey =
+          homepageHtml.match(/api-cdn\.yotpo\.com\/v1\/widget\/([A-Za-z0-9_-]{20,})/i)?.[1] ||
+          homepageHtml.match(/yotpo\.com[^"']*\/([A-Za-z0-9_-]{20,})\/widget/i)?.[1] ||
+          homepageHtml.match(/data-appkey=["']([^"']+)["']/i)?.[1] ||
+          homepageHtml.match(/appKey\s*[=:]\s*["']([A-Za-z0-9_-]{20,})["']/i)?.[1] ||
+          homepageHtml.match(/yotpoConfig[^}]*appKey["']\s*:\s*["']([^"']+)["']/i)?.[1] || "";
+        if (appKey) {
+          console.log(`[Yotpo] Resolved appKey via homepage fallback: ${appKey}`);
+        }
+      }
+    } catch (e: any) {
+      console.warn("[Yotpo] Homepage fallback failed:", e.message || e);
+    }
+  }
 
   return { appKey, productId: productData.id, productTitle: productData.title }
 }
@@ -1764,6 +1800,44 @@ async function fetchOkendoPageMeta(productUrl: string): Promise<{ storeId: strin
         }
       }
     } catch { /* silent */ }
+  }
+
+  // Fallback 2: Headless setups load Okendo's UUID store identifier (subscriberId) on general reviews index routes
+  if (!resolvedStoreId) {
+    try {
+      const origin = new URL(productUrl).origin;
+      console.log(`[Okendo] storeId not found. Trying reviews page fallback routes for ${origin}...`);
+      const paths = ["/pages/reviews", "/pages/customer-reviews", "/pages/reviews-page", "/pages/shop-reviews", "/reviews"];
+      for (const path of paths) {
+        const reviewsPageUrl = `${origin}${path}`;
+        const reviewsPageHtml = await fetch(reviewsPageUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+          cache: "no-store"
+        }).then(r => r.ok ? r.text() : "").catch(() => "");
+
+        if (reviewsPageHtml) {
+          const matchUUID = new RegExp(UUID, "i");
+          const found =
+            reviewsPageHtml.match(new RegExp(`okendo\\.io/v1/stores/${UUID}`, "i"))?.[1] ||
+            reviewsPageHtml.match(new RegExp(`cloudfront\\.net[^"'?]*[?&]shop=${UUID}`, "i"))?.[1] ||
+            reviewsPageHtml.match(new RegExp(`oke[^"']*store[^"']*id=["']${UUID}["']`, "i"))?.[1] ||
+            reviewsPageHtml.match(new RegExp(`data-store-id=["']${UUID}["']`, "i"))?.[1] ||
+            reviewsPageHtml.match(new RegExp(`store[_-]?[Ii]d["']?\\s*[=:]\\s*["']${UUID}["']`, "i"))?.[1] ||
+            reviewsPageHtml.match(new RegExp(`["']subscriberId["']\\s*:\\s*["']${UUID}["']`, "i"))?.[1] ||
+            reviewsPageHtml.match(new RegExp(`cloudfront\\.net/${UUID}`, "i"))?.[1] ||
+            reviewsPageHtml.match(new RegExp(`oke[^}]*?${UUID}`, "i"))?.[1] ||
+            reviewsPageHtml.match(matchUUID)?.[0] || "";
+
+          if (found) {
+            resolvedStoreId = found.toLowerCase();
+            console.log(`[Okendo] Resolved storeId via fallback page ${path}: ${resolvedStoreId}`);
+            break;
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn("[Okendo] Reviews page fallback failed:", e.message || e);
+    }
   }
 
   console.log(`[Okendo] storeId=${resolvedStoreId || "not found"} productId=${productData.id || "not found"} htmlLen=${pageHtml.length}`)
@@ -1924,5 +1998,9 @@ export async function resolveShopifyDomain(productUrl: string): Promise<string> 
     return new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
   } catch {
     return "";
+  }
+}
+eReviewCount: totalReviewsCount || collectedReviews.length,
+    sampleNote: `Okendo public API retrieved ${collectedReviews.length} review${collectedReviews.length === 1 ? "" : "s"}.`
   }
 }

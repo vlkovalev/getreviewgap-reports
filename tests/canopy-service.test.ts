@@ -17,6 +17,8 @@ async function main() {
   await assertSmartCsvParser()
   await assertPublicJudgeMeCrawler()
   await assertPublicStampedCrawler()
+  await assertPublicYotpoCrawler()
+  await assertPublicOkendoCrawler()
 
   process.env.CANOPY_API_KEY = "test-key"
   process.env.CANOPY_REVIEW_PAGE_LIMIT = "3"
@@ -391,6 +393,90 @@ async function assertPublicStampedCrawler() {
     assert.ok(requestedUrls[0].includes("/products/awesome-product.js"))
     assert.ok(requestedUrls[2].includes("productId=12345"))
     assert.ok(requestedUrls[2].includes("storeUrl=stamped-shop.com"))
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+}
+
+async function assertPublicYotpoCrawler() {
+  const originalFetch = globalThis.fetch
+  const requestedUrls: string[] = []
+
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    requestedUrls.push(url.toString())
+    if (url.pathname.endsWith(".js")) {
+      return new Response(JSON.stringify({ id: "12345", title: "Mock Product" }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    if (url.pathname === "/") {
+      return new Response(`<html><body><script src="https://staticw2.yotpo.com/abc123xyz78901234567890/widget.js"></script></body></html>`, { status: 200, headers: { "content-type": "text/html" } })
+    }
+    if (url.pathname.includes("/v1/widget/abc123xyz78901234567890/products/12345/reviews.json")) {
+      return new Response(JSON.stringify({
+        response: {
+          reviews: [
+            { score: 5, title: "Wonderful", content: "Great quality Yotpo review!" }
+          ],
+          pagination: { total: 1 }
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    return new Response("not found", { status: 404 })
+  }
+
+  try {
+    const result = await fetchAmazonReviews({
+      productUrl: "https://yotpo-shop.com/products/glow-serum",
+      platform: "shopify",
+      marketplace: "Shopify / DTC store",
+      reviewApp: "yotpo",
+      reviewPageLimit: 5
+    })
+
+    assert.equal(result.source, "judgeme") // Yotpo maps to judgeme source field
+    assert.equal(result.reviews.length, 1)
+    assert.ok(result.reviews[0].includes("Rating: 5. Wonderful. Great quality Yotpo review!"))
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+}
+
+async function assertPublicOkendoCrawler() {
+  const originalFetch = globalThis.fetch
+  const requestedUrls: string[] = []
+
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    requestedUrls.push(url.toString())
+    if (url.pathname.endsWith(".js")) {
+      return new Response(JSON.stringify({ id: "12345", title: "Mock Product" }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    if (url.pathname === "/pages/reviews") {
+      return new Response(`<html><body><div data-oke-store-id="98765432-1234-abcd-ef01-1234567890ab"></div></body></html>`, { status: 200, headers: { "content-type": "text/html" } })
+    }
+    if (url.pathname.includes("/v1/stores/98765432-1234-abcd-ef01-1234567890ab/products/shopify-12345/reviews")) {
+      return new Response(JSON.stringify({
+        reviews: [
+          { rating: 5, title: "Superb", body: "Okendo reviews page fallback worked perfectly!" }
+        ],
+        pagination: { total: 1 }
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    }
+    return new Response("not found", { status: 404 })
+  }
+
+  try {
+    const result = await fetchAmazonReviews({
+      productUrl: "https://okendo-shop.com/products/interval-singlet",
+      platform: "shopify",
+      marketplace: "Shopify / DTC store",
+      reviewApp: "okendo",
+      reviewPageLimit: 5
+    })
+
+    assert.equal(result.source, "judgeme") // Okendo maps to judgeme source field
+    assert.equal(result.reviews.length, 1)
+    assert.ok(result.reviews[0].includes("Rating: 5. Superb. Okendo reviews page fallback worked perfectly!"))
   } finally {
     globalThis.fetch = originalFetch
   }
