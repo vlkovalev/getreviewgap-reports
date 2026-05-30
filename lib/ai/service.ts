@@ -206,20 +206,39 @@ async function fetchJudgeMeProduct({ apiToken, shopDomain, externalId }: { apiTo
 
 async function fetchShopifyProductData(productUrl: string): Promise<{ id: string; title: string }> {
   const productJsonUrl = shopifyProductJsonUrl(productUrl)
-  const response = await fetch(productJsonUrl, { cache: "no-store" })
-  if (!response.ok) {
-    throw new Error("Could not read the Shopify product data. Check that the product URL is public, or upload a CSV export from your review app.")
+  try {
+    const response = await fetch(productJsonUrl, { cache: "no-store" })
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`The product page at ${new URL(productUrl).pathname} could not be found (returned 404). Verify that the product is active in the store catalog, or upload a CSV export instead.`)
+      }
+      throw new Error(`Shopify returned status ${response.status}. Check that the product URL is public, or upload a CSV export.`)
+    }
+    const payload = await response.json() as Record<string, unknown>
+    const product = payload.product && typeof payload.product === "object" && !Array.isArray(payload.product)
+      ? payload.product as Record<string, unknown>
+      : payload
+    const id = product.id
+    if (typeof id !== "number" && typeof id !== "string") {
+      throw new Error("The Shopify product data did not include a product ID. Upload a CSV export from your review app instead.")
+    }
+    const title = typeof product.title === "string" ? product.title : ""
+    return { id: String(id), title }
+  } catch (error: any) {
+    const errorStr = `${error.message || ""} ${error.code || ""} ${error.cause?.message || ""} ${error.cause?.code || ""}`
+    if (errorStr.includes("fetch failed") || errorStr.includes("ENOTFOUND") || errorStr.includes("cert") || errorStr.includes("ALTNAME") || errorStr.includes("TLS") || errorStr.includes("Overflow") || errorStr.includes("OVERFLOW")) {
+      let reason = "The network connection failed."
+      if (errorStr.includes("cert") || errorStr.includes("ALTNAME") || errorStr.includes("TLS")) {
+        reason = "The website's SSL/TLS certificate is invalid or is being intercepted by your network connection (e.g. proxy or captive portal)."
+      } else if (errorStr.includes("Overflow") || errorStr.includes("OVERFLOW")) {
+        reason = "The website returned extremely large headers that exceeded server parser limits."
+      } else if (errorStr.includes("ENOTFOUND") || errorStr.includes("DNS")) {
+        reason = "The domain name could not be resolved (DNS lookup failed)."
+      }
+      throw new Error(`${reason} Verify that the URL is public and active in your browser, or upload a CSV/TXT export from your review app instead.`);
+    }
+    throw error
   }
-  const payload = await response.json() as Record<string, unknown>
-  const product = payload.product && typeof payload.product === "object" && !Array.isArray(payload.product)
-    ? payload.product as Record<string, unknown>
-    : payload
-  const id = product.id
-  if (typeof id !== "number" && typeof id !== "string") {
-    throw new Error("The Shopify product data did not include a product ID. Upload a CSV export from your review app instead.")
-  }
-  const title = typeof product.title === "string" ? product.title : ""
-  return { id: String(id), title }
 }
 
 /** @deprecated Use fetchShopifyProductData instead */
@@ -1375,58 +1394,65 @@ async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string)
   let totalReviewsCount = 0;
   let previousPageAddedReviews = true;
 
-  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
-    const pageNum = pagesFetched + 1;
-    const params = new URLSearchParams({
-      storeUrl: shopDomain,
-      productId: externalId,
-      page: String(pageNum),
-      pageSize: "50",
-      ...(apiKey ? { apiKey } : {})
-    });
+  try {
+    while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+      const pageNum = pagesFetched + 1;
+      const params = new URLSearchParams({
+        storeUrl: shopDomain,
+        productId: externalId,
+        page: String(pageNum),
+        pageSize: "50",
+        ...(apiKey ? { apiKey } : {})
+      });
 
-    const response = await fetch(`https://stamped.io/api/widget/reviews?${params}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": input.productUrl
-      },
-      cache: "no-store"
-    });
+      const response = await fetch(`https://stamped.io/api/widget/reviews?${params}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": input.productUrl
+        },
+        cache: "no-store"
+      });
 
-    console.log(`[Stamped] widget response: ${response.status} page=${pageNum}`);
-    if (!response.ok) {
-      throw new Error(`Stamped.io public widget request failed with status ${response.status}.`);
+      console.log(`[Stamped] widget response: ${response.status} page=${pageNum}`);
+      if (!response.ok) {
+        throw new Error(`Stamped.io public widget request failed with status ${response.status}.`);
+      }
+
+      const payload = await response.json() as Record<string, unknown>;
+      const dataList = Array.isArray(payload.data) ? payload.data : [];
+
+      if (typeof payload.total === "number") {
+        totalReviewsCount = payload.total;
+      }
+
+      const previousCount = reviews.size;
+      for (const item of dataList) {
+        if (!item || typeof item !== "object") continue;
+        const row = item as Record<string, unknown>;
+        const rating = row.reviewRating ?? row.rating ?? "";
+        const title = String(row.reviewTitle ?? row.title ?? "").trim();
+        const body = String(row.reviewMessage ?? row.reviewBody ?? row.body ?? "").trim();
+
+        if (!body) continue;
+
+        const cleanBody = body.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+        const cleanTitle = title.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+
+        let text = "";
+        if (rating) text += `Rating: ${rating}. `;
+        if (cleanTitle) text += `${cleanTitle}. `;
+        text += cleanBody;
+        reviews.add(text.trim());
+      }
+
+      pagesFetched += 1;
+      previousPageAddedReviews = dataList.length > 0 && reviews.size > previousCount;
     }
-
-    const payload = await response.json() as Record<string, unknown>;
-    const dataList = Array.isArray(payload.data) ? payload.data : [];
-
-    if (typeof payload.total === "number") {
-      totalReviewsCount = payload.total;
+  } catch (error: any) {
+    if (error.message?.includes("fetch failed") || error.code === "ENOTFOUND") {
+      throw new Error("Stamped.io widget fetch failed due to a network connection issue or service block. Upload a Stamped CSV export instead.");
     }
-
-    const previousCount = reviews.size;
-    for (const item of dataList) {
-      if (!item || typeof item !== "object") continue;
-      const row = item as Record<string, unknown>;
-      const rating = row.reviewRating ?? row.rating ?? "";
-      const title = String(row.reviewTitle ?? row.title ?? "").trim();
-      const body = String(row.reviewMessage ?? row.reviewBody ?? row.body ?? "").trim();
-
-      if (!body) continue;
-
-      const cleanBody = body.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
-      const cleanTitle = title.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
-
-      let text = "";
-      if (rating) text += `Rating: ${rating}. `;
-      if (cleanTitle) text += `${cleanTitle}. `;
-      text += cleanBody;
-      reviews.add(text.trim());
-    }
-
-    pagesFetched += 1;
-    previousPageAddedReviews = dataList.length > 0 && reviews.size > previousCount;
+    throw error;
   }
 
   const collectedReviews = [...reviews].slice(0, 500);
@@ -1480,19 +1506,20 @@ async function fetchLooxPublicReviews(input: ReviewInput): Promise<ReviewFetchRe
   let totalReviewsCount = 0
   let previousPageAddedReviews = true
 
-  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
-    const params = new URLSearchParams({
-      shopId,
-      productId,
-      page: String(pagesFetched + 1)
-    })
-    const response = await fetch(`https://loox.io/app/loox/api/reviews?${params}`, {
-      headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
-      cache: "no-store"
-    })
+  try {
+    while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+      const params = new URLSearchParams({
+        shopId,
+        productId,
+        page: String(pagesFetched + 1)
+      })
+      const response = await fetch(`https://loox.io/app/loox/api/reviews?${params}`, {
+        headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
+        cache: "no-store"
+      })
 
-    console.log(`[Loox] response: ${response.status} page=${pagesFetched + 1}`)
-    if (!response.ok) throw new Error(`Loox API returned status ${response.status}. Upload a Loox CSV export instead.`)
+      console.log(`[Loox] response: ${response.status} page=${pagesFetched + 1}`)
+      if (!response.ok) throw new Error(`Loox API returned status ${response.status}. Upload a Loox CSV export instead.`)
 
     const payload = await response.json() as Record<string, unknown>
     const reviewList = Array.isArray(payload.reviews) ? payload.reviews : []
@@ -1513,6 +1540,12 @@ async function fetchLooxPublicReviews(input: ReviewInput): Promise<ReviewFetchRe
 
     pagesFetched++
     previousPageAddedReviews = reviewList.length > 0 && reviews.size > previousCount
+  }
+  } catch (error: any) {
+    if (error.message?.includes("fetch failed") || error.code === "ENOTFOUND") {
+      throw new Error("Loox widget fetch failed: The network connection was lost or the Loox service is unreachable. Upload a Loox CSV export instead.");
+    }
+    throw error;
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
@@ -1568,38 +1601,45 @@ async function fetchYotpoPublicReviews(input: ReviewInput): Promise<ReviewFetchR
   let totalReviewsCount = 0
   let previousPageAddedReviews = true
 
-  while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
-    const params = new URLSearchParams({ per_page: "100", page: String(pagesFetched + 1) })
-    const url = `https://api-cdn.yotpo.com/v1/widget/${appKey}/products/${productId}/reviews.json?${params}`
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
-      cache: "no-store"
-    })
+  try {
+    while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+      const params = new URLSearchParams({ per_page: "100", page: String(pagesFetched + 1) })
+      const url = `https://api-cdn.yotpo.com/v1/widget/${appKey}/products/${productId}/reviews.json?${params}`
+      const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
+        cache: "no-store"
+      })
 
-    console.log(`[Yotpo] response: ${response.status} page=${pagesFetched + 1}`)
-    if (!response.ok) throw new Error(`Yotpo API returned status ${response.status}. Upload a Yotpo CSV export instead.`)
+      console.log(`[Yotpo] response: ${response.status} page=${pagesFetched + 1}`)
+      if (!response.ok) throw new Error(`Yotpo API returned status ${response.status}. Upload a Yotpo CSV export instead.`)
 
-    const payload = await response.json() as Record<string, unknown>
-    const responseData = (payload.response as any) ?? {}
-    const reviewList: any[] = Array.isArray(responseData.reviews) ? responseData.reviews : []
-    const pagination = (responseData.pagination as any) ?? {}
-    if (typeof pagination.total === "number") totalReviewsCount = pagination.total
+      const payload = await response.json() as Record<string, unknown>
+      const responseData = (payload.response as any) ?? {}
+      const reviewList: any[] = Array.isArray(responseData.reviews) ? responseData.reviews : []
+      const pagination = (responseData.pagination as any) ?? {}
+      if (typeof pagination.total === "number") totalReviewsCount = pagination.total
 
-    const previousCount = reviews.size
-    for (const r of reviewList) {
-      const body = String(r.content || r.body || "").trim()
-      if (!body) continue
-      const rating = r.score ?? r.rating ?? ""
-      const title = String(r.title || "").trim()
-      let text = ""
-      if (rating) text += `Rating: ${rating}. `
-      if (title) text += `${title}. `
-      text += body
-      reviews.add(text.trim())
+      const previousCount = reviews.size
+      for (const r of reviewList) {
+        const body = String(r.content || r.body || "").trim()
+        if (!body) continue
+        const rating = r.score ?? r.rating ?? ""
+        const title = String(r.title || "").trim()
+        let text = ""
+        if (rating) text += `Rating: ${rating}. `
+        if (title) text += `${title}. `
+        text += body
+        reviews.add(text.trim())
+      }
+
+      pagesFetched++
+      previousPageAddedReviews = reviewList.length > 0 && reviews.size > previousCount
     }
-
-    pagesFetched++
-    previousPageAddedReviews = reviewList.length > 0 && reviews.size > previousCount
+  } catch (error: any) {
+    if (error.message?.includes("fetch failed") || error.code === "ENOTFOUND") {
+      throw new Error("Yotpo widget fetch failed: The network connection was lost or the Yotpo service is unreachable. Upload a Yotpo CSV export instead.");
+    }
+    throw error;
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
@@ -1694,36 +1734,43 @@ async function fetchOkendoPublicReviews(input: ReviewInput): Promise<ReviewFetch
   let hasMore = true
   const limit = 100
 
-  while (reviews.size < Math.min(maxReviews, 500) && hasMore) {
-    const params = new URLSearchParams({ limit: String(limit), offset: String(offset), orderBy: "date_created desc" })
-    const url = `https://api.okendo.io/v1/stores/${storeId}/products/shopify-${productId}/reviews?${params}`
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
-      cache: "no-store"
-    })
+  try {
+    while (reviews.size < Math.min(maxReviews, 500) && hasMore) {
+      const params = new URLSearchParams({ limit: String(limit), offset: String(offset), orderBy: "date_created desc" })
+      const url = `https://api.okendo.io/v1/stores/${storeId}/products/shopify-${productId}/reviews?${params}`
+      const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
+        cache: "no-store"
+      })
 
-    console.log(`[Okendo] response: ${response.status} offset=${offset}`)
-    if (!response.ok) throw new Error(`Okendo API returned status ${response.status}. Upload an Okendo CSV export instead.`)
+      console.log(`[Okendo] response: ${response.status} offset=${offset}`)
+      if (!response.ok) throw new Error(`Okendo API returned status ${response.status}. Upload an Okendo CSV export instead.`)
 
-    const payload = await response.json() as Record<string, unknown>
-    const reviewList: any[] = Array.isArray(payload.reviews) ? payload.reviews : []
-    if (typeof (payload.pagination as any)?.total === "number") totalReviewsCount = (payload.pagination as any).total
+      const payload = await response.json() as Record<string, unknown>
+      const reviewList: any[] = Array.isArray(payload.reviews) ? payload.reviews : []
+      if (typeof (payload.pagination as any)?.total === "number") totalReviewsCount = (payload.pagination as any).total
 
-    const previousCount = reviews.size
-    for (const r of reviewList) {
-      const body = String(r.body || r.reviewBody || "").trim()
-      if (!body) continue
-      const rating = r.rating ?? ""
-      const title = String(r.title || "").trim()
-      let text = ""
-      if (rating) text += `Rating: ${rating}. `
-      if (title) text += `${title}. `
-      text += body
-      reviews.add(text.trim())
+      const previousCount = reviews.size
+      for (const r of reviewList) {
+        const body = String(r.body || r.reviewBody || "").trim()
+        if (!body) continue
+        const rating = r.rating ?? ""
+        const title = String(r.title || "").trim()
+        let text = ""
+        if (rating) text += `Rating: ${rating}. `
+        if (title) text += `${title}. `
+        text += body
+        reviews.add(text.trim())
+      }
+
+      offset += limit
+      hasMore = reviewList.length === limit && reviews.size > previousCount
     }
-
-    offset += limit
-    hasMore = reviewList.length === limit && reviews.size > previousCount
+  } catch (error: any) {
+    if (error.message?.includes("fetch failed") || error.code === "ENOTFOUND") {
+      throw new Error("Okendo widget fetch failed due to a network connection issue or service block. Upload an Okendo CSV export instead.");
+    }
+    throw error;
   }
 
   const collectedReviews = [...reviews].slice(0, 500)
