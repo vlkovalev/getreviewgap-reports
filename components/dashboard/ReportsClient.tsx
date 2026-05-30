@@ -52,6 +52,7 @@ export function ReportsClient({
   const [reviewApp, setReviewApp] = useState<typeof shopifyReviewApps[number]["value"]>("judgeme")
   const [detectedApp, setDetectedApp] = useState<string | null>(null)
   const [detecting, setDetecting] = useState(false)
+  const [showAppOverride, setShowAppOverride] = useState(false)
   const [sourceId, setSourceId] = useState("")
   const [productUrl, setProductUrl] = useState(initialProductUrl)
   const [productName, setProductName] = useState(initialProductName)
@@ -254,7 +255,7 @@ export function ReportsClient({
           <div className="relative">
             <input
               value={productUrl}
-              onChange={(event) => { setProductUrl(event.target.value); setDetectedApp(null) }}
+              onChange={(event) => { setProductUrl(event.target.value); setDetectedApp(null); setShowAppOverride(false) }}
               onBlur={(event) => detectReviewApp(event.target.value)}
               type="url"
               placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."}
@@ -277,25 +278,52 @@ export function ReportsClient({
         </label>
         {platform === "shopify" ? (
           <div className="mt-4 rounded-2xl border border-cyan/20 bg-cyan/10 p-4">
-            <label className="grid gap-2 text-sm">
-              <span className="font-black uppercase text-cyan">Review app / export source</span>
-              <select value={reviewApp} onChange={(event) => setReviewApp(event.target.value as typeof shopifyReviewApps[number]["value"])} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white">
-                {shopifyReviewApps.map((app) => <option key={app.value} value={app.value}>{app.label}</option>)}
-              </select>
-            </label>
-            <p className="mt-3 text-sm text-white/70">
-              {(["judgeme", "stamped", "loox", "yotpo", "okendo"] as string[]).includes(reviewApp)
-                ? "Paste a Shopify product URL for direct collection. Upload a CSV export as a fallback."
-                : shopifyReviewApps.find((app) => app.value === reviewApp)?.helper}
-            </p>
+            {/* Auto-detected: show badge + subtle override link */}
+            {detectedApp && !showAppOverride ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-lime text-xs font-black text-ink">✓</span>
+                  <span className="font-bold text-white">
+                    {shopifyReviewApps.find(a => a.value === detectedApp)?.label ?? detectedApp} detected
+                  </span>
+                  <span className="text-white/50">— reviews will be collected automatically</span>
+                </div>
+                <button type="button" onClick={() => setShowAppOverride(true)} className="text-xs text-white/40 underline hover:text-white/70">
+                  wrong app?
+                </button>
+              </div>
+            ) : !productUrl.trim() || showAppOverride ? (
+              /* No URL yet, or user requested override: show full selector */
+              <label className="grid gap-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-black uppercase text-cyan">
+                    {showAppOverride ? "Select the correct review app" : "Review app"}
+                  </span>
+                  {showAppOverride && (
+                    <button type="button" onClick={() => { setShowAppOverride(false) }} className="text-xs text-white/40 underline hover:text-white/70">cancel</button>
+                  )}
+                </div>
+                <select value={reviewApp} onChange={(event) => { setReviewApp(event.target.value as typeof shopifyReviewApps[number]["value"]); setShowAppOverride(false) }} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white">
+                  {shopifyReviewApps.map((app) => <option key={app.value} value={app.value}>{app.label}</option>)}
+                </select>
+                {!productUrl.trim() && <p className="text-xs text-white/50">Or paste a product URL above and we'll detect it automatically.</p>}
+              </label>
+            ) : detecting ? (
+              /* URL entered, detection in progress */
+              <p className="text-sm text-white/50">Detecting review app…</p>
+            ) : (
+              /* URL entered, detection failed */
+              <label className="grid gap-2 text-sm">
+                <span className="font-black uppercase text-cyan">Select review app</span>
+                <select value={reviewApp} onChange={(event) => setReviewApp(event.target.value as typeof shopifyReviewApps[number]["value"])} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white">
+                  {shopifyReviewApps.map((app) => <option key={app.value} value={app.value}>{app.label}</option>)}
+                </select>
+                <p className="text-xs text-white/50">Couldn't auto-detect — select the review app this store uses.</p>
+              </label>
+            )}
             <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-white/58">
-              <p className="font-bold text-white/78">Recommended export columns</p>
-              <p className="mt-2 font-mono">review_text, rating, review_title, product_name, review_date</p>
-              <p className="mt-2">
-                {(["judgeme", "stamped", "loox", "yotpo", "okendo"] as string[]).includes(reviewApp)
-                  ? "Direct collection reads the store's public review widget. Upload a CSV export for private or restricted stores."
-                  : "Upload a CSV/TXT export from your review app. Paste review rows directly if you have a small batch."}
-              </p>
+              <p className="font-bold text-white/78">CSV fallback</p>
+              <p className="mt-1">If direct collection fails, upload or paste a review export below. Columns needed: review text, rating, title.</p>
             </div>
           </div>
         ) : null}
