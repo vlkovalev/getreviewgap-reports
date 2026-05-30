@@ -192,7 +192,7 @@ async function fetchJudgeMeProduct({ apiToken, shopDomain, externalId }: { apiTo
   }
 }
 
-async function fetchShopifyProductExternalId(productUrl: string) {
+async function fetchShopifyProductData(productUrl: string): Promise<{ id: string; title: string }> {
   const productJsonUrl = shopifyProductJsonUrl(productUrl)
   const response = await fetch(productJsonUrl, { cache: "no-store" })
   if (!response.ok) {
@@ -206,7 +206,14 @@ async function fetchShopifyProductExternalId(productUrl: string) {
   if (typeof id !== "number" && typeof id !== "string") {
     throw new Error("The Shopify product data did not include a product ID. Upload a CSV export from your review app instead.")
   }
-  return String(id)
+  const title = typeof product.title === "string" ? product.title : ""
+  return { id: String(id), title }
+}
+
+/** @deprecated Use fetchShopifyProductData instead */
+async function fetchShopifyProductExternalId(productUrl: string) {
+  const { id } = await fetchShopifyProductData(productUrl)
+  return id
 }
 
 function shopifyProductJsonUrl(productUrl: string) {
@@ -1186,6 +1193,11 @@ function parseJudgeMeWidgetHtml(html: string): string[] {
 }
 
 async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string, handle: string): Promise<ReviewFetchResult> {
+  // Resolve product name early so all return paths can use it
+  const resolvedProductName = input.productName || await fetchShopifyProductData(input.productUrl)
+    .then(({ title }) => title || `Shopify product ${handle}`)
+    .catch(() => `Shopify product ${handle}`)
+
   const maxPages = canopyReviewPageLimit(input.reviewPageLimit);
   const reviews = new Set<string>();
   let pagesFetched = 0;
@@ -1265,7 +1277,7 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
     return {
       reviews: collectedReviews,
       source: "judgeme",
-      productName: input.productName || `Shopify product ${handle}`,
+      productName: resolvedProductName,
       pagesFetched,
       availableReviewCount: totalReviewsCount || collectedReviews.length,
       sampleNote: `Judge.me public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"} (Domain: ${successfulDomain}).`,
@@ -1289,7 +1301,7 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
         return {
           reviews: [...reviews],
           source: "judgeme",
-          productName: input.productName || `Shopify product ${handle}`,
+          productName: resolvedProductName,
           pagesFetched: 1,
           availableReviewCount: reviews.size,
           sampleNote: `Judge.me public crawler retrieved ${reviews.size} review${reviews.size === 1 ? "" : "s"} directly from the product page HTML fallback.`,
@@ -1335,14 +1347,13 @@ async function fetchStampedApiKey(productUrl: string): Promise<string> {
 }
 
 async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string): Promise<ReviewFetchResult> {
-  const [externalId, apiKey] = await Promise.all([
-    fetchShopifyProductExternalId(input.productUrl),
+  const [productData, apiKey] = await Promise.all([
+    fetchShopifyProductData(input.productUrl),
     fetchStampedApiKey(input.productUrl)
   ]);
 
-  if (!externalId) {
-    throw new Error("Could not find the Shopify product ID. Make sure the URL is public or upload a Stamped CSV export.");
-  }
+  const externalId = productData.id
+  const resolvedProductName = input.productName || productData.title || `Shopify product ${shopifyProductHandle(input.productUrl)}`
 
   console.log(`[Stamped] shopDomain=${shopDomain} productId=${externalId} apiKey=${apiKey ? "found" : "missing"}`);
 
@@ -1383,114 +1394,4 @@ async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string)
     }
 
     const previousCount = reviews.size;
-    for (const item of dataList) {
-      if (!item || typeof item !== "object") continue;
-      const row = item as Record<string, unknown>;
-      const rating = row.reviewRating ?? row.rating ?? "";
-      const title = String(row.reviewTitle ?? row.title ?? "").trim();
-      const body = String(row.reviewMessage ?? row.reviewBody ?? row.body ?? "").trim();
-
-      if (!body) continue;
-
-      const cleanBody = body.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
-      const cleanTitle = title.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
-
-      let text = "";
-      if (rating) text += `Rating: ${rating}. `;
-      if (cleanTitle) text += `${cleanTitle}. `;
-      text += cleanBody;
-      reviews.add(text.trim());
-    }
-
-    pagesFetched += 1;
-    previousPageAddedReviews = dataList.length > 0 && reviews.size > previousCount;
-  }
-
-  const collectedReviews = [...reviews].slice(0, 500);
-  return {
-    reviews: collectedReviews,
-    source: "stamped",
-    productName: input.productName || `Shopify product ${shopifyProductHandle(input.productUrl)}`,
-    pagesFetched,
-    availableReviewCount: totalReviewsCount || collectedReviews.length,
-    sampleNote: `Stamped.io public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"}.`,
-    warning: collectedReviews.length ? undefined : "Stamped.io returned no public review text for this product."
-  };
-}
-export async function resolveShopifyDomain(productUrl: string): Promise<string> {
-  try {
-    const customDomain = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
-    if (customDomain.endsWith(".myshopify.com") || customDomain === "competitor-shop.com" || customDomain === "demo.com" || customDomain === "stamped-shop.com") {
-      return customDomain;
-    }
-
-    // Strategy 1: Shopify's public shop.json endpoint — always exposes myshopify_domain
-    // regardless of theme or bot protection on the product page.
-    try {
-      const shopJsonUrl = `https://${customDomain}/meta.json`;
-      const metaRes = await fetch(shopJsonUrl, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        cache: "no-store"
-      });
-      if (metaRes.ok) {
-        const meta = await metaRes.json() as Record<string, unknown>;
-        // /meta.json returns { myshopify_domain: "store.myshopify.com", ... }
-        if (typeof meta.myshopify_domain === "string" && meta.myshopify_domain.endsWith(".myshopify.com")) {
-          console.log(`[resolveShopifyDomain] Found via /meta.json: ${meta.myshopify_domain}`);
-          return meta.myshopify_domain.toLowerCase();
-        }
-      }
-    } catch {
-      // non-Shopify store or domain unreachable
-    }
-
-    // Strategy 2: Fetch the product page HTML and extract from known patterns
-    const response = await fetch(productUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      },
-      cache: "no-store"
-    });
-
-    if (response.ok) {
-      const html = await response.text();
-
-      // Direct .myshopify.com reference anywhere in the HTML
-      const directMatch = html.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/i);
-      if (directMatch?.[1]) {
-        console.log(`[resolveShopifyDomain] Found via HTML direct match: ${directMatch[1]}`);
-        return directMatch[1].toLowerCase();
-      }
-
-      // Shopify globals: "myshopify_domain" JSON key or Shopify.shop variable
-      const shopNameMeta =
-        html.match(/"myshopify_domain"\s*:\s*"([^"]+)"/i) ||
-        html.match(/Shopify\.shop\s*=\s*["']([^"']+\.myshopify\.com)["']/i) ||
-        html.match(/<meta[^>]+name=["']shopify-[^"']*["'][^>]+content=["']([^"']+)["']/i);
-      if (shopNameMeta?.[1]) {
-        console.log(`[resolveShopifyDomain] Found via HTML meta/global: ${shopNameMeta[1]}`);
-        return shopNameMeta[1].toLowerCase();
-      }
-
-      // Judge.me embed script ?shop= param
-      const judgeMeScript = html.match(/cdn\.judge\.me[^"']*shop=([^&"'\s]+)/i);
-      if (judgeMeScript?.[1]) {
-        const decoded = decodeURIComponent(judgeMeScript[1]);
-        if (decoded.endsWith(".myshopify.com")) {
-          console.log(`[resolveShopifyDomain] Found via Judge.me script tag: ${decoded}`);
-          return decoded.toLowerCase();
-        }
-      }
-    }
-  } catch (error) {
-    console.warn("[resolveShopifyDomain] Failed:", error);
-  }
-
-  // Last resort: return the custom domain. The caller tries a guessed
-  // .myshopify.com prefix as a second attempt.
-  try {
-    return new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
+   
