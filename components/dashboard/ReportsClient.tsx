@@ -261,7 +261,14 @@ export function ReportsClient({
             <input
               value={productUrl}
               onChange={(event) => { setProductUrl(event.target.value); setDetectedApp(null); setShowAppOverride(false) }}
-              onBlur={(event) => detectReviewApp(event.target.value)}
+              onBlur={(event) => {
+                let val = event.target.value.trim()
+                if (val && !val.startsWith("http://") && !val.startsWith("https://")) {
+                  val = `https://${val}`
+                  setProductUrl(val)
+                }
+                detectReviewApp(val)
+              }}
               type="url"
               placeholder={platform === "amazon" ? "https://www.amazon.com/dp/..." : "https://yourstore.com/products/..."}
               className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white"

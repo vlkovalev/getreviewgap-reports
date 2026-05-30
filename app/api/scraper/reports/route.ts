@@ -12,7 +12,11 @@ const createReportSchema = z.object({
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   platform: z.enum(["amazon", "shopify"]).optional().default("amazon"),
-  productUrl: z.string().url().max(2000).optional().or(z.literal("")),
+  productUrl: z.string().max(2000).optional().or(z.literal("")).transform(val => {
+    if (!val) return val
+    try { new URL(val); return val } catch {}
+    return val.startsWith("//") ? `https:${val}` : `https://${val}`
+  }).pipe(z.string().url().max(2000).optional().or(z.literal(""))),
   productName: z.string().trim().max(160).optional().or(z.literal("")),
   competitorName: z.string().trim().max(160).optional().or(z.literal("")),
   pastedReviews: z.string().trim().max(30000).optional().or(z.literal("")),
