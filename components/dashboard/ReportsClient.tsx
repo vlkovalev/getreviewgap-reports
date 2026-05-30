@@ -391,4 +391,38 @@ export function ReportsClient({
                 <div className="flex flex-wrap gap-2">
                   {isEmptyReport(report) && productHref(report) ? (
                     <Link href={productHref(report)!} className="rounded-full bg-lime px-3 py-2 text-xs font-black text-black">Run fresh analysis</Link>
- 
+                  ) : null}
+                  <Link href={`/dashboard/reports/${report.id}`} className="rounded-full bg-white px-3 py-2 text-xs font-black text-black">View</Link>
+                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "csv" })} href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">CSV</a>
+                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "json" })} href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">JSON</a>
+                  <a onClick={() => trackClientEvent("report_export_started", { reportId: report.id, format: "pdf" })} href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black">PDF</a>
+                  <button type="button" disabled={busyReportId === report.id} onClick={() => setArchived(report, showArchived ? "restore" : "archive")} className="rounded-full border border-white/10 px-3 py-2 text-xs font-black disabled:opacity-40">{showArchived ? "Restore" : "Archive"}</button>
+                  <button type="button" disabled={busyReportId === report.id} onClick={() => deleteReport(report)} className="rounded-full border border-coral/30 px-3 py-2 text-xs font-black text-coral disabled:opacity-40">Delete</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function isEmptyReport(report: IntelligenceReport) {
+  return Number(report.summary?.reviewCount ?? 0) === 0
+}
+
+function isArchived(report: IntelligenceReport) {
+  return Boolean(report.summary?.archivedAt)
+}
+
+function productHref(report: IntelligenceReport) {
+  const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
+  if (!productUrl) return null
+  const params = new URLSearchParams({
+    productUrl,
+    productName: String(report.summary?.productName ?? report.filters?.productName ?? ""),
+    platform: String(report.summary?.platform ?? report.filters?.platform ?? "amazon")
+  })
+  return `/dashboard/reports?${params.toString()}`
+}
