@@ -1190,81 +1190,110 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
   let totalReviewsCount = 0;
   let previousPageAddedReviews = true;
 
-  try {
-    while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
-      const pageNum = pagesFetched + 1;
-      const params = new URLSearchParams({
-        shop_domain: shopDomain,
-        platform: "shopify",
-        product_handle: handle,
-        page: String(pageNum)
-      });
-
-      const response = await fetch(`https://judge.me/api/v1/widgets/reviews?${params}`, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        },
-        cache: "no-store"
-      });
-
-      if (!response.ok) {
-        throw new Error(`Status ${response.status}`);
-      }
-
-      const payload = await response.json() as Record<string, unknown>;
-      const htmlString = typeof payload.reviews === "string" ? payload.reviews : "";
-      const pageReviews = parseJudgeMeWidgetHtml(htmlString);
-
-      if (typeof payload.total_reviews === "number") {
-        totalReviewsCount = payload.total_reviews;
-      }
-
-      const previousCount = reviews.size;
-      for (const text of pageReviews) reviews.add(text);
-
-      pagesFetched += 1;
-      previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount;
+  const domainsToTry = [shopDomain];
+  if (!shopDomain.endsWith(".myshopify.com")) {
+    const prefix = shopDomain.split(".")[0];
+    if (prefix) {
+      domainsToTry.push(`${prefix}.myshopify.com`);
     }
-  } catch (apiError: any) {
-    console.warn("Judge.me widget API failed, falling back to direct HTML scraping:", apiError?.message || apiError);
-    try {
-      const response = await fetch(input.productUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        },
-        cache: "no-store"
-      });
-      if (response.ok) {
-        const html = await response.text();
-        const pageReviews = parseJudgeMeWidgetHtml(html);
-        for (const text of pageReviews) reviews.add(text);
-        if (reviews.size > 0) {
-          return {
-            reviews: [...reviews],
-            source: "judgeme",
-            productName: input.productName || `Shopify product ${handle}`,
-            pagesFetched: 1,
-            availableReviewCount: reviews.size,
-            sampleNote: `Judge.me public crawler retrieved ${reviews.size} review${reviews.size === 1 ? "" : "s"} directly from the product page HTML fallback.`,
-          };
-        }
-      }
-    } catch (htmlError) {
-      console.error("Direct HTML scraping fallback failed:", htmlError);
-    }
-    throw new Error(`Judge.me public widget request failed: ${apiError?.message || apiError}`);
   }
 
-  const collectedReviews = [...reviews].slice(0, 500);
-  return {
-    reviews: collectedReviews,
-    source: "judgeme",
-    productName: input.productName || `Shopify product ${handle}`,
-    pagesFetched,
-    availableReviewCount: totalReviewsCount || collectedReviews.length,
-    sampleNote: `Judge.me public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"}.`,
-    warning: collectedReviews.length ? undefined : "Judge.me returned no public review text for this product."
-  };
+  let lastFetchError: any = null;
+  let successfulDomain = shopDomain;
+
+  for (const domain of domainsToTry) {
+    try {
+      pagesFetched = 0;
+      reviews.clear();
+      previousPageAddedReviews = true;
+      totalReviewsCount = 0;
+
+      while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
+        const pageNum = pagesFetched + 1;
+        const params = new URLSearchParams({
+          shop_domain: domain,
+          platform: "shopify",
+          product_handle: handle,
+          page: String(pageNum)
+        });
+
+        const response = await fetch(`https://judge.me/api/v1/widgets/reviews?${params}`, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          },
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error(`Status ${response.status}`);
+        }
+
+        const payload = await response.json() as Record<string, unknown>;
+        const htmlString = typeof payload.reviews === "string" ? payload.reviews : "";
+        const pageReviews = parseJudgeMeWidgetHtml(htmlString);
+
+        if (typeof payload.total_reviews === "number") {
+          totalReviewsCount = payload.total_reviews;
+        }
+
+        const previousCount = reviews.size;
+        for (const text of pageReviews) reviews.add(text);
+
+        pagesFetched += 1;
+        previousPageAddedReviews = pageReviews.length > 0 && reviews.size > previousCount;
+      }
+
+      if (reviews.size > 0 || totalReviewsCount > 0) {
+        successfulDomain = domain;
+        break;
+      }
+    } catch (apiError: any) {
+      lastFetchError = apiError;
+      console.warn(`Judge.me widget API failed for domain ${domain}:`, apiError?.message || apiError);
+    }
+  }
+
+  if (reviews.size > 0) {
+    const collectedReviews = [...reviews].slice(0, 500);
+    return {
+      reviews: collectedReviews,
+      source: "judgeme",
+      productName: input.productName || `Shopify product ${handle}`,
+      pagesFetched,
+      availableReviewCount: totalReviewsCount || collectedReviews.length,
+      sampleNote: `Judge.me public crawler retrieved ${collectedReviews.length} written review${collectedReviews.length === 1 ? "" : "s"} across ${pagesFetched} widget page${pagesFetched === 1 ? "" : "s"} (Domain: ${successfulDomain}).`,
+      warning: collectedReviews.length ? undefined : "Judge.me returned no public review text for this product."
+    };
+  }
+
+  console.warn("Judge.me widget API returned no reviews for all tried domains, falling back to direct HTML scraping...");
+  try {
+    const response = await fetch(input.productUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      },
+      cache: "no-store"
+    });
+    if (response.ok) {
+      const html = await response.text();
+      const pageReviews = parseJudgeMeWidgetHtml(html);
+      for (const text of pageReviews) reviews.add(text);
+      if (reviews.size > 0) {
+        return {
+          reviews: [...reviews],
+          source: "judgeme",
+          productName: input.productName || `Shopify product ${handle}`,
+          pagesFetched: 1,
+          availableReviewCount: reviews.size,
+          sampleNote: `Judge.me public crawler retrieved ${reviews.size} review${reviews.size === 1 ? "" : "s"} directly from the product page HTML fallback.`,
+        };
+      }
+    }
+  } catch (htmlError) {
+    console.error("Direct HTML scraping fallback failed:", htmlError);
+  }
+
+  throw new Error(`Judge.me public widget request failed: ${lastFetchError?.message || lastFetchError || "Status 404"}`);
 }
 
 async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string): Promise<ReviewFetchResult> {
