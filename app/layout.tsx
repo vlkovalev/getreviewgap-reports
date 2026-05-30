@@ -7,28 +7,12 @@ import { TrackingScripts } from "@/components/TrackingScripts"
 import { site } from "@/lib/content"
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://reviewgap.com"),
   title: {
-    default: `${site.name} | AI Review Reports`,
+    default: `${site.name} | AI Competitor Review Intelligence`,
     template: `%s | ${site.name}`
   },
-  description: site.description,
+  description: "ReviewGap turns competitor reviews into AI-powered reports for Shopify brands and Amazon sellers. Find complaints, buyer language, and product gaps in minutes.",
   openGraph: {
-    title: site.name,
-    description: site.description,
-    type: "website"
-  }
-}
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning>
-        <Header />
-        <AnalyticsBeacon />
-        <TrackingScripts />
-        {children}
-        <Footer />
-      </body>
-    </html>
-  )
-}
+    title: `${site.name} | AI Competitor Review Intelligence`,
+    description: "ReviewGap turns competitor reviews into AI-powered reports for Shopify brands 

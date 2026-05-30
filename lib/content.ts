@@ -1,6 +1,6 @@
 export const site = {
   name: "ReviewGap",
-  description: "Find what customers wish competitors fixed."
+  description: "AI-powered competitor review intelligence for Shopify brands and Amazon sellers. Find complaints, buyer language, and product gaps in minutes."
 }
 
 export const faqs = [
@@ -32,20 +32,10 @@ export const resources = [
     title: "How to Use Amazon Reviews for Competitor Intelligence",
     excerpt: "Turn public customer reviews into product gaps, ad hooks, and launch positioning.",
     tags: ["Amazon", "Shopify", "Research"],
-    content: "Customer reviews are one of the fastest ways to understand what buyers expected, what disappointed them, and what language they use when describing the category. Start with competing products, group recurring complaints and compliments, then translate those patterns into product improvements and product-page messaging."
-  },
-  {
-    slug: "product-page-objection-mining",
-    title: "How to Mine Product Page Objections Before Launch",
-    excerpt: "Find the objections your product page needs to answer before customers ask them.",
-    tags: ["CRO", "Messaging"],
-    content: "Look for phrases that signal uncertainty: smaller than expected, smells too strong, unclear ingredients, hard to assemble, not durable, or shipping issues. These become FAQ blocks, comparison copy, and proof points."
-  },
-  {
-    slug: "review-language-ad-hooks",
-    title: "Turning Review Language into Ad Hooks",
-    excerpt: "Use real buyer language to write sharper ads without inventing claims.",
-    tags: ["Ads", "Copywriting"],
-    content: "Strong hooks often come from the exact words buyers use. Keep claims grounded in the review data, avoid unsupported performance promises, and make assumptions explicit when data is thin."
-  }
-]
+    content: `Customer reviews are the single most valuable source of unvarnished market feedback. Every day, millions of customers explain precisely why they purchased a product, what they liked, and, most importantly, where the product failed them. In the DTC and Amazon e-commerce world, this data represents a direct, real-time feedback loop on your competitors. By systematically scraping and analyzing competitor reviews, you can uncover lucrative product gaps, identify high-converting marketing hooks, and position your brand to win.
+
+### Why Competitor Reviews are a Goldmine
+
+Traditional market research requires expensive focus groups, surveys, and months of waiting. Amazon reviews are public, abundant, and written in the customer's raw, emotional language. Rather than asking customers what they *might* buy, review mining looks at what they *already* bought and experienced.
+
+When analyzing reviews, you are looking for patterns in customer sentiment. The goal is to move from qualitative reading to quantitative analysis. When you use tools like the [ReviewGap Dashboard](/dashboard), you can instantly parse thousands of rev

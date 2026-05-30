@@ -1154,9 +1154,11 @@ function parseJudgeMeWidgetHtml(html: string): string[] {
     const verifiedMatch = block.match(/data-verified-buyer=['"](true|false)['"]/) ||
                           block.match(/class=['"]jdgm-rev__buyer-badge['"]/) || 
                           block.match(/class=['"]jdgm-rev__verified-buyer-badge['"]/) || 
-                          block.includes("jdgm-verified-buyer-badge") ||
-                          block.includes("jdgm-rev__verified-buyer-badge");
-    const verified = verifiedMatch ? (verifiedMatch[1] ? verifiedMatch[1] === "true" : true) : false;
+                          (block.includes("jdgm-verified-buyer-badge") ? true : null) ||
+                          (block.includes("jdgm-rev__verified-buyer-badge") ? true : null);
+    const verified = verifiedMatch 
+      ? (typeof verifiedMatch === "boolean" ? true : (verifiedMatch[1] ? verifiedMatch[1] === "true" : true))
+      : false;
 
     const dateMatch = block.match(/data-timestamp=['"](.*?)['"]/) ||
                       block.match(/class=['"]jdgm-rev__timestamp[^'"]*['"]\s+data-content=['"](.*?)['"]/) ||
@@ -1201,6 +1203,8 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
   let lastFetchError: any = null;
   let successfulDomain = shopDomain;
 
+  console.log(`[Judge.me] Trying domains: ${domainsToTry.join(", ")} | handle: ${handle}`);
+
   for (const domain of domainsToTry) {
     try {
       pagesFetched = 0;
@@ -1217,13 +1221,16 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
           page: String(pageNum)
         });
 
-        const response = await fetch(`https://judge.me/api/v1/widgets/reviews?${params}`, {
+        const widgetUrl = `https://judge.me/api/v1/widgets/reviews?${params}`;
+        console.log(`[Judge.me] Fetching: ${widgetUrl}`);
+        const response = await fetch(widgetUrl, {
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
           },
           cache: "no-store"
         });
 
+        console.log(`[Judge.me] Response: ${response.status} for domain=${domain}`);
         if (!response.ok) {
           throw new Error(`Status ${response.status}`);
         }
@@ -1293,7 +1300,17 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
     console.error("Direct HTML scraping fallback failed:", htmlError);
   }
 
-  throw new Error(`Judge.me public widget request failed: ${lastFetchError?.message || lastFetchError || "Status 404"}`);
+  const detail = lastFetchError?.message || (lastFetchError ? String(lastFetchError) : null);
+  // 404 means the shop_domain didn't match a Judge.me-registered myshopify.com domain.
+  // No error + no reviews means the store doesn't use Judge.me or the handle is wrong.
+  if (!detail || detail.includes("404")) {
+    throw new Error(
+      "Could not find Judge.me reviews for this product. " +
+      "The store may not use Judge.me, the product handle may be wrong, or the myshopify.com domain couldn't be detected. " +
+      "Try uploading a Judge.me CSV export (Judge.me dashboard → Reviews → Export)."
+    );
+  }
+  throw new Error(`Judge.me public widget request failed: ${detail}`);
 }
 
 async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string): Promise<ReviewFetchResult> {
@@ -1369,34 +1386,7 @@ async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string)
     warning: collectedReviews.length ? undefined : "Stamped.io returned no public review text for this product."
   };
 }
-async function resolveShopifyDomain(productUrl: string): Promise<string> {
+export async function resolveShopifyDomain(productUrl: string): Promise<string> {
   try {
     const customDomain = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
-    if (customDomain.endsWith(".myshopify.com") || customDomain === "competitor-shop.com" || customDomain === "demo.com" || customDomain === "stamped-shop.com") {
-      return customDomain;
-    }
-
-    const response = await fetch(productUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      },
-      cache: "no-store"
-    });
-
-    if (response.ok) {
-      const html = await response.text();
-      const match = html.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/i);
-      if (match && match[1]) {
-        return match[1].toLowerCase();
-      }
-    }
-  } catch (error) {
-    console.warn("Could not fetch shop HTML to extract myshopify.com domain:", error);
-  }
-
-  try {
-    return new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
+    if (customDomain.endsWith(".myshopify.co

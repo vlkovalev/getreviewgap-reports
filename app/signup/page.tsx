@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = { title: "Sign up", description: "Create a ReviewGap account." }
+export const metadata: Metadata = { title: "Sign up", description: "Create your ReviewGap account.", robots: { index: false, follow: false } }
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ error?: string; created?: string }> }) {
   const params = await searchParams
@@ -34,8 +34,4 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             <Link href="/login" className="font-bold text-lime">Already have an account?</Link>
             <Link href="/onboarding" className="font-bold text-white/70">View onboarding</Link>
           </div>
-        </section>
-      </div>
-    </main>
-  )
-}
+      

@@ -4,8 +4,9 @@ import { DashboardShell, StatusBadge } from "@/components/dashboard/DashboardShe
 import { getStore } from "@/lib/scrapers/store"
 
 export const metadata: Metadata = {
-  title: "Dashboard | ReviewGap",
-  description: "Monitor review sources, analysis runs, products, and Amazon review intelligence reports."
+  title: "Dashboard",
+  description: "Monitor review sources, analysis runs, products, and Amazon review intelligence reports.",
+  robots: { index: false, follow: false }
 }
 
 export default function DashboardPage() {
@@ -58,7 +59,4 @@ export default function DashboardPage() {
             Last analysis: {lastRun ? <StatusBadge status={lastRun.status} /> : "No runs yet"}
           </div>
         </div>
-      </section>
-    </DashboardShell>
-  )
-}
+      </sectio

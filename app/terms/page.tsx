@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "Terms", description: "Terms for ReviewGap." }
+export const metadata: Metadata = { title: "Terms of Service", description: "ReviewGap terms of service covering acceptable use, report credits, data handling, and lawful review intelligence requirements." }
 
 export default function TermsPage() {
   return (
@@ -18,8 +18,4 @@ export default function TermsPage() {
         <h2 className="mt-10 text-2xl font-black text-white">Refunds and credits</h2>
         <p className="mt-4">One report credit is consumed when a report is generated. If report generation fails after a credit is consumed, the system is designed to return that credit automatically. Paid purchases are generally final after credits are used, but you can contact support for billing errors, duplicate charges, or failed access.</p>
         <h2 className="mt-10 text-2xl font-black text-white">AI output limitations</h2>
-        <p className="mt-4">AI-generated summaries can be incomplete or wrong. Users should review outputs before making product, legal, financial, advertising, or inventory decisions. Reports are research aids, not professional advice.</p>
-      </div>
-    </main>
-  )
-}
+        <p className="mt-4">AI-generated summaries can be incomplete or wrong. Users should review outputs before making product, legal, financial, advert

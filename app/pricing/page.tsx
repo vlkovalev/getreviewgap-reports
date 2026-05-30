@@ -68,7 +68,7 @@ export default async function PricingPage() {
         <section className="mt-16 grid gap-5 md:grid-cols-4">
           {valueNotes.map((note) => (
             <article key={note.title} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-              <h2 className="text-xl font-black">{note.title}</h2>
+              <strong className="block text-xl font-black">{note.title}</strong>
               <p className="mt-3 text-white/70">{note.copy}</p>
             </article>
           ))}
@@ -110,6 +110,4 @@ function PricingCard({ planId, isSignedIn }: { planId: PlanId; isSignedIn: boole
           <Link href="/login" className="w-full rounded-full border border-white/15 px-5 py-3 text-center font-black text-white hover:bg-white/10">Sign in</Link>
         </div>
       )}
-    </article>
-  )
-}
+    </a

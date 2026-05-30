@@ -338,6 +338,7 @@ async function assertPublicJudgeMeCrawler() {
     const result = await fetchAmazonReviews({
       productUrl: "https://competitor-shop.com/products/cool-product",
       platform: "shopify",
+      marketplace: "Shopify / DTC store",
       reviewApp: "judgeme",
       reviewPageLimit: 5
     })
@@ -379,6 +380,7 @@ async function assertPublicStampedCrawler() {
     const result = await fetchAmazonReviews({
       productUrl: "https://stamped-shop.com/products/awesome-product",
       platform: "shopify",
+      marketplace: "Shopify / DTC store",
       reviewApp: "stamped",
       reviewPageLimit: 5
     })

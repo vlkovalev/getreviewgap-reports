@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { getCurrentCustomer } from "@/lib/customer-session"
 
-export const metadata: Metadata = { title: "Welcome", description: "Start your first ReviewGap report." }
+export const metadata: Metadata = { title: "Welcome", description: "Start your first ReviewGap report.", robots: { index: false, follow: false } }
 
 export default async function OnboardingPage() {
   const customer = await getCurrentCustomer()
@@ -30,8 +30,4 @@ export default async function OnboardingPage() {
         <div className="mt-10 flex flex-wrap gap-3">
           <Link href="/dashboard/reports" className="btn-primary">Generate first report</Link>
           <Link href="/dashboard/billing" className="btn-secondary">View credits</Link>
-        </div>
-      </div>
-    </main>
-  )
-}
+     

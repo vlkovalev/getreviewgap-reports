@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "Privacy Policy", description: "Privacy policy for ReviewGap." }
+export const metadata: Metadata = { title: "Privacy Policy", description: "How ReviewGap collects, stores, and protects your data. We do not share or sell your review reports or account information." }
 
 export default function PrivacyPage() {
   return (
@@ -15,8 +15,4 @@ export default function PrivacyPage() {
         <h2 className="mt-10 text-2xl font-black text-white">Payments</h2>
         <p className="mt-4">Payments are processed by third-party providers such as Stripe or PayPal. We do not store full card numbers. Purchase metadata, plan IDs, payment status, and credit balances may be stored so the product can grant credits and show billing history.</p>
         <h2 className="mt-10 text-2xl font-black text-white">Analytics</h2>
-        <p className="mt-4">We may use privacy-conscious analytics and advertising pixels to understand page views, signup events, checkout starts, and report-generation events. Tracking IDs are only active when configured in production environment variables.</p>
-      </div>
-    </main>
-  )
-}
+        <p className="mt-4">We may use privacy-conscious analytics and advertising pixels to understand page views, signup events, checkout starts, and report-generation events. Tracking IDs are only a
