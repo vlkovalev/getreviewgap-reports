@@ -389,8 +389,8 @@ async function assertPublicStampedCrawler() {
     assert.equal(result.reviews.length, 1)
     assert.ok(result.reviews[0].includes("Rating: 5. Perfect. Highly recommend!"))
     assert.ok(requestedUrls[0].includes("/products/awesome-product.js"))
-    assert.ok(requestedUrls[1].includes("productId=12345"))
-    assert.ok(requestedUrls[1].includes("shopUrl=stamped-shop.com"))
+    assert.ok(requestedUrls[2].includes("productId=12345"))
+    assert.ok(requestedUrls[2].includes("storeUrl=stamped-shop.com"))
   } finally {
     globalThis.fetch = originalFetch
   }
