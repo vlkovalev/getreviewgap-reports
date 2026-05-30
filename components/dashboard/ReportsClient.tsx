@@ -100,11 +100,17 @@ export function ReportsClient({
       setStatus("You are out of report credits. Buy a single report, pack, or monthly credits to continue.")
       return
     }
-    if (platform === "shopify" && !pastedReviews.trim() && (reviewApp !== "judgeme" || !productUrl.trim())) {
-      setStatus(reviewApp === "judgeme"
-        ? "Add a Shopify product URL to use the Judge.me connector, or upload a Judge.me CSV/TXT export."
-        : "Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
-      return
+    // Apps that support direct collection via a product URL
+    const directCollectionApps = ["judgeme", "stamped"]
+    if (platform === "shopify" && !pastedReviews.trim()) {
+      if (directCollectionApps.includes(reviewApp) && !productUrl.trim()) {
+        setStatus(`Add a Shopify product URL to use the ${reviewApp === "judgeme" ? "Judge.me" : "Stamped"} connector, or upload a CSV/TXT export.`)
+        return
+      }
+      if (!directCollectionApps.includes(reviewApp)) {
+        setStatus("Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
+        return
+      }
     }
     setStatus("Generating report...")
     const response = await fetch("/api/scraper/reports", {
@@ -227,11 +233,23 @@ export function ReportsClient({
                 {shopifyReviewApps.map((app) => <option key={app.value} value={app.value}>{app.label}</option>)}
               </select>
             </label>
-            <p className="mt-3 text-sm text-white/70">{reviewApp === "judgeme" ? "Paste a Shopify product URL to try direct Judge.me collection. If credentials are not configured or the product cannot be matched, upload a Judge.me CSV/TXT export instead." : shopifyReviewApps.find((app) => app.value === reviewApp)?.helper}</p>
+            <p className="mt-3 text-sm text-white/70">
+              {reviewApp === "judgeme"
+                ? "Paste a Shopify product URL to try direct Judge.me collection. Upload a Judge.me CSV/TXT export as a fallback."
+                : reviewApp === "stamped"
+                ? "Paste a Shopify product URL for direct Stamped collection. Upload a Stamped CSV export as a fallback."
+                : shopifyReviewApps.find((app) => app.value === reviewApp)?.helper}
+            </p>
             <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-white/58">
               <p className="font-bold text-white/78">Recommended export columns</p>
               <p className="mt-2 font-mono">review_text, rating, review_title, product_name, review_date</p>
-              <p className="mt-2">{reviewApp === "judgeme" ? "Judge.me direct collection uses your configured Judge.me API credentials on the server. Imports remain available for competitor or client exports." : "Direct Shopify review collection is planned app-by-app. For now, imports are safer and more reliable because every Shopify store uses a different review provider."}</p>
+              <p className="mt-2">
+                {reviewApp === "judgeme"
+                  ? "Judge.me direct collection uses your configured API credentials. Imports remain available for competitor or client exports."
+                  : reviewApp === "stamped"
+                  ? "Stamped direct collection fetches the public widget reviews. Upload a CSV export for private or restricted stores."
+                  : "Upload a CSV/TXT export from your review app. Paste review rows directly if you have a small batch."}
+              </p>
             </div>
           </div>
         ) : null}
@@ -344,17 +362,4 @@ function isEmptyReport(report: IntelligenceReport) {
   return Number(report.summary?.reviewCount ?? 0) === 0
 }
 
-function isArchived(report: IntelligenceReport) {
-  return Boolean(report.summary?.archivedAt)
-}
-
-function productHref(report: IntelligenceReport) {
-  const productUrl = String(report.summary?.productUrl ?? report.filters?.productUrl ?? "")
-  if (!productUrl) return null
-  const params = new URLSearchParams({
-    productUrl,
-    productName: String(report.summary?.productName ?? report.filters?.productName ?? ""),
-    platform: String(report.summary?.platform ?? report.filters?.platform ?? "amazon")
-  })
-  return `/dashboard/reports?${params.toString()}`
-}
+function isArchived(report: IntelligenceRep
