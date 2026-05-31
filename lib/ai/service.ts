@@ -205,47 +205,87 @@ async function fetchJudgeMeProduct({ apiToken, shopDomain, externalId }: { apiTo
 }
 
 async function fetchShopifyProductData(productUrl: string): Promise<{ id: string; title: string }> {
-  const isTestEnv = process.env.NODE_ENV === "test" || !globalThis.fetch.toString().includes("[native code]")
-  const hostname = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "")
-  if (!isTestEnv && (hostname === "competitor-shop.com" || hostname === "stamped-shop.com" || hostname === "demo.com")) {
-    console.log(`[Shopify Data] Mock domain detected: ${hostname}. Returning mock product ID and title.`);
-    return { id: "12345", title: "Mock Demo Product" }
-  }
+    const isTestEnv = process.env.NODE_ENV === "test" || !globalThis.fetch.toString().includes("[native code]");
+    const hostname = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
+    if (!isTestEnv && (hostname === "competitor-shop.com" || hostname === "stamped-shop.com" || hostname === "demo.com")) {
+        console.log(`[Shopify Data] Mock domain detected: ${hostname}. Returning mock product ID and title.`);
+        return { id: "12345", title: "Mock Demo Product" };
+    }
+    const productJsonUrl = shopifyProductJsonUrl(productUrl);
+    try {
+        const response = await fetch(productJsonUrl, {
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+            cache: "no-store"
+        });
+        if (response.ok) {
+            const payload = await response.json() as any;
+            const product = payload.product && typeof payload.product === "object" && !Array.isArray(payload.product)
+                ? payload.product
+                : payload;
+            const id = product.id;
+            if (typeof id === "number" || typeof id === "string") {
+                const title = typeof product.title === "string" ? product.title : "";
+                return { id: String(id), title };
+            }
+        }
+    } catch {
+        // Fall through to HTML page parser
+    }
 
-  const productJsonUrl = shopifyProductJsonUrl(productUrl)
-  try {
-    const response = await fetch(productJsonUrl, { cache: "no-store" })
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(`The product page at ${new URL(productUrl).pathname} could not be found (returned 404). Verify that the product is active in the store catalog, or upload a CSV export instead.`)
-      }
-      throw new Error(`Shopify returned status ${response.status}. Check that the product URL is public, or upload a CSV export.`)
+    // Fallback: Fetch the main product page HTML and extract product ID & title directly
+    try {
+        console.log(`[Shopify Data] .js endpoint failed or returned non-JSON. Scraping main HTML page: ${productUrl}`);
+        const htmlRes = await fetch(productUrl, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            },
+            cache: "no-store"
+        });
+        if (!htmlRes.ok) {
+            throw new Error(`The product page at ${new URL(productUrl).pathname} could not be found (returned ${htmlRes.status}). Verify that the product is active in the store catalog, or upload a CSV export instead.`);
+        }
+        const html = await htmlRes.text();
+
+        // Extract product ID using robust regex matching JSON-LD, meta, analytics, and scripts
+        const productId =
+            html.match(/<meta[^>]+property=["']og:product:id["'][^>]+content=["'](\d+)["']/i)?.[1] ||
+            html.match(/<meta[^>]+content=["'](\d+)["'][^>]+property=["']og:product:id["']/i)?.[1] ||
+            html.match(/["']productid["']\s*:\s*["']?(\d+)["']?/i)?.[1] ||
+            html.match(/["']id["']\s*:\s*["']?gid:\/\/shopify\/Product\/(\d+)["']?/i)?.[1] ||
+            html.match(/["']product_id["']\s*:\s*(\d+)/i)?.[1] ||
+            html.match(/productIds\s*=\s*\[\s*(\d+)\s*\]/i)?.[1] ||
+            html.match(/var\s+meta\s*=\s*\{[^}]*?["']id["']\s*:\s*(\d+)/i)?.[1] ||
+            html.match(/data-product-id=["'](\d+)["']/i)?.[1] || "";
+
+        if (!productId) {
+            throw new Error("Could not detect the Shopify product ID from the page HTML. Upload a CSV export from your review app instead.");
+        }
+
+        // Extract product title from <title> tag
+        const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+        const title = (titleMatch?.[1] || "").split(/[|•-]/)[0].trim() || `Shopify Product ${productId}`;
+
+        console.log(`[Shopify Data] Successfully extracted productId=${productId} title="${title}" from page HTML.`);
+        return { id: productId, title };
     }
-    const payload = await response.json() as Record<string, unknown>
-    const product = payload.product && typeof payload.product === "object" && !Array.isArray(payload.product)
-      ? payload.product as Record<string, unknown>
-      : payload
-    const id = product.id
-    if (typeof id !== "number" && typeof id !== "string") {
-      throw new Error("The Shopify product data did not include a product ID. Upload a CSV export from your review app instead.")
+    catch (error: any) {
+        const errorStr = `${error.message || ""} ${error.code || ""} ${error.cause?.message || ""} ${error.cause?.code || ""}`;
+        if (errorStr.includes("fetch failed") || errorStr.includes("ENOTFOUND") || errorStr.includes("cert") || errorStr.includes("ALTNAME") || errorStr.includes("TLS") || errorStr.includes("Overflow") || errorStr.includes("OVERFLOW")) {
+            let reason = "The network connection failed.";
+            if (errorStr.includes("cert") || errorStr.includes("ALTNAME") || errorStr.includes("TLS")) {
+                reason = "The website's SSL/TLS certificate is invalid or is being intercepted by your network connection (e.g. proxy or captive portal).";
+            }
+            else if (errorStr.includes("Overflow") || errorStr.includes("OVERFLOW")) {
+                reason = "The website returned extremely large headers that exceeded server parser limits.";
+            }
+            else if (errorStr.includes("ENOTFOUND") || errorStr.includes("DNS")) {
+                reason = "The domain name could not be resolved (DNS lookup failed).";
+            }
+            throw new Error(`${reason} Verify that the URL is public and active in your browser, or upload a CSV/TXT export from your review app instead.`);
+        }
+        throw error;
     }
-    const title = typeof product.title === "string" ? product.title : ""
-    return { id: String(id), title }
-  } catch (error: any) {
-    const errorStr = `${error.message || ""} ${error.code || ""} ${error.cause?.message || ""} ${error.cause?.code || ""}`
-    if (errorStr.includes("fetch failed") || errorStr.includes("ENOTFOUND") || errorStr.includes("cert") || errorStr.includes("ALTNAME") || errorStr.includes("TLS") || errorStr.includes("Overflow") || errorStr.includes("OVERFLOW")) {
-      let reason = "The network connection failed."
-      if (errorStr.includes("cert") || errorStr.includes("ALTNAME") || errorStr.includes("TLS")) {
-        reason = "The website's SSL/TLS certificate is invalid or is being intercepted by your network connection (e.g. proxy or captive portal)."
-      } else if (errorStr.includes("Overflow") || errorStr.includes("OVERFLOW")) {
-        reason = "The website returned extremely large headers that exceeded server parser limits."
-      } else if (errorStr.includes("ENOTFOUND") || errorStr.includes("DNS")) {
-        reason = "The domain name could not be resolved (DNS lookup failed)."
-      }
-      throw new Error(`${reason} Verify that the URL is public and active in your browser, or upload a CSV/TXT export from your review app instead.`);
-    }
-    throw error
-  }
 }
 
 /** @deprecated Use fetchShopifyProductData instead */
@@ -1998,9 +2038,5 @@ export async function resolveShopifyDomain(productUrl: string): Promise<string> 
     return new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
   } catch {
     return "";
-  }
-}
-eReviewCount: totalReviewsCount || collectedReviews.length,
-    sampleNote: `Okendo public API retrieved ${collectedReviews.length} review${collectedReviews.length === 1 ? "" : "s"}.`
   }
 }

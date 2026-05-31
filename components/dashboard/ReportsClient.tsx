@@ -81,7 +81,19 @@ export function ReportsClient({
   }, [initialProductUrl])
 
   async function detectReviewApp(url: string) {
-    if (!url.trim() || platform !== "shopify") return
+    if (!url.trim()) return
+    const isAmazon = url.includes("amazon.") || url.includes("/dp/") || url.includes("/gp/")
+    const targetPlatform = isAmazon ? "amazon" : "shopify"
+
+    if (platform !== targetPlatform) {
+      setPlatform(targetPlatform)
+    }
+
+    if (targetPlatform !== "shopify") {
+      setDetectedApp(null)
+      return
+    }
+
     try {
       new URL(url)
     } catch {

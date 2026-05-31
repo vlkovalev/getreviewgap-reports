@@ -348,8 +348,9 @@ async function assertPublicJudgeMeCrawler() {
     assert.equal(result.source, "judgeme")
     assert.equal(result.reviews.length, 1)
     assert.ok(result.reviews[0].includes("Rating: 5. Amazing. This is a great product!"))
-    assert.ok(requestedUrls[1].includes("shop_domain=competitor-shop.com"))
-    assert.ok(requestedUrls[1].includes("product_handle=cool-product"))
+    const widgetUrl = requestedUrls.find((u) => u.includes("shop_domain=competitor-shop.com"));
+    assert.ok(widgetUrl, "Should have requested Judge.me widget URL");
+    assert.ok(widgetUrl.includes("product_handle=cool-product"));
   } finally {
     globalThis.fetch = originalFetch
     if (originalJudgeMeToken !== undefined) process.env.JUDGEME_API_TOKEN = originalJudgeMeToken
