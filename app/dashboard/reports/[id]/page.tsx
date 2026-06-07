@@ -658,7 +658,7 @@ function cleanText(value: unknown) {
     .trim()
 }
 
-function renderPlain(value: unknown) {
+function renderPlain(value: unknown): string {
   if (Array.isArray(value)) return value.map((item) => cleanText(item)).filter(Boolean).join(", ") || "-"
   if (value && typeof value === "object") return Object.entries(value as Record<string, unknown>)
     .map(([key, item]) => `${formatHeader(key)}: ${renderPlain(item)}`)
