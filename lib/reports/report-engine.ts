@@ -429,9 +429,29 @@ function buildPdfLines(report: IntelligenceReport) {
 
 function stringifyPdfValue(value: unknown): string {
   if (value === null || value === undefined) return "-"
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value)
-  if (Array.isArray(value)) return value.map((item) => stringifyPdfValue(item)).join("; ").slice(0, 160)
-  return JSON.stringify(value).slice(0, 160)
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return closeUnclosedBrackets(String(value).slice(0, 160))
+  if (Array.isArray(value)) return closeUnclosedBrackets(value.map((item) => stringifyPdfValue(item)).join("; ").slice(0, 160))
+  return closeUnclosedBrackets(JSON.stringify(value).slice(0, 160))
+}
+
+function closeUnclosedBrackets(value: string): string {
+  const brackets = { "(": ")", "[": "]", "{": "}" }
+  const stack: string[] = []
+  
+  for (const char of value) {
+    if (char === "(" || char === "[" || char === "{") {
+      stack.push(char)
+    } else if (char === ")" || char === "]" || char === "}") {
+      if (stack.length > 0) {
+        const last = stack[stack.length - 1]
+        if ((last === "(" && char === ")") || (last === "[" && char === "]") || (last === "{" && char === "}")) {
+          stack.pop()
+        }
+      }
+    }
+  }
+  
+  return value + stack.reverse().map((bracket) => brackets[bracket as keyof typeof brackets]).join("")
 }
 
 function formatReviewApp(value: unknown) {
