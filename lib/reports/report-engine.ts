@@ -451,7 +451,20 @@ function closeUnclosedBrackets(value: string): string {
     }
   }
   
-  return value + stack.reverse().map((bracket) => brackets[bracket as keyof typeof brackets]).join("")
+  let result = value
+  if (stack.length > 0) {
+    const closingBrackets = stack.reverse().map((bracket) => brackets[bracket as keyof typeof brackets]).join("")
+    
+    // Check if the last unclosed bracket is "(" and the value ends with digits or decimals
+    // This handles cases like "reviews (35" -> "reviews (35%)"
+    if (stack[0] === "(" && /\(\d+\.?\d*$/.test(value)) {
+      result = value + "%" + closingBrackets
+    } else {
+      result = value + closingBrackets
+    }
+  }
+  
+  return result
 }
 
 function formatReviewApp(value: unknown) {

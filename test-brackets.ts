@@ -17,15 +17,28 @@ function closeUnclosedBrackets(value: string): string {
     }
   }
   
-  return value + stack.reverse().map((bracket) => brackets[bracket as keyof typeof brackets]).join("")
+  let result = value
+  if (stack.length > 0) {
+    const closingBrackets = stack.reverse().map((bracket) => brackets[bracket as keyof typeof brackets]).join("")
+    
+    // Check if the last unclosed bracket is "(" and the value ends with digits or decimals
+    // This handles cases like "reviews (35" -> "reviews (35%)"
+    if (stack[0] === "(" && /\(\d+\.?\d*$/.test(value)) {
+      result = value + "%" + closingBrackets
+    } else {
+      result = value + closingBrackets
+    }
+  }
+  
+  return result
 }
 
 // Test cases
 const testCases = [
   {
     input: "15 of 57 reviews (26",
-    expected: "15 of 57 reviews (26)",
-    description: "Unclosed parenthesis"
+    expected: "15 of 57 reviews (26%)",
+    description: "Unclosed parenthesis with percentage"
   },
   {
     input: "evidence: 15 of 57 reviews (26.3%). Sub-patterns: deflates quickly, arrived punctured, difficult",
@@ -39,8 +52,8 @@ const testCases = [
   },
   {
     input: "Mitigates top complaint theme: Inflation and Air Retention Issues. Evidence: 15 of 57 reviews (26",
-    expected: "Mitigates top complaint theme: Inflation and Air Retention Issues. Evidence: 15 of 57 reviews (26)",
-    description: "Another unclosed parenthesis case from PDF"
+    expected: "Mitigates top complaint theme: Inflation and Air Retention Issues. Evidence: 15 of 57 reviews (26%)",
+    description: "Another unclosed parenthesis case from PDF with percentage"
   },
   {
     input: "normal text without brackets",
