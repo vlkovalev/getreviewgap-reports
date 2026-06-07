@@ -1065,7 +1065,12 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
 
   const topComplaints = Array.isArray(parsedJson.top_complaints)
     ? parsedJson.top_complaints.map((item: any) => {
-        const pctStr = typeof item.percentage === 'number' ? ` (${item.percentage}%)` : ""
+        const count = item.count || 0
+        const total = item.total || reviews.length
+        const percentage = typeof item.percentage === 'number' 
+          ? item.percentage 
+          : total > 0 ? (count / total * 100).toFixed(2) : 0
+        const pctStr = ` (${percentage}%)`
         const subPatternsStr = Array.isArray(item.sub_patterns) && item.sub_patterns.length ? ` Sub-patterns: ${item.sub_patterns.join(", ")}.` : ""
         const quotesStr = Array.isArray(item.verbatim_quotes) && item.verbatim_quotes.length
           ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}★, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
@@ -1075,7 +1080,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
         return {
           theme: item.theme || "Complaint theme",
           severity: item.severity === 'high' || item.severity === 'medium' || item.severity === 'low' ? item.severity : "medium",
-          evidence: `${item.count || 0} of ${item.total || reviews.length} reviews${pctStr}.${subPatternsStr}${quotesStr}${temporalStr}`,
+          evidence: `${count} of ${total} reviews${pctStr}.${subPatternsStr}${quotesStr}${temporalStr}`,
           productImplication: item.action || "No recommendation specified."
         }
       })
@@ -1083,7 +1088,12 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
 
   const topCompliments = Array.isArray(parsedJson.top_compliments)
     ? parsedJson.top_compliments.map((item: any) => {
-        const pctStr = typeof item.percentage === 'number' ? ` (${item.percentage}%)` : ""
+        const count = item.count || 0
+        const total = item.total || reviews.length
+        const percentage = typeof item.percentage === 'number' 
+          ? item.percentage 
+          : total > 0 ? (count / total * 100).toFixed(2) : 0
+        const pctStr = ` (${percentage}%)`
         const subPatternsStr = Array.isArray(item.sub_patterns) && item.sub_patterns.length ? ` Sub-patterns: ${item.sub_patterns.join(", ")}.` : ""
         const quotesStr = Array.isArray(item.verbatim_quotes) && item.verbatim_quotes.length
           ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}★, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
@@ -1091,7 +1101,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
 
         return {
           theme: item.theme || "Compliment theme",
-          evidence: `${item.count || 0} of ${item.total || reviews.length} reviews${pctStr}.${subPatternsStr}${quotesStr}`,
+          evidence: `${count} of ${total} reviews${pctStr}.${subPatternsStr}${quotesStr}`,
           marketingImplication: item.action || "No marketing angle specified."
         }
       })
