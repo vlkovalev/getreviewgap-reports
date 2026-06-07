@@ -76,32 +76,30 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           <Link href={freshReportHref} className="rounded-full bg-lime px-5 py-3 font-black text-black">Run fresh analysis</Link>
         </section>
       ) : null}
-      <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
-        <div className="border-b border-white/10 bg-gradient-to-br from-lime/20 via-white/[0.04] to-cyan/10 p-6 md:p-8">
+      <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/90 shadow-2xl shadow-black/20">
+        <div className="border-b border-white/10 bg-gradient-to-br from-lime/15 via-white/[0.04] to-cyan/10 p-6 md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="max-w-3xl">
               <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge status={report.status} />
-                <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-black uppercase text-white/55">{String(report.reportType).replaceAll("_", " ")}</span>
+                <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-black uppercase text-white/70">{String(report.reportType).replaceAll("_", " ")}</span>
               </div>
-              <p className="mt-6 text-sm font-black uppercase text-lime">{isSingleProductReport ? "ReviewGap brief" : "Watchlist report"}</p>
-              <h1 className="mt-2 text-4xl font-black leading-none md:text-6xl">
+              <p className="mt-6 text-sm font-black uppercase text-lime tracking-[0.2em]">{isSingleProductReport ? "ReviewGap brief" : "Watchlist report"}</p>
+              <h1 className="mt-2 text-4xl font-black leading-tight tracking-[-0.03em] md:text-6xl">
                 {String(isSingleProductReport ? (report.summary?.productName ?? "Product review analysis") : cleanReportTitle(report.title))}
               </h1>
               {isSingleProductReport ? (
                 <p className="mt-4 max-w-2xl text-white/70">
-                  {report.summary?.productUrl ? <a href={String(report.summary.productUrl)} target="_blank" rel="noreferrer" className="hover:text-lime">{displayUrl(String(report.summary.productUrl))}</a> : "No product URL supplied"}
+                  {report.summary?.productUrl ? <a href={String(report.summary.productUrl)} target="_blank" rel="noreferrer" className="font-medium text-lime hover:text-cyan transition-colors">{displayUrl(String(report.summary.productUrl))}</a> : "No product URL supplied"}
                 </p>
               ) : (
-                <p className="mt-4 max-w-2xl text-white/70">
-                  Tracked catalog watchlist monitor report
-                </p>
+                <p className="mt-4 max-w-2xl text-white/70">Tracked catalog watchlist monitor report.</p>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full bg-lime px-4 py-2 text-sm font-black text-black">PDF</a>
-              <a href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full bg-white px-4 py-2 text-sm font-black text-black">CSV</a>
-              <a href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 px-4 py-2 text-sm font-black">JSON</a>
+            <div className="flex flex-wrap gap-3">
+              <a href={`/api/scraper/reports/${report.id}/export?format=pdf`} className="rounded-full bg-lime px-5 py-3 text-sm font-black text-black transition hover:bg-lime/90">PDF</a>
+              <a href={`/api/scraper/reports/${report.id}/export?format=csv`} className="rounded-full bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-white/90">CSV</a>
+              <a href={`/api/scraper/reports/${report.id}/export?format=json`} className="rounded-full border border-white/10 bg-black/30 px-5 py-3 text-sm font-black text-white transition hover:border-lime/40 hover:text-white">JSON</a>
             </div>
           </div>
 
@@ -135,7 +133,13 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
 
         {isSingleProductReport ? (
           <section className="border-b border-white/10 bg-black/20 p-6 md:p-8">
-            <p className="text-sm font-black uppercase text-cyan">Data coverage</p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-black uppercase text-cyan">Data coverage</p>
+                <p className="mt-2 text-sm text-white/70">Sample and confidence details for this product review brief.</p>
+              </div>
+              <div className="rounded-3xl bg-black/50 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-white/65">Review evidence snapshot</div>
+            </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               <CoverageItem label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
               <CoverageItem label="Written reviews analyzed" value={String(reviewCount)} />
@@ -143,7 +147,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
               <CoverageItem label="Coverage" value={dataScore.label} tone={dataScore.tone} />
             </div>
             {targetReviewCount && reviewCount < targetReviewCount ? (
-              <div className="mt-4 rounded-xl border border-yellow-300/20 bg-yellow-300/5 p-4 text-sm text-yellow-100/90 leading-relaxed">
+              <div className="mt-4 rounded-[1.5rem] border border-yellow-300/15 bg-yellow-300/10 p-5 text-sm text-yellow-100/90 leading-relaxed shadow-soft">
                 <span className="font-bold text-yellow-300">⚠️ Amazon Review Retrieval Note:</span> Target was {targetReviewCount} written reviews, but only {reviewCount} unique written text reviews were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily caps the public page retrieval of written review texts (often limiting it to ~60-100 reviews). The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.
               </div>
             ) : null}
@@ -151,11 +155,11 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         ) : null}
 
         <div className="grid gap-5 p-6 md:p-8 lg:grid-cols-[1.1fr_.9fr]">
-          <section className="rounded-2xl border border-lime/20 bg-lime/10 p-5">
+          <section className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-soft">
             <p className="text-sm font-black uppercase text-lime">Executive summary</p>
-            <p className="mt-3 text-lg leading-relaxed text-white/84">{String(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
+            <p className="mt-4 text-lg leading-relaxed text-white/85">{String(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
           </section>
-          <section className="rounded-2xl border border-white/10 bg-black/25 p-5">
+          <section className="rounded-[2rem] border border-white/10 bg-black/30 p-6 shadow-soft">
             <p className="text-sm font-black uppercase text-cyan">Next best actions</p>
             <div className="mt-4 grid gap-3">
               {nextActions(insight, isSingleProductReport).map((item) => <ActionItem key={item} text={item} />)}
@@ -380,7 +384,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         </>
       ) : null}
 
-      <section className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+      <section className="mt-6 overflow-x-auto rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-950/90 to-slate-900/80 p-6 shadow-soft">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-black uppercase text-white/40">Appendix</p>
@@ -389,12 +393,14 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           <p className="text-sm text-white/50">{rows.length} rows</p>
         </div>
         {rows.length && headers.length ? (
-          <table className="w-full text-left text-sm">
-            <thead className="text-white/50"><tr>{headers.map((header) => <th key={header} className="min-w-32 py-2 pr-5">{formatHeader(header)}</th>)}</tr></thead>
+          <table className="w-full min-w-[800px] text-left text-sm">
+            <thead className="bg-white/5 text-white/60">
+              <tr>{headers.map((header) => <th key={header} className="min-w-32 py-3 pr-5 text-left font-semibold tracking-wide">{formatHeader(header)}</th>)}</tr>
+            </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr key={index} className="border-t border-white/10">
-                  {headers.map((header) => <td key={header} className="py-3 pr-5 align-top">{renderCell(row[header])}</td>)}
+                <tr key={index} className={`border-t border-white/10 ${index % 2 === 0 ? "bg-white/3" : "bg-transparent"} hover:bg-white/10`}>
+                  {headers.map((header) => <td key={header} className="py-4 pr-5 align-top text-white/80">{renderCell(row[header])}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -551,9 +557,9 @@ function CoverageItem({ label, value, tone = "white" }: { label: string; value: 
 function BriefPanel({ title, tone, children }: { title: string; tone: "coral" | "lime" | "cyan" | "yellow"; children: React.ReactNode }) {
   const color = toneClass(tone)
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+    <article className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 shadow-soft ring-1 ring-white/5">
       <h2 className={`text-xl font-black ${color}`}>{title}</h2>
-      <div className="mt-4">{children}</div>
+      <div className="mt-5">{children}</div>
     </article>
   )
 }
@@ -561,13 +567,13 @@ function BriefPanel({ title, tone, children }: { title: string; tone: "coral" | 
 function EvidenceList({ title, items, tone }: { title: string; items: Array<{ title: string; eyebrow: string; body: string; footer: string }>; tone: "coral" | "lime" }) {
   return (
     <BriefPanel title={title} tone={tone}>
-      <div className="grid gap-3">
+      <div className="grid gap-4">
         {items.length ? items.slice(0, 5).map((item) => (
-          <article key={`${item.title}-${item.body}`} className="rounded-xl bg-black/25 p-4">
-            <p className="text-xs font-black uppercase text-white/38">{item.eyebrow}</p>
-            <h3 className="mt-1 font-black text-white">{item.title}</h3>
-            <p className="mt-2 text-sm text-white/64">{item.body}</p>
-            <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/76">{item.footer}</p>
+          <article key={`${item.title}-${item.body}`} className="rounded-3xl border border-white/10 bg-black/25 p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-white/40">{item.eyebrow}</p>
+            <h3 className="mt-3 font-black text-white text-lg">{item.title}</h3>
+            <p className="mt-3 text-sm text-white/65 leading-relaxed">{item.body}</p>
+            <p className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/75">{item.footer}</p>
           </article>
         )) : <EmptyText text="No evidence was available in this section." />}
       </div>
@@ -578,8 +584,8 @@ function EvidenceList({ title, items, tone }: { title: string; items: Array<{ ti
 function SimpleList({ title, items, tone }: { title: string; items: string[]; tone: "coral" | "lime" | "cyan" | "yellow" }) {
   return (
     <BriefPanel title={title} tone={tone}>
-      <ul className="grid gap-2 text-sm text-white/70">
-        {items.length ? items.slice(0, 8).map((item) => <li key={item} className="rounded-xl bg-black/25 p-3">{item}</li>) : <li><EmptyText text="No items were available in this section." /></li>}
+      <ul className="grid gap-3 text-sm text-white/75">
+        {items.length ? items.slice(0, 8).map((item) => <li key={item} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-white/80 shadow-sm">{item}</li>) : <li><EmptyText text="No items were available in this section." /></li>}
       </ul>
     </BriefPanel>
   )
@@ -648,15 +654,54 @@ function summarizeObject(value: unknown) {
   return Object.entries(value as Record<string, unknown>).slice(0, 4).map(([key, item]) => `${formatHeader(key)}: ${renderPlain(item)}`).join(" | ")
 }
 
+function cleanText(value: unknown) {
+  if (value == null) return ""
+  return String(value)
+    .replace(/\[(Outcome|Objection|Comparison|Unexpected Use|Unexpected|Competitor Moat Analysis|Moat Analysis|Emerging Signal)\]/gi, "")
+    .replace(/\[.*?\]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+}
+
 function renderPlain(value: unknown) {
-  if (Array.isArray(value)) return `${value.length} items`
-  if (value && typeof value === "object") return "available"
-  return String(value ?? "-")
+  if (Array.isArray(value)) return value.map((item) => cleanText(item)).filter(Boolean).join(", ") || "-"
+  if (value && typeof value === "object") return Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => `${formatHeader(key)}: ${renderPlain(item)}`)
+    .join(" | ")
+  return cleanText(value ?? "-")
 }
 
 function renderCell(value: unknown) {
-  if (Array.isArray(value) || (value && typeof value === "object")) return <span className="font-mono text-xs text-white/60">{JSON.stringify(value)}</span>
-  return String(value ?? "-")
+  if (Array.isArray(value)) {
+    if (value.every((item) => typeof item !== "object")) {
+      return <span className="text-xs text-white/70">{value.map(cleanText).filter(Boolean).join(", ") || "-"}</span>
+    }
+    return (
+      <div className="space-y-2 text-xs text-white/70">
+        {value.map((item, index) => (
+          <div key={index} className="rounded-2xl bg-white/5 p-3">
+            {renderCell(item)}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+    return (
+      <div className="space-y-2 text-xs text-white/70">
+        {entries.map(([key, item]) => (
+          <div key={key} className="rounded-2xl bg-white/5 p-3">
+            <span className="font-semibold text-white/80">{formatHeader(key)}:</span>{" "}
+            <span className="text-white/75">{renderPlain(item)}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return cleanText(value ?? "-")
 }
 
 function formatHeader(value: string) {
