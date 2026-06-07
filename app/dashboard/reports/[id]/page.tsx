@@ -157,7 +157,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         <div className="grid gap-5 p-6 md:p-8 lg:grid-cols-[1.1fr_.9fr]">
           <section className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-soft">
             <p className="text-sm font-black uppercase text-lime">Executive summary</p>
-            <p className="mt-4 text-lg leading-relaxed text-white/85">{String(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
+            <p className="mt-4 text-lg leading-relaxed text-white/85">{cleanText(report.summary?.executiveSummary ?? summarizeObject(report.summary))}</p>
           </section>
           <section className="rounded-[2rem] border border-white/10 bg-black/30 p-6 shadow-soft">
             <p className="text-sm font-black uppercase text-cyan">Next best actions</p>
@@ -178,7 +178,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       {report.summary?.warning ? (
         <section className="mt-6 rounded-2xl border border-yellow-300/25 bg-yellow-300/10 p-5 text-yellow-50/82">
           <p className="text-sm font-black uppercase text-yellow-300">Data source warning</p>
-          <p className="mt-2">{String(report.summary.warning)}</p>
+          <p className="mt-2">{cleanText(report.summary.warning)}</p>
         </section>
       ) : null}
 
@@ -205,9 +205,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
                     <p className="text-sm text-white/45">Evidence-led findings from {reviewCount} review{reviewCount === 1 ? "" : "s"}</p>
                   </div>
                   <div className="mt-5 grid gap-3 lg:grid-cols-3">
-                    <SnapshotItem label="Main friction" title={insight.topComplaints?.[0]?.theme ?? "No complaint signal"} body={insight.topComplaints?.[0]?.productImplication ?? "Collect more reviews before choosing a product response."} tone="coral" />
-                    <SnapshotItem label="Winning signal" title={insight.topCompliments?.[0]?.theme ?? "No positive signal"} body={insight.topCompliments?.[0]?.marketingImplication ?? "No validated marketing claim is available yet."} tone="lime" />
-                    <SnapshotItem label="Recommended move" title={insight.productImprovementIdeas?.[0]?.idea ?? "Increase evidence"} body={insight.productImprovementIdeas?.[0]?.whyItMatters ?? "Add more customer review text to increase confidence."} tone="cyan" />
+                    <SnapshotItem label="Main friction" title={cleanText(insight.topComplaints?.[0]?.theme ?? "No complaint signal")} body={cleanText(insight.topComplaints?.[0]?.productImplication ?? "Collect more reviews before choosing a product response.")} tone="coral" />
+                    <SnapshotItem label="Winning signal" title={cleanText(insight.topCompliments?.[0]?.theme ?? "No positive signal")} body={cleanText(insight.topCompliments?.[0]?.marketingImplication ?? "No validated marketing claim is available yet.")} tone="lime" />
+                    <SnapshotItem label="Recommended move" title={cleanText(insight.productImprovementIdeas?.[0]?.idea ?? "Increase evidence")} body={cleanText(insight.productImprovementIdeas?.[0]?.whyItMatters ?? "Add more customer review text to increase confidence.")} tone="cyan" />
                   </div>
                 </section>
 
@@ -215,18 +215,18 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
                   <section className={`mt-6 grid gap-4 ${(!isEmpty(insight.topComplaints) && !isEmpty(insight.topCompliments)) ? "lg:grid-cols-2" : "grid-cols-1"}`}>
                     {!isEmpty(insight.topComplaints) && (
                       <EvidenceList title="Top complaints to exploit or avoid" items={insight.topComplaints?.map((item) => ({
-                        title: item.theme,
-                        eyebrow: `Severity: ${item.severity}`,
-                        body: item.evidence,
-                        footer: item.productImplication
+                        title: cleanText(item.theme),
+                        eyebrow: cleanText(`Severity: ${item.severity}`),
+                        body: cleanText(item.evidence),
+                        footer: cleanText(item.productImplication)
                       })) ?? []} tone="coral" />
                     )}
                     {!isEmpty(insight.topCompliments) && (
                       <EvidenceList title="Strengths customers already value" items={insight.topCompliments?.map((item) => ({
-                        title: item.theme,
+                        title: cleanText(item.theme),
                         eyebrow: "Positive signal",
-                        body: item.evidence,
-                        footer: item.marketingImplication
+                        body: cleanText(item.evidence),
+                        footer: cleanText(item.marketingImplication)
                       })) ?? []} tone="lime" />
                     )}
                   </section>
@@ -274,12 +274,12 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
                   <BriefPanel title="Product improvement ideas" tone="yellow">
                     <div className="grid gap-3">
                       {insight.productImprovementIdeas?.length ? insight.productImprovementIdeas.slice(0, 5).map((item) => (
-                        <div key={item.idea} className="rounded-xl bg-black/25 p-4">
+                        <div key={cleanText(item.idea) || item.idea} className="rounded-xl bg-black/25 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-black">{item.idea}</p>
-                            <span className="rounded-full bg-yellow-300/15 px-2 py-1 text-xs font-black uppercase text-yellow-300">{item.confidence}</span>
+                            <p className="font-black">{cleanText(item.idea)}</p>
+                            <span className="rounded-full bg-yellow-300/15 px-2 py-1 text-xs font-black uppercase text-yellow-300">{cleanText(item.confidence)}</span>
                           </div>
-                          <p className="mt-2 text-sm text-white/64">{item.whyItMatters}</p>
+                          <p className="mt-2 text-sm text-white/64">{cleanText(item.whyItMatters)}</p>
                         </div>
                       )) : <EmptyText text="No product ideas were available in this report." />}
                     </div>
@@ -457,14 +457,7 @@ function groupBuyerLanguage(phrases: string[]) {
 
   phrases.forEach((phrase) => {
     const trimmed = phrase.trim()
-    const clean = trimmed
-      .replaceAll("[Outcome]", "")
-      .replaceAll("[Objection]", "")
-      .replaceAll("[Comparison]", "")
-      .replaceAll("[Unexpected Use]", "")
-      .replaceAll("[Unexpected]", "")
-      .replace(/\s+/g, " ")
-      .trim()
+    const clean = cleanText(trimmed)
 
     if (trimmed.includes("[Outcome]")) {
       groups.outcomes.push(clean)
@@ -585,22 +578,22 @@ function SimpleList({ title, items, tone }: { title: string; items: string[]; to
   return (
     <BriefPanel title={title} tone={tone}>
       <ul className="grid gap-3 text-sm text-white/75">
-        {items.length ? items.slice(0, 8).map((item) => <li key={item} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-white/80 shadow-sm">{item}</li>) : <li><EmptyText text="No items were available in this section." /></li>}
+        {items.length ? items.slice(0, 8).map((item) => <li key={cleanText(item) || item} className="rounded-2xl border border-white/10 bg-black/20 p-4 text-white/80 shadow-sm">{cleanText(item)}</li>) : <li><EmptyText text="No items were available in this section." /></li>}
       </ul>
     </BriefPanel>
   )
 }
 
 function ActionItem({ text }: { text: string }) {
-  return <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/76">{text}</p>
+  return <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/76">{cleanText(text)}</p>
 }
 
 function SnapshotItem({ label, title, body, tone }: { label: string; title: string; body: string; tone: "coral" | "lime" | "cyan" }) {
   return (
     <article className="rounded-xl border border-white/10 bg-black/25 p-5">
-      <p className={`text-xs font-black uppercase ${toneClass(tone)}`}>{label}</p>
-      <h3 className="mt-3 text-xl font-black">{title}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-white/65">{body}</p>
+      <p className={`text-xs font-black uppercase ${toneClass(tone)}`}>{cleanText(label)}</p>
+      <h3 className="mt-3 text-xl font-black">{cleanText(title)}</h3>
+      <p className="mt-3 text-sm leading-relaxed text-white/65">{cleanText(body)}</p>
     </article>
   )
 }
@@ -611,9 +604,9 @@ function EmptyText({ text }: { text: string }) {
 
 function nextActions(insight: ReviewInsightLike | undefined, isSingle: boolean) {
   if (isSingle) {
-    const ideas = insight?.productImprovementIdeas?.map((item) => item.idea) ?? []
-    const complaints = insight?.topComplaints?.map((item) => `Address "${item.theme}" in product, listing, or support copy.`) ?? []
-    const hooks = insight?.adHooks?.map((item) => `Test hook: ${item}`) ?? []
+    const ideas = insight?.productImprovementIdeas?.map((item) => cleanText(item.idea)) ?? []
+    const complaints = insight?.topComplaints?.map((item) => `Address "${cleanText(item.theme)}" in product, listing, or support copy.`) ?? []
+    const hooks = insight?.adHooks?.map((item) => cleanText(item)) ?? []
     return [...ideas, ...complaints, ...hooks].slice(0, 4).length ? [...ideas, ...complaints, ...hooks].slice(0, 4) : [
       "Collect more review data before making product decisions.",
       "Paste reviews manually if the connector returns no text.",
@@ -657,8 +650,10 @@ function summarizeObject(value: unknown) {
 function cleanText(value: unknown) {
   if (value == null) return ""
   return String(value)
+    .replace(/<[^>]*>/g, "")
     .replace(/\[(Outcome|Objection|Comparison|Unexpected Use|Unexpected|Competitor Moat Analysis|Moat Analysis|Emerging Signal)\]/gi, "")
     .replace(/\[.*?\]/g, "")
+    .replace(/[\[\]]/g, "")
     .replace(/\s{2,}/g, " ")
     .trim()
 }
