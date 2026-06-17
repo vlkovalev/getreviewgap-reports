@@ -31,6 +31,63 @@ export function listReportTypes() {
   return Object.entries(reportLabels).map(([value, label]) => ({ value: value as ReportType, label }))
 }
 
+type ReportInput = {
+  reportType: ReportType
+  customerId?: string
+  title: string
+  filters: ReportFilters
+  summary: Record<string, any>
+  data: Record<string, any>
+}
+
+export function mapPrismaIntelligenceReport(report: {
+  id: string
+  customerId: string | null
+  reportType: string
+  title: string
+  status: string
+  filters: unknown
+  summary: unknown
+  data: unknown
+  generatedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+}): IntelligenceReport {
+  return {
+    id: report.id,
+    customerId: report.customerId ?? undefined,
+    reportType: report.reportType as ReportType,
+    title: report.title,
+    status: report.status as IntelligenceReport["status"],
+    filters: (report.filters as ReportFilters) ?? {},
+    summary: (report.summary as Record<string, unknown>) ?? {},
+    data: (report.data as Record<string, unknown>) ?? {},
+    generatedAt: report.generatedAt?.toISOString(),
+    createdAt: report.createdAt.toISOString(),
+    updatedAt: report.updatedAt.toISOString()
+  } satisfies IntelligenceReport
+}
+
+async function persistIntelligenceReport(reportInput: ReportInput): Promise<IntelligenceReport> {
+  if (hasRealDatabaseUrl()) {
+    const report = await getDb().intelligenceReport.create({
+      data: {
+        customerId: reportInput.customerId,
+        reportType: reportInput.reportType,
+        title: reportInput.title,
+        status: "COMPLETED",
+        filters: reportInput.filters,
+        summary: reportInput.summary,
+        data: reportInput.data,
+        generatedAt: new Date()
+      }
+    })
+    return mapPrismaIntelligenceReport(report)
+  }
+
+  return addReport(reportInput)
+}
+
 export async function generateReport(type: ReportType, filters: ReportFilters = {}, customerId?: string) {
   if ((type === "REVIEW_RATING" || type === "EXECUTIVE_SUMMARY") && (filters.productUrl || filters.pastedReviews)) {
     return generateReviewIntelligenceReport(type, filters, customerId)
@@ -47,36 +104,7 @@ export async function generateReport(type: ReportType, filters: ReportFilters = 
     data: payload.data
   }
 
-  if (hasRealDatabaseUrl()) {
-    const now = new Date()
-    const report = await getDb().intelligenceReport.create({
-      data: {
-        customerId,
-        reportType: type,
-        title: reportInput.title,
-        status: "COMPLETED",
-        filters,
-        summary: reportInput.summary,
-        data: reportInput.data,
-        generatedAt: now
-      }
-    })
-    return {
-      id: report.id,
-      customerId: report.customerId ?? undefined,
-      reportType: type,
-      title: report.title,
-      status: report.status,
-      filters: (report.filters as ReportFilters) ?? {},
-      summary: (report.summary as Record<string, unknown>) ?? {},
-      data: (report.data as Record<string, unknown>) ?? {},
-      generatedAt: report.generatedAt?.toISOString(),
-      createdAt: report.createdAt.toISOString(),
-      updatedAt: report.updatedAt.toISOString()
-    } satisfies IntelligenceReport
-  }
-
-  return addReport(reportInput)
+  return persistIntelligenceReport(reportInput)
 }
 
 async function generateReviewIntelligenceReport(type: ReportType, filters: ReportFilters, customerId?: string) {
@@ -114,7 +142,6 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     marketplace,
     reviewPageLimit: filters.reviewPageLimit
   }, reviewResult.reviews)
-  const now = new Date()
   const insightRows = [
     ...insight.topComplaints.map((item) => ({ section: "Top complaint", theme: item.theme, evidence: item.evidence, severity: item.severity, recommendation: item.productImplication })),
     ...insight.topCompliments.map((item) => ({ section: "Top compliment", theme: item.theme, evidence: item.evidence, severity: "", recommendation: item.marketingImplication })),
@@ -168,35 +195,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
     }
   }
 
-  if (hasRealDatabaseUrl()) {
-    const report = await getDb().intelligenceReport.create({
-      data: {
-        customerId,
-        reportType: type,
-        title: reportInput.title,
-        status: "COMPLETED",
-        filters,
-        summary: reportInput.summary,
-        data: reportInput.data,
-        generatedAt: now
-      }
-    })
-    return {
-      id: report.id,
-      customerId: report.customerId ?? undefined,
-      reportType: type,
-      title: report.title,
-      status: report.status,
-      filters: (report.filters as ReportFilters) ?? {},
-      summary: (report.summary as Record<string, unknown>) ?? {},
-      data: (report.data as Record<string, unknown>) ?? {},
-      generatedAt: report.generatedAt?.toISOString(),
-      createdAt: report.createdAt.toISOString(),
-      updatedAt: report.updatedAt.toISOString()
-    } satisfies IntelligenceReport
-  }
-
-  return addReport(reportInput)
+  return persistIntelligenceReport(reportInput)
 }
 
 function reviewDepthLabel(pageLimit?: number) {
@@ -240,7 +239,7 @@ export function exportReportPdf(report: IntelligenceReport) {
   const lines = buildPdfLines(report)
   const objects: string[] = []
   const pages: number[] = []
-  const chunks = chunk(lines, 44)
+  const chunks = paginatePdfLines(lines, 42)
 
   objects.push("<< /Type /Catalog /Pages 2 0 R >>")
   objects.push("<< /Type /Pages /Kids [] /Count 0 >>")
@@ -250,22 +249,33 @@ export function exportReportPdf(report: IntelligenceReport) {
   chunks.forEach((pageLines, pageIndex) => {
     let y = 688
     const contentLines = [
-      "q 0.06 0.07 0.09 rg 0 720 612 72 re f Q",
-      "q 0.78 1 0.24 rg 0 716 612 4 re f Q",
+      pdfRect(0, 0, 612, 792, "0.97 0.98 0.96"),
+      pdfRect(0, 716, 612, 76, "0.05 0.07 0.10"),
+      pdfRect(0, 716, 612, 4, "0.78 1 0.24"),
+      pdfRect(46, 674, 520, 26, "1 1 1"),
+      "q 0.86 0.89 0.88 RG 46 674 520 26 re S Q",
       pdfDraw("REVIEWGAP", 46, 758, 11, "F2", "0.78 1 0.24"),
       pdfDraw("AI Review Intelligence Brief", 46, 735, 19, "F2", "1 1 1"),
+      pdfDraw("Buyer sentiment signals, risks, and next actions", 46, 721, 9, "F1", "0.72 0.75 0.78"),
       pdfDraw(`Page ${pageIndex + 1} of ${chunks.length}`, 500, 744, 9, "F1", "0.72 0.75 0.78")
     ]
-    pageLines.forEach((line) => {
+    pageLines.forEach((line, lineIndex) => {
       if (isPdfSectionHeading(line)) {
         y -= 6
-        contentLines.push(pdfDraw(line.toUpperCase(), 46, y, 11, "F2", "0.30 0.77 0.82"))
+        contentLines.push(
+          pdfRect(46, y - 5, 520, 20, "0.88 0.97 0.98"),
+          pdfRect(46, y - 5, 4, 20, "0.30 0.77 0.82"),
+          pdfDraw(line.toUpperCase(), 58, y, 10, "F2", "0.08 0.20 0.22")
+        )
         y -= 18
         return
       }
-      const isMeta = /^(Product|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Marketplace ratings shown|Confidence):/.test(line)
+      const isMeta = isPdfMetadataLine(line)
       const isIndented = line.startsWith("   ")
-      contentLines.push(pdfDraw(line, isMeta ? 46 : isIndented ? 62 : 52, y, 9.5, isMeta ? "F2" : "F1", isMeta ? "0.18 0.23 0.27" : "0.26 0.29 0.32"))
+      if (isMeta) {
+        contentLines.push(pdfRect(46, y - 3, 520, 14, lineIndex % 2 === 0 ? "1 1 1" : "0.94 0.96 0.95"))
+      }
+      contentLines.push(pdfDraw(line, isMeta ? 58 : isIndented ? 68 : 58, y, isMeta ? 9 : 9.5, isMeta ? "F2" : "F1", isMeta ? "0.14 0.18 0.21" : "0.25 0.28 0.30"))
       y -= line ? 13 : 7
     })
     contentLines.push(
@@ -357,7 +367,7 @@ function buildPdfLines(report: IntelligenceReport) {
       "Marketplace rating counts may include star-only ratings and records the provider cannot return as written text.",
       "Customer-reported complaints are signals for human review, not verified product defects.",
       ...(summary.targetReviewCount && reviewCount < Number(summary.targetReviewCount) ? [
-        `Amazon Review Cap Note: Target was ${summary.targetReviewCount} written reviews, but only ${reviewCount} were exposed by Amazon. Amazon consolidates star-ratings across listing variations but heavily limits public written review retrieval. The system successfully performed a deep scan and captured 100% of the public written reviews available on Amazon for this listing.`
+        `Amazon Review Cap Note: Target was ${summary.targetReviewCount} written reviews, but only ${reviewCount} were exposed by the connected providers. Amazon consolidates star-ratings across listing variations but heavily limits public written review retrieval. Treat this as the public written-review sample available to the provider, not the full marketplace rating base.`
       ] : []),
       ...(summary.productUrl ? ["", "Source URL", wrapPdfLine(stringifyPdfValue(summary.productUrl))] : []),
       ...(summary.warning ? ["", "Data Source Warning", wrapPdfLine(stringifyPdfValue(summary.warning))] : []),
@@ -454,7 +464,7 @@ function closeUnclosedBrackets(value: string): string {
   return value + stack.reverse().map((bracket) => brackets[bracket as keyof typeof brackets]).join("")
 }
 
-function formatReviewApp(value: unknown) {
+export function formatReviewApp(value: unknown) {
   const app = String(value ?? "").trim()
   if (!app) return "Import"
   const labels: Record<string, string> = {
@@ -536,7 +546,7 @@ function splitPdfLine(value: string) {
   if (!value) return [""]
   if (isPdfSectionHeading(value)) return [value]
   const indent = value.match(/^\s*/)?.[0] ?? ""
-  const isMeta = /^(Product|Platform|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Marketplace ratings shown|Confidence|Sample):/.test(value)
+  const isMeta = isPdfMetadataLine(value)
   const width = isMeta ? 100 : indent.length ? 98 : 102
   const continuationIndent = indent || (isMeta ? "  " : "   ")
   const words = value.replace(/\s+/g, " ").trim().split(" ")
@@ -558,19 +568,29 @@ function splitPdfLine(value: string) {
   return lines
 }
 
+function isPdfMetadataLine(line: string) {
+  return /^(Product|Platform|ASIN|Report|Type|Status|Generated|Source|Review app|Depth|Written reviews analyzed|Target written reviews|Marketplace ratings shown|Confidence|Sample|Products Monitored|Source Filter|Avg Product Price|In-Stock Rate|Data Completeness):/.test(line)
+}
+
+function pdfRect(x: number, y: number, width: number, height: number, color: string) {
+  return `q ${color} rg ${x} ${y} ${width} ${height} re f Q`
+}
+
 function pdfText(text: string) {
   const escaped = text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "")
   return `(${escaped}) Tj`
 }
 
 function pdfDraw(text: string, x: number, y: number, size: number, font: "F1" | "F2", color: string) {
-  return `BT ${color} rg /${font} ${size} Tf ${x} ${y} Td ${pdfText(text)} ET`
+  return `BT ${color} rg /${font} ${size} Tf ${x} ${y} Td ${pdfText(closeUnclosedBrackets(text))} ET`
 }
 
 function isPdfSectionHeading(line: string) {
+  const normalized = line.replace(/ \(Continued\)$/i, "")
   return [
     "Executive Summary",
     "Interpretation Note",
+    "Source URL",
     "Data Source Warning",
     "Next Best Actions",
     "Top Complaints",
@@ -580,12 +600,23 @@ function isPdfSectionHeading(line: string) {
     "Positioning Angles",
     "Assumptions and Limitations",
     "Appendix Rows"
-  ].includes(line)
+  ].includes(normalized)
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = []
-  for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size))
+function paginatePdfLines(items: string[], size: number): string[][] {
+  const chunks: string[][] = []
+  let current: string[] = []
+  let currentSection = ""
+  for (const item of items) {
+    if (isPdfSectionHeading(item)) currentSection = item.replace(/ \(Continued\)$/i, "")
+    if (current.length >= size) {
+      chunks.push(current)
+      current = []
+      if (currentSection && !isPdfSectionHeading(item)) current.push(`${currentSection} (Continued)`)
+    }
+    current.push(item)
+  }
+  if (current.length) chunks.push(current)
   return chunks.length ? chunks : [[]]
 }
 
@@ -638,7 +669,7 @@ function buildPriceReport(products: ProductWithSource[]) {
       currentPrice: product.currentPrice ?? null,
       previousPrice: previous ?? null,
       priceChangeAmount: change,
-      priceChangePercentage: change !== null && previous ? round(percent(change, previous)) : null,
+      priceChangePercentage: change !== null && previous !== undefined ? round(percent(change, previous)) : null,
       highestPrice: prices.length ? Math.max(...prices) : product.currentPrice ?? null,
       lowestPrice: prices.length ? Math.min(...prices) : product.currentPrice ?? null,
       averagePrice: prices.length ? round(average(prices)) : product.currentPrice ?? null,
@@ -648,7 +679,7 @@ function buildPriceReport(products: ProductWithSource[]) {
   const sorted = [...rows].sort((a, b) => Number(a.priceChangeAmount ?? 0) - Number(b.priceChangeAmount ?? 0))
   return {
     summary: {
-      averageCurrentPrice: round(average(rows.map((row) => Number(row.currentPrice)).filter(Number.isFinite))),
+      averageCurrentPrice: round(average(rows.map((row) => row.currentPrice).filter((price): price is number => typeof price === "number"))),
       biggestDrops: sorted.slice(0, 3),
       biggestIncreases: sorted.slice(-3).reverse()
     },

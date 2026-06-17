@@ -1,11 +1,6 @@
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  return cookieStore.get("admin_session")?.value === "ok"
-}
+import { requireAdmin } from "@/lib/admin-session"
 
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })

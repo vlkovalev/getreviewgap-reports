@@ -1,10 +1,10 @@
 import Link from "next/link"
 import { DashboardShell, StatusBadge } from "@/components/dashboard/DashboardShell"
-import { reportRowsForExport } from "@/lib/reports/report-engine"
+import { formatReviewApp, mapPrismaIntelligenceReport, reportRowsForExport } from "@/lib/reports/report-engine"
 import { getStore } from "@/lib/scrapers/store"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
-import type { IntelligenceReport, ReportFilters, ReportType } from "@/lib/scrapers/types"
+import type { IntelligenceReport } from "@/lib/scrapers/types"
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -17,19 +17,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
     )
   }
   const report = hasRealDatabaseUrl()
-    ? await getDb().intelligenceReport.findFirst({ where: { id, customerId: customer.id } }).then((item) => item ? ({
-      id: item.id,
-      customerId: item.customerId ?? undefined,
-      reportType: item.reportType as ReportType,
-      title: item.title,
-      status: item.status,
-      filters: (item.filters as ReportFilters) ?? {},
-      summary: (item.summary as Record<string, unknown>) ?? {},
-      data: (item.data as Record<string, unknown>) ?? {},
-      generatedAt: item.generatedAt?.toISOString(),
-      createdAt: item.createdAt.toISOString(),
-      updatedAt: item.updatedAt.toISOString()
-    } satisfies IntelligenceReport) : null)
+    ? await getDb().intelligenceReport.findFirst({ where: { id, customerId: customer.id } }).then((item) => item ? mapPrismaIntelligenceReport(item) : null)
     : getStore().reports.find((item) => item.id === id && item.customerId === customer.id)
 
   if (!report) {
@@ -529,10 +517,67 @@ function getEmergingSignals(insight: ReviewInsightLike) {
 
 function Metric({ label, value, tone = "white" }: { label: string; value: string; tone?: "white" | "lime" | "yellow" | "coral" }) {
   const color = tone === "lime" ? "text-lime" : tone === "yellow" ? "text-yellow-300" : tone === "coral" ? "text-coral" : "text-white"
+  
+  const getIcon = (lbl: string) => {
+    const l = lbl.toLowerCase();
+    if (l.includes("written") || l.includes("review")) {
+      return (
+        <svg className="h-5 w-5 text-lime" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      );
+    }
+    if (l.includes("rating") || l.includes("monitored")) {
+      return (
+        <svg className="h-5 w-5 text-yellow-300" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.907a1 1 0 00.95-.69l1.519-4.674z" />
+        </svg>
+      );
+    }
+    if (l.includes("depth") || l.includes("completeness")) {
+      return (
+        <svg className="h-5 w-5 text-cyan" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      );
+    }
+    if (l.includes("platform") || l.includes("price")) {
+      return (
+        <svg className="h-5 w-5 text-purple-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      );
+    }
+    if (l.includes("app") || l.includes("filter") || l.includes("rate")) {
+      return (
+        <svg className="h-5 w-5 text-pink-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+      );
+    }
+    if (l.includes("confidence") || l.includes("coverage")) {
+      return (
+        <svg className="h-5 w-5 text-lime" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      );
+    }
+    return (
+      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    );
+  }
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-      <p className="text-xs font-black uppercase text-white/40">{label}</p>
-      <p className={`mt-2 break-words text-xl font-black ${color}`}>{value}</p>
+    <div className="rounded-2xl border border-white/10 bg-black/45 hover:border-white/20 transition-all duration-300 p-4 flex items-start gap-3 shadow-lg hover:shadow-black/50">
+      <div className="p-2 rounded-xl bg-white/[0.04] border border-white/5 mt-0.5">
+        {getIcon(label)}
+      </div>
+      <div>
+        <p className="text-xs font-black uppercase text-white/40 tracking-wider">{label}</p>
+        <p className={`mt-1.5 break-words text-xl font-black ${color}`}>{value}</p>
+      </div>
     </div>
   )
 }
@@ -540,8 +585,8 @@ function Metric({ label, value, tone = "white" }: { label: string; value: string
 function CoverageItem({ label, value, tone = "white" }: { label: string; value: string; tone?: "white" | "lime" | "yellow" | "coral" }) {
   const color = tone === "lime" ? "text-lime" : tone === "yellow" ? "text-yellow-300" : tone === "coral" ? "text-coral" : "text-white"
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-      <p className="text-xs font-black uppercase text-white/40">{label}</p>
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.06] transition-all duration-200 p-4">
+      <p className="text-xs font-black uppercase text-white/40 tracking-wider">{label}</p>
       <p className={`mt-2 break-words text-2xl font-black ${color}`}>{value}</p>
     </div>
   )
@@ -549,24 +594,34 @@ function CoverageItem({ label, value, tone = "white" }: { label: string; value: 
 
 function BriefPanel({ title, tone, children }: { title: string; tone: "coral" | "lime" | "cyan" | "yellow"; children: React.ReactNode }) {
   const color = toneClass(tone)
+  const glowBorder = 
+    tone === "coral" ? "border-t-2 border-t-coral/50" :
+    tone === "lime" ? "border-t-2 border-t-lime/50" :
+    tone === "cyan" ? "border-t-2 border-t-cyan/50" :
+    "border-t-2 border-t-yellow-300/50";
+
   return (
-    <article className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 shadow-soft ring-1 ring-white/5">
-      <h2 className={`text-xl font-black ${color}`}>{title}</h2>
+    <article className={`rounded-[1.75rem] border border-white/10 bg-white/5 p-6 shadow-xl ring-1 ring-white/5 ${glowBorder}`}>
+      <h2 className={`text-xl font-black tracking-tight ${color}`}>{title}</h2>
       <div className="mt-5">{children}</div>
     </article>
   )
 }
 
 function EvidenceList({ title, items, tone }: { title: string; items: Array<{ title: string; eyebrow: string; body: string; footer: string }>; tone: "coral" | "lime" }) {
+  const accentBorder = tone === "coral" ? "border-l-4 border-l-coral border border-white/5" : "border-l-4 border-l-lime border border-white/5";
   return (
     <BriefPanel title={title} tone={tone}>
       <div className="grid gap-4">
         {items.length ? items.slice(0, 5).map((item) => (
-          <article key={`${item.title}-${item.body}`} className="rounded-3xl border border-white/10 bg-black/25 p-5 shadow-sm">
+          <article key={`${item.title}-${item.body}`} className={`rounded-xl bg-black/30 p-4 transition-all duration-200 hover:bg-black/40 ${accentBorder} shadow-sm`}>
             <p className="text-xs font-black uppercase tracking-[0.2em] text-white/40">{item.eyebrow}</p>
-            <h3 className="mt-3 font-black text-white text-lg">{item.title}</h3>
-            <p className="mt-3 text-sm text-white/65 leading-relaxed">{item.body}</p>
-            <p className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/75">{item.footer}</p>
+            <h3 className="mt-2.5 font-black text-white text-base leading-snug">{item.title}</h3>
+            <p className="mt-2.5 text-sm text-white/70 leading-relaxed italic">"{item.body}"</p>
+            <div className="mt-3.5 rounded-xl border border-white/5 bg-white/[0.02] p-3">
+              <span className="block text-xs font-bold text-white/40 uppercase tracking-wider mb-1">Strategic Implication</span>
+              <p className="text-sm font-medium text-white/80">{item.footer}</p>
+            </div>
           </article>
         )) : <EmptyText text="No evidence was available in this section." />}
       </div>
@@ -585,15 +640,54 @@ function SimpleList({ title, items, tone }: { title: string; items: string[]; to
 }
 
 function ActionItem({ text }: { text: string }) {
-  return <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm font-bold text-white/76">{cleanText(text)}</p>
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-cyan/20 transition-all duration-200 p-3.5 flex items-start gap-3 shadow-sm">
+      <span className="mt-0.5 p-1 rounded-md bg-cyan/10 text-cyan flex items-center justify-center border border-cyan/25">
+        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+      </span>
+      <p className="text-sm font-bold text-white/85 leading-relaxed">{cleanText(text)}</p>
+    </div>
+  )
 }
 
 function SnapshotItem({ label, title, body, tone }: { label: string; title: string; body: string; tone: "coral" | "lime" | "cyan" }) {
+  const gradient = 
+    tone === "coral" ? "from-coral/15 to-transparent border-coral/20" :
+    tone === "lime" ? "from-lime/15 to-transparent border-lime/20" :
+    "from-cyan/15 to-transparent border-cyan/20";
+    
+  const getIcon = (tn: string) => {
+    if (tn === "coral") {
+      return (
+        <span className="p-1.5 rounded-lg bg-coral/10 text-coral border border-coral/20 flex items-center justify-center">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </span>
+      );
+    }
+    if (tn === "lime") {
+      return (
+        <span className="p-1.5 rounded-lg bg-lime/10 text-lime border border-lime/20 flex items-center justify-center">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+        </span>
+      );
+    }
+    return (
+      <span className="p-1.5 rounded-lg bg-cyan/10 text-cyan border border-cyan/20 flex items-center justify-center">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9.663 17h4.673M12 3v1m6.364.364l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+      </span>
+    );
+  }
+
   return (
-    <article className="rounded-xl border border-white/10 bg-black/25 p-5">
-      <p className={`text-xs font-black uppercase ${toneClass(tone)}`}>{cleanText(label)}</p>
-      <h3 className="mt-3 text-xl font-black">{cleanText(title)}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-white/65">{cleanText(body)}</p>
+    <article className={`rounded-2xl border bg-gradient-to-b ${gradient} p-5 flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] shadow-md hover:shadow-xl`}>
+      <div>
+        <div className="flex items-center gap-2">
+          {getIcon(tone)}
+          <p className={`text-xs font-black uppercase tracking-wider ${toneClass(tone)}`}>{cleanText(label)}</p>
+        </div>
+        <h3 className="mt-3.5 text-xl font-black text-white leading-snug">{cleanText(title)}</h3>
+      </div>
+      <p className="mt-4 text-sm leading-relaxed text-white/70">{cleanText(body)}</p>
     </article>
   )
 }
@@ -710,21 +804,6 @@ function displayUrl(value: string) {
   } catch {
     return value.slice(0, 100)
   }
-}
-
-function formatReviewApp(value: unknown) {
-  const app = String(value ?? "").trim()
-  if (!app) return "Import"
-  const labels: Record<string, string> = {
-    judgeme: "Judge.me",
-    loox: "Loox",
-    yotpo: "Yotpo",
-    okendo: "Okendo",
-    stamped: "Stamped",
-    "shopify-product-reviews": "Shopify Reviews",
-    other: "Other"
-  }
-  return labels[app] ?? app
 }
 
 function createFreshReportHref(report: IntelligenceReport, productUrl: string) {

@@ -1,4 +1,3 @@
-import { cookies } from "next/headers"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getDb } from "@/lib/db"
@@ -7,10 +6,10 @@ import { ReportStatusBadge } from "@/components/ReportStatusBadge"
 import { AdminSignOutButton } from "@/components/AdminSignOutButton"
 import { getStore } from "@/lib/scrapers/store"
 import { getReadinessChecks, type ReadinessCheck } from "@/lib/readiness"
+import { requireAdmin } from "@/lib/admin-session"
 
 export default async function AdminPage() {
-  const cookieStore = await cookies()
-  if (cookieStore.get("admin_session")?.value !== "ok") redirect("/admin/login")
+  if (!(await requireAdmin())) redirect("/admin/login")
 
   const reports = await listReports()
   const scraperStore = getStore()

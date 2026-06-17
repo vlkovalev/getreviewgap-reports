@@ -48,11 +48,11 @@ export async function POST(request: Request) {
     const { reportType, sourceId, dateFrom, dateTo, platform, productUrl, productName, competitorName, pastedReviews, reviewApp, reviewPageLimit } = parsed.data
     const customer = await getCurrentCustomer()
     if (!customer) return NextResponse.json({ error: "Sign in to generate and save reports." }, { status: 401 })
-    if (!(await consumeCredit(customer.id))) return NextResponse.json({ error: "You are out of report credits. Choose a plan or bundle from Billing." }, { status: 402 })
+    const debitedCustomer = await consumeCredit(customer.id)
+    if (!debitedCustomer) return NextResponse.json({ error: "You are out of report credits. Choose a plan or bundle from Billing." }, { status: 402 })
     consumedCustomerId = customer.id
     const report = await generateReport(reportType, { sourceId, dateFrom, dateTo, platform, productUrl: productUrl || undefined, productName: productName || undefined, competitorName: competitorName || undefined, pastedReviews: pastedReviews || undefined, reviewApp, reviewPageLimit }, customer.id)
-    const updatedCustomer = await getCurrentCustomer()
-    return NextResponse.json({ report, credits: updatedCustomer?.credits ?? Math.max(customer.credits - 1, 0) }, { status: 201 })
+    return NextResponse.json({ report, credits: debitedCustomer.credits }, { status: 201 })
   } catch (error) {
     if (consumedCustomerId) await addCredits(consumedCustomerId, 1, "report_generation_refund").catch(() => null)
     console.error("Report generation failed", error)

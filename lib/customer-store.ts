@@ -97,7 +97,7 @@ export async function findCustomerById(id: string | undefined) {
 export async function createCustomer(email: string, password: string) {
   const normalizedEmail = email.toLowerCase()
   const existing = await findCustomerByEmail(normalizedEmail)
-  if (existing) return existing
+  if (existing) return null
 
   if (hasRealDatabaseUrl()) {
     const passwordHash = await bcrypt.hash(password, 10)
@@ -135,20 +135,20 @@ export async function createCustomer(email: string, password: string) {
   return customer
 }
 
-export async function consumeCredit(customerId: string, referenceId?: string) {
+export async function consumeCredit(customerId: string, referenceId?: string): Promise<Customer | null> {
   if (hasRealDatabaseUrl()) {
     const db = getDb()
     const customer = await withDbRetry(() => db.customerAccount.findUnique({ where: { id: customerId } }))
-    if (!customer || customer.credits <= 0) return false
-    await withDbRetry(() => db.$transaction([
+    if (!customer || customer.credits <= 0) return null
+    const [updated] = await withDbRetry(() => db.$transaction([
       db.customerAccount.update({ where: { id: customerId }, data: { credits: { decrement: 1 } } }),
       db.creditTransaction.create({ data: { customerId, amount: -1, reason: "report_generation", referenceId } })
     ]))
-    return true
+    return toCustomer(updated)
   }
 
   const customer = memoryCustomers().find((item) => item.id === customerId)
-  if (!customer || customer.credits <= 0) return false
+  if (!customer || customer.credits <= 0) return null
   customer.credits -= 1
   memoryTransactions().push({
     id: crypto.randomUUID(),
@@ -158,7 +158,7 @@ export async function consumeCredit(customerId: string, referenceId?: string) {
     referenceId,
     createdAt: new Date().toISOString()
   })
-  return true
+  return customer
 }
 
 export async function addCredits(customerId: string, credits: number, reason = "purchase", referenceId?: string) {

@@ -14,6 +14,10 @@ export function hasRealDatabaseUrl() {
   return Boolean(url && !url.includes("USER:PASSWORD") && !url.includes("HOST:5432"))
 }
 
+if (process.env.NODE_ENV === "production" && !hasRealDatabaseUrl()) {
+  throw new Error("DATABASE_URL must be set to a real database in production")
+}
+
 export async function withDbRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
   let lastError: unknown
   for (let attempt = 1; attempt <= attempts; attempt += 1) {

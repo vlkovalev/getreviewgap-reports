@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { CUSTOMER_COOKIE } from "@/lib/customer-session"
 import { createCustomer, validateCustomerPassword } from "@/lib/customer-store"
+import { signSession } from "@/lib/session-crypto"
 
 export async function POST(request: NextRequest) {
   const form = await request.formData()
@@ -15,13 +16,14 @@ export async function POST(request: NextRequest) {
 
   const customer = mode === "signup" ? await createCustomer(email, password) : await validateCustomerPassword(email, password)
   if (!customer) {
-    return NextResponse.redirect(new URL("/login?error=credentials", request.url))
+    return NextResponse.redirect(new URL(mode === "signup" ? "/signup?error=exists" : "/login?error=credentials", request.url))
   }
 
   const host = request.headers.get("host") || "127.0.0.1:3000"
   const protocol = request.headers.get("x-forwarded-proto") || "http"
   const response = NextResponse.redirect(`${protocol}://${host}${redirectTo}`)
-  response.cookies.set(CUSTOMER_COOKIE, customer.id, {
+  const sessionToken = await signSession(customer.id)
+  response.cookies.set(CUSTOMER_COOKIE, sessionToken, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

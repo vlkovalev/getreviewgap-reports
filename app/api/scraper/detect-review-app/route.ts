@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { assertPublicHttpUrl } from "@/lib/url-safety"
 
 // Signals used to detect which review app a Shopify store uses.
 // Ordered by specificity — first match wins.
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    new URL(url) // validate
+    await assertPublicHttpUrl(url)
   } catch {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 })
   }

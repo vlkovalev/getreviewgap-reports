@@ -1,6 +1,7 @@
 import { reviewInsightPrompt } from "./prompts"
 import { ReviewInput, ReviewInsight, reviewInsightSchema } from "./schemas"
 import { extractReviewsFromCsv } from "@/lib/scrapers/shopify-csv-parser"
+import { assertPublicHttpUrl } from "@/lib/url-safety"
 
 const demoReviews = [
   "Love the texture and the packaging feels premium, but the pump stopped working after two weeks.",
@@ -211,6 +212,7 @@ async function fetchShopifyProductData(productUrl: string): Promise<{ id: string
         console.log(`[Shopify Data] Mock domain detected: ${hostname}. Returning mock product ID and title.`);
         return { id: "12345", title: "Mock Demo Product" };
     }
+    if (!isTestEnv) await assertPublicHttpUrl(productUrl);
     const productJsonUrl = shopifyProductJsonUrl(productUrl);
     try {
         const response = await fetch(productJsonUrl, {
@@ -1066,7 +1068,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
   const topComplaints = Array.isArray(parsedJson.top_complaints)
     ? parsedJson.top_complaints.map((item: any) => {
         const count = item.count || 0
-        const total = item.total || reviews.length
+        const total = typeof item.total === "number" ? item.total : reviews.length
         const percentage = typeof item.percentage === 'number' 
           ? item.percentage 
           : total > 0 ? (count / total * 100).toFixed(2) : 0
@@ -1089,7 +1091,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
   const topCompliments = Array.isArray(parsedJson.top_compliments)
     ? parsedJson.top_compliments.map((item: any) => {
         const count = item.count || 0
-        const total = item.total || reviews.length
+        const total = typeof item.total === "number" ? item.total : reviews.length
         const percentage = typeof item.percentage === 'number' 
           ? item.percentage 
           : total > 0 ? (count / total * 100).toFixed(2) : 0
@@ -1386,6 +1388,7 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
 
   console.warn("Judge.me widget API returned no reviews for all tried domains, falling back to direct HTML scraping...");
   try {
+    if (!isTestEnv) await assertPublicHttpUrl(input.productUrl);
     const response = await fetch(input.productUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

@@ -15,7 +15,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
         </div>
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-7">
           <h2 className="text-2xl font-black">Sign up</h2>
-          {params.error ? <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">Use a valid email and a password of at least 6 characters.</p> : null}
+          {params.error === "exists" ? <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">An account with that email already exists. <Link href="/login" className="font-bold underline">Log in instead</Link>.</p> : params.error ? <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">Use a valid email and a password of at least 6 characters.</p> : null}
           {params.created ? <p className="mt-4 rounded-xl border border-lime/30 bg-lime/10 p-3 text-sm text-lime">Account created. You can now choose your next step.</p> : null}
           <form action="/api/auth/login" method="post" className="mt-6 grid gap-4">
             <input type="hidden" name="mode" value="signup" />
