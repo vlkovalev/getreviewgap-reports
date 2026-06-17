@@ -207,6 +207,25 @@ Stop guessing what will make your audience click. The answers are already writte
       }
     })
   }
+
+  const demoEmail = "demo@reviewgap.test"
+  const demoPasswordHash = await bcrypt.hash("demo1234", 10)
+  await prisma.customerAccount.upsert({
+    where: { email: demoEmail },
+    update: {},
+    create: {
+      id: "cust-demo",
+      email: demoEmail,
+      passwordHash: demoPasswordHash,
+      credits: 3,
+      transactions: {
+        create: {
+          amount: 3,
+          reason: "demo_init"
+        }
+      }
+    }
+  })
 }
 
 main().finally(async () => {

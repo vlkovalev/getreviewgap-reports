@@ -7,10 +7,13 @@ const schema = z.object({ planId: z.enum(["one_report", "five_pack", "twenty_pac
 
 export async function POST(request: Request) {
   try {
+    const customer = await getCurrentCustomer()
+    if (!customer) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 })
+    }
     const parsed = schema.safeParse(await request.json())
     if (!parsed.success) return NextResponse.json({ error: "Choose a valid plan." }, { status: 400 })
-    const customer = await getCurrentCustomer()
-    const session = await createStripeCheckoutSession(parsed.data.planId, customer?.id)
+    const session = await createStripeCheckoutSession(parsed.data.planId, customer.id)
     return NextResponse.json({ sessionId: session.id, url: session.url })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not start card checkout." }, { status: 500 })
