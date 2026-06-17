@@ -11,5 +11,7 @@ tsconfig.tsbuildinfo
 coverage/
 dist/
 build/
+dist_test/
+.claude/
 
 .vercel
