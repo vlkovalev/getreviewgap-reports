@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { canonicalAmazonProductUrl, fetchAmazonReviews } from "../lib/ai/service"
 
+;(process.env as { NODE_ENV: string }).NODE_ENV = "test"
+
 async function main() {
   const originalFetch = globalThis.fetch
   const originalKey = process.env.CANOPY_API_KEY

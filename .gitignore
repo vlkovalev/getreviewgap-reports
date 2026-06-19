@@ -5,6 +5,8 @@ node_modules/
 *.log
 dev.out.log
 dev.err.log
+dev.pid
+scratch/review-app-test-results.json
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 .vercel/

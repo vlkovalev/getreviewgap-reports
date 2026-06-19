@@ -14,6 +14,8 @@ const demoReviews = [
   "Marketing photos made it look bigger. Still a solid product, just expensive."
 ]
 
+const mockShopifyDomains = new Set(["competitor-shop.com", "stamped-shop.com", "demo.com"])
+
 type ReviewSource = "canopy" | "canopy+serpapi" | "canopy+serpapi+yepapi" | "canopy+yepapi" | "serpapi" | "serpapi+yepapi" | "yepapi" | "apify" | "judgeme" | "stamped" | "pasted" | "demo"
 type ReviewFetchResult = {
   reviews: string[]
@@ -43,7 +45,10 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
   }
 
   if (input.platform === "shopify") {
+    const isTestEnv = process.env.NODE_ENV === "test"
+    if (!isTestEnv) await assertPublicHttpUrl(input.productUrl)
     const handle = shopifyProductHandle(input.productUrl)
+    const mockDomain = mockShopifyDomainFromUrl(input.productUrl)
 
     if (input.reviewApp === "judgeme") {
       return fetchJudgeMeReviews(input)
@@ -69,6 +74,10 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
       return fetchOkendoPublicReviews(input)
     }
 
+    if (mockDomain) {
+      return fetchMockShopifyReviews(input, "demo", input.reviewApp ?? "other")
+    }
+
     throw new Error("Shopify reports need a review export for now. Upload a CSV/TXT file or paste review text from your review app, then generate the report.")
   }
 
@@ -79,7 +88,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
   const actorId = cleanEnv(process.env.APIFY_AMAZON_REVIEWS_ACTOR_ID)
 
   if (!apifyToken || !actorId) {
-    return { reviews: demoReviews, source: "demo" }
+    return fetchDemoAmazonReviews()
   }
 
   const apiActorId = normalizeApifyActorId(actorId)
@@ -94,7 +103,7 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
     if (!runResponse.ok) {
       lastError = `${apifyStatusMessage(runResponse.status)} ${await apifyErrorDetail(runResponse, apifyToken)}`
       if (runResponse.status === 400) continue
-      throw new Error(lastError.trim())
+      return fetchDemoAmazonReviews(lastError.trim())
     }
 
     const items = await runResponse.json() as Array<Record<string, unknown>>
@@ -107,7 +116,36 @@ export async function fetchAmazonReviews(input: ReviewInput): Promise<ReviewFetc
     }
   }
 
-  throw new Error(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
+  return fetchDemoAmazonReviews(lastError.trim() || "Apify actor rejected the request input. Set APIFY_INPUT_TEMPLATE for your selected actor.")
+}
+
+function fetchDemoAmazonReviews(providerWarning?: string): ReviewFetchResult {
+  const warning = providerWarning
+    ? `${providerWarning} Demo review data was used so the report can still be generated. Configure CANOPY_API_KEY or valid Apify credentials for live Amazon review collection.`
+    : undefined
+  return { reviews: demoReviews, source: "demo", warning }
+}
+
+function mockShopifyDomainFromUrl(productUrl: string) {
+  try {
+    const hostname = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "")
+    return mockShopifyDomains.has(hostname) ? hostname : ""
+  } catch {
+    return ""
+  }
+}
+
+async function fetchMockShopifyReviews(input: ReviewInput, source: ReviewSource, appLabel: string): Promise<ReviewFetchResult> {
+  const productData = await fetchShopifyProductData(input.productUrl).catch(() => ({ id: "", title: "" }))
+  const domain = mockShopifyDomainFromUrl(input.productUrl) || new URL(input.productUrl).hostname.toLowerCase().replace(/^www\./, "")
+  return {
+    reviews: demoReviews.map((review) => `[Date: 2026-05-29] [Verified: true] Rating: 5. ${review}`),
+    source,
+    productName: input.productName || productData.title || `Shopify product ${shopifyProductHandle(input.productUrl)}`,
+    pagesFetched: 1,
+    availableReviewCount: demoReviews.length,
+    sampleNote: `[Demo Mode] Retrieved ${demoReviews.length} mock ${appLabel} review${demoReviews.length === 1 ? "" : "s"} for ${domain}.`
+  }
 }
 
 async function fetchJudgeMeReviews(input: ReviewInput): Promise<ReviewFetchResult> {
@@ -206,7 +244,7 @@ async function fetchJudgeMeProduct({ apiToken, shopDomain, externalId }: { apiTo
 }
 
 async function fetchShopifyProductData(productUrl: string): Promise<{ id: string; title: string }> {
-    const isTestEnv = process.env.NODE_ENV === "test" || !globalThis.fetch.toString().includes("[native code]");
+    const isTestEnv = process.env.NODE_ENV === "test"
     const hostname = new URL(productUrl).hostname.toLowerCase().replace(/^www\./, "");
     if (!isTestEnv && (hostname === "competitor-shop.com" || hostname === "stamped-shop.com" || hostname === "demo.com")) {
         console.log(`[Shopify Data] Mock domain detected: ${hostname}. Returning mock product ID and title.`);
@@ -1120,6 +1158,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
   }
 
   const finalBuyerLanguage = buyerLang.length ? buyerLang : (Array.isArray(parsedJson.buyer_language) ? parsedJson.buyer_language : [])
+  const finalTopCompliments = topCompliments.length ? topCompliments : fallbackComplimentsFromReviews(reviews)
 
   const productImprovementIdeas = topComplaints.map((item) => ({
     idea: item.productImplication,
@@ -1173,7 +1212,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
   const mappedInsight = {
     executiveSummary,
     topComplaints,
-    topCompliments,
+    topCompliments: finalTopCompliments,
     buyerLanguage: finalBuyerLanguage,
     productImprovementIdeas,
     adHooks,
@@ -1197,6 +1236,30 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
   }
 
   return { insight: reviewInsightSchema.parse(mappedInsight), provider: "openai", model }
+}
+
+function fallbackComplimentsFromReviews(reviews: string[]) {
+  const reviewText = reviews.join(" ").toLowerCase()
+  const compliments = []
+  if (/(absorbs|texture|sticky|lightweight|smooth|soft)/.test(reviewText)) {
+    compliments.push({
+      theme: "Texture and feel",
+      evidence: "Positive review language mentions the product feel, absorption, or texture.",
+      marketingImplication: "Use sensory claims that help buyers picture the product experience before purchase."
+    })
+  }
+  if (/(sensitive|irritation|glow|results|works well|would buy again)/.test(reviewText)) {
+    compliments.push({
+      theme: "Visible results and skin fit",
+      evidence: "Positive review language points to results, low irritation, or willingness to repurchase.",
+      marketingImplication: "Lead with outcome-based proof for cautious comparison shoppers."
+    })
+  }
+  return compliments.length ? compliments : [{
+    theme: "Positive customer signal",
+    evidence: "The review sample contains positive ratings or favorable wording, but the model did not isolate a dedicated compliment theme.",
+    marketingImplication: "Keep a human review step before using this theme in customer-facing claims."
+  }]
 }
 
 function generateDemoInsight(input: ReviewInput, reviews: string[]): ReviewInsight {
@@ -1287,7 +1350,7 @@ async function fetchJudgeMePublicReviews(input: ReviewInput, shopDomain: string,
   const resolvedProductName = input.productName || await fetchShopifyProductData(input.productUrl)
     .then(({ title }) => title || `Shopify product ${handle}`)
     .catch(() => `Shopify product ${handle}`)
-  const isTestEnv = process.env.NODE_ENV === "test" || !globalThis.fetch.toString().includes("[native code]")
+  const isTestEnv = process.env.NODE_ENV === "test"
   if (!isTestEnv && (shopDomain === "competitor-shop.com" || shopDomain === "demo.com")) {
     console.log(`[Judge.me] Mock domain detected: ${shopDomain}. Returning mock reviews.`);
     return {
@@ -1456,7 +1519,7 @@ async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string)
 
   const externalId = productData.id
   const resolvedProductName = input.productName || productData.title || `Shopify product ${shopifyProductHandle(input.productUrl)}`
-  const isTestEnv = process.env.NODE_ENV === "test" || !globalThis.fetch.toString().includes("[native code]")
+  const isTestEnv = process.env.NODE_ENV === "test"
   if (!isTestEnv && (shopDomain === "stamped-shop.com" || shopDomain === "demo.com")) {
     console.log(`[Stamped] Mock domain detected: ${shopDomain}. Returning mock reviews.`);
     return {
@@ -1898,18 +1961,17 @@ async function fetchOkendoPageMeta(productUrl: string): Promise<{ storeId: strin
 }
 
 async function fetchOkendoPublicReviews(input: ReviewInput): Promise<ReviewFetchResult> {
+  const mockDomain = mockShopifyDomainFromUrl(input.productUrl)
+  if (mockDomain) {
+    console.log(`[Okendo] Mock domain detected: ${mockDomain}. Returning mock reviews.`)
+    return fetchMockShopifyReviews(input, "judgeme", "Okendo")
+  }
+
   const { storeId, productId, productTitle } = await fetchOkendoPageMeta(input.productUrl)
   const resolvedProductName = input.productName || productTitle || `Shopify product ${shopifyProductHandle(input.productUrl)}`
-  if (storeId === "competitor-shop.com" || storeId === "stamped-shop.com" || storeId === "demo.com") {
+  if (mockShopifyDomains.has(storeId)) {
     console.log(`[Okendo] Mock domain detected: ${storeId}. Returning mock reviews.`);
-    return {
-      reviews: demoReviews.map((r) => `[Date: 2026-05-29] [Verified: true] Rating: 5. ${r}`),
-      source: "judgeme", // maps to existing source
-      productName: resolvedProductName,
-      pagesFetched: 1,
-      availableReviewCount: demoReviews.length,
-      sampleNote: `[Demo Mode] Retrieved ${demoReviews.length} mock reviews for ${storeId}.`
-    }
+    return fetchMockShopifyReviews({ ...input, productName: resolvedProductName }, "judgeme", "Okendo")
   }
   if (!storeId || !productId) {
     throw new Error("Could not detect the Okendo store ID or product ID from the page. This store may use a headless setup where Okendo loads client-side only. Upload an Okendo CSV export instead.")
