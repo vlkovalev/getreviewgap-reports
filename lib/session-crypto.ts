@@ -1,13 +1,14 @@
 const encoder = new TextEncoder()
 
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
-  throw new Error("SESSION_SECRET must be set in production")
+function getSessionSecret() {
+  if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET must be set in production")
+  }
+  return process.env.SESSION_SECRET || "reviewgap_super_secret_fallback_key_32_chars_long"
 }
 
-const SECRET = process.env.SESSION_SECRET || "reviewgap_super_secret_fallback_key_32_chars_long"
-
 async function getCryptoKey() {
-  const keyData = encoder.encode(SECRET)
+  const keyData = encoder.encode(getSessionSecret())
   return crypto.subtle.importKey(
     "raw",
     keyData,
