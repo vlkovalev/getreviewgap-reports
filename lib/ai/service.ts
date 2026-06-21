@@ -499,6 +499,15 @@ async function fetchCanopyReviews(input: ReviewInput, apiKey: string): Promise<R
     productName = productMetadata?.title || productName
     marketplaceRatingCount ||= productMetadata?.marketplaceRatingCount
   }
+  if (!finalReviews.length) {
+    return {
+      ...fetchDemoAmazonReviews("The configured Amazon review providers returned no review text for this product and marketplace."),
+      productName,
+      asin,
+      marketplaceRatingCount,
+      sampleNote: "Demo Mode: automatic Amazon providers returned no written review text, so sample reviews were used to keep the report workflow available."
+    }
+  }
   const sampleNote = amazonSampleNote({ writtenReviews: finalReviews.length, pagesFetched, requestedPages: maxPages, targetReviewCount: targetReviews, availableReviewCount, marketplaceRatingCount, basePagesFetched, ratingFilterPagesFetched, ratingFiltersUsed: [...ratingFiltersUsed], fallbackReviewsAdded, yepApiReviewsAdded, yepApiPagesFetched })
   return {
     reviews: finalReviews,
