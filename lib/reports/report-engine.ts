@@ -439,9 +439,9 @@ function buildPdfLines(report: IntelligenceReport) {
 
 function stringifyPdfValue(value: unknown): string {
   if (value === null || value === undefined) return "-"
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return closeUnclosedBrackets(String(value).slice(0, 160))
-  if (Array.isArray(value)) return closeUnclosedBrackets(value.map((item) => stringifyPdfValue(item)).join("; ").slice(0, 160))
-  return closeUnclosedBrackets(JSON.stringify(value).slice(0, 160))
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return closeUnclosedBrackets(String(value).slice(0, 600))
+  if (Array.isArray(value)) return closeUnclosedBrackets(value.map((item) => stringifyPdfValue(item)).join("; ").slice(0, 600))
+  return closeUnclosedBrackets(JSON.stringify(value).slice(0, 600))
 }
 
 function closeUnclosedBrackets(value: string): string {

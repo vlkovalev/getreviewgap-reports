@@ -1197,15 +1197,11 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
   if (Array.isArray(parsedJson.assumptions_and_limitations)) {
     assumptions.push(...parsedJson.assumptions_and_limitations)
   }
-  if (parsedJson.competitive_gap && typeof parsedJson.competitive_gap === 'object') {
-    const gap = parsedJson.competitive_gap
-    assumptions.push(
-      `[Competitor Moat Analysis] Competitors Analyzed: ${(gap.competitors_analyzed || []).join(", ") || "N/A"}`,
-      `[Moat Analysis] Primary Wins: ${(gap.primary_wins || []).join("; ") || "N/A"}`,
-      `[Moat Analysis] Primary Losses: ${(gap.primary_losses || []).join("; ") || "N/A"}`,
-      `[Moat Analysis] Open Gaps/Unmet Needs: ${(gap.open_gaps || []).join("; ") || "N/A"}`
-    )
-  }
+  // Note: competitive_gap data is intentionally NOT duplicated into assumptions here.
+  // It is already captured in full on mappedInsight.competitiveGap below and rendered
+  // in its own report section. Pushing formatted "[Moat Analysis] ... N/A" strings into
+  // assumptions caused raw template-looking text to leak into the Assumptions section
+  // whenever competitive_gap was present but sparse.
 
   const metaCount = parsedJson.report_meta?.reviews_analyzed
   const limitationsList: string[] = []
