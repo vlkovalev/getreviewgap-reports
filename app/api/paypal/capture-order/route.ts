@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { capturePayPalOrder } from "@/lib/paypal"
 import { getPaidPlan, getPlanCredits } from "@/lib/plans"
-import { addCreditsOnce } from "@/lib/customer-store"
+import { addCreditsOnce, findCustomerById } from "@/lib/customer-store"
 import { getCurrentCustomer } from "@/lib/customer-session"
 
 export async function POST(request: Request) {
@@ -10,9 +10,12 @@ export async function POST(request: Request) {
     const body = await request.json() as { orderId?: string; planId?: string }
     if (!body.orderId) return NextResponse.json({ error: "Missing PayPal order ID." }, { status: 400 })
     const capture = await capturePayPalOrder(body.orderId)
-    const planId = body.planId || capture.purchase_units?.[0]?.reference_id
+    const purchaseUnit = capture.purchase_units?.[0]
+    const planId = body.planId || purchaseUnit?.reference_id
     const plan = getPaidPlan(planId)
-    const customer = await getCurrentCustomer()
+    const sessionCustomer = await getCurrentCustomer()
+    const paypalCustomer = await findCustomerById(purchaseUnit?.custom_id)
+    const customer = sessionCustomer ?? paypalCustomer
     if (customer && plan) {
       const credits = getPlanCredits(plan.id)
       await addCreditsOnce(customer.id, credits, "paypal_checkout", capture.id)

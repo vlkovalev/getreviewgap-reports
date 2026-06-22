@@ -34,7 +34,7 @@ async function getAccessToken() {
   return data.access_token
 }
 
-export async function createPayPalOrder(planId: string) {
+export async function createPayPalOrder(planId: string, customerId: string) {
   const plan = getPaidPlan(planId)
   if (!plan) throw new Error("Unknown plan.")
   const token = await getAccessToken()
@@ -54,7 +54,7 @@ export async function createPayPalOrder(planId: string) {
         {
           reference_id: plan.id,
           description: `${plan.name} - ReviewGap credits`,
-          custom_id: plan.id,
+          custom_id: customerId,
           amount: {
             currency_code: "USD",
             value: plan.price.toFixed(2)
@@ -96,6 +96,6 @@ export async function capturePayPalOrder(orderId: string) {
     id: string
     status: string
     payer?: { email_address?: string }
-    purchase_units?: Array<{ reference_id?: string; payments?: { captures?: Array<{ id: string; status: string; amount?: { value: string; currency_code: string } }> } }>
+    purchase_units?: Array<{ reference_id?: string; custom_id?: string; payments?: { captures?: Array<{ id: string; status: string; amount?: { value: string; currency_code: string } }> } }>
   }>
 }
