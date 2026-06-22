@@ -1617,11 +1617,18 @@ async function fetchStampedPublicReviews(input: ReviewInput, shopDomain: string)
   };
 }
 // ─── Loox ────────────────────────────────────────────────────────────────────
-// Loox widget API: GET https://loox.io/app/loox/api/reviews
-// Required params: shopId (myshopify domain), productId (Shopify numeric ID)
-// The shopId and product id are embedded in the page source.
+// Loox Storefront API (current, as of 2026): GET https://storefront-api.loox.io/storefront/v1/store/{publicStoreId}/product-reviews
+// Required: publicStoreId (a Loox-internal store token, NOT the myshopify domain) and the Shopify numeric product id.
+// publicStoreId is normally only visible in the merchant's own Loox admin (Settings > API Keys), but it also appears
+// as the path segment right after "/widget/" in the Loox widget loader script tag the storefront embeds, e.g.
+// https://loox.io/widget/{publicStoreId}/loox.<version>.js?shop=<shop>.myshopify.com - that's what we scrape here.
+// NOTE: the old endpoint this replaced (https://loox.io/app/loox/api/reviews?shopId=...&productId=...) was confirmed
+// dead (404) on multiple live Loox stores. This endpoint is the officially documented replacement, but in testing it
+// consistently returned 503 even for a deliberately invalid store id - consistent with edge/bot-protection on
+// storefront-api.loox.io rather than a per-request data error. Treat failures here as expected/possible and fail
+// with a clear CSV-upload fallback rather than a confusing generic error.
 
-async function fetchLooxPageMeta(productUrl: string): Promise<{ shopId: string; productId: string; productTitle: string }> {
+async function fetchLooxPageMeta(productUrl: string): Promise<{ publicStoreId: string; shopId: string; productId: string; productTitle: string }> {
   const [pageHtml, productData] = await Promise.all([
     fetch(productUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
@@ -1630,29 +1637,26 @@ async function fetchLooxPageMeta(productUrl: string): Promise<{ shopId: string; 
     fetchShopifyProductData(productUrl)
   ])
 
-  // shopId: the myshopify.com domain, visible as Shopify.shop or in Loox script src
+  // publicStoreId: the path segment immediately after /widget/ in the Loox widget loader script src,
+  // e.g. https://loox.io/widget/osY_Hzcuoa/loox.1706133792434.js
+  const publicStoreId =
+    pageHtml.match(/loox\.io\/widget\/([A-Za-z0-9_-]+)\//i)?.[1] || ""
+
+  // shopId: the myshopify.com domain - kept for logging/fallback context, not used by the Storefront API itself
   const shopId =
     pageHtml.match(/loox\.io[^"']*[?&]shop=([^&"'\s]+)/i)?.[1]?.toLowerCase() ||
     pageHtml.match(/Shopify\.shop\s*=\s*["']([^"']+\.myshopify\.com)["']/i)?.[1]?.toLowerCase() ||
     pageHtml.match(/"myshopify_domain"\s*:\s*"([^"]+)"/i)?.[1]?.toLowerCase() ||
     pageHtml.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/i)?.[1]?.toLowerCase() || ""
 
-  return { shopId, productId: productData.id, productTitle: productData.title }
+  return { publicStoreId, shopId, productId: productData.id, productTitle: productData.title }
 }
 
 async function fetchLooxPublicReviews(input: ReviewInput): Promise<ReviewFetchResult> {
-  let { shopId, productId, productTitle } = await fetchLooxPageMeta(input.productUrl)
+  const { publicStoreId, shopId, productId, productTitle } = await fetchLooxPageMeta(input.productUrl)
   const resolvedProductName = input.productName || productTitle || `Shopify product ${shopifyProductHandle(input.productUrl)}`
 
-  if (!shopId) {
-    const resolved = await resolveShopifyDomain(input.productUrl);
-    if (resolved && resolved.endsWith(".myshopify.com")) {
-      shopId = resolved;
-      console.log(`[Loox] Resolved shopId via resolveShopifyDomain fallback: ${shopId}`);
-    }
-  }
-
-  if (shopId === "competitor-shop.com" || shopId === "stamped-shop.com" || shopId === "demo.com" || !shopId) {
+  if (shopId === "competitor-shop.com" || shopId === "stamped-shop.com" || shopId === "demo.com" || (!shopId && !publicStoreId)) {
     // If shopId was not found because we bypassed it in mock product data
     const mockId = shopId || "demo.com"
     console.log(`[Loox] Mock domain detected: ${mockId}. Returning mock reviews.`);
@@ -1665,11 +1669,11 @@ async function fetchLooxPublicReviews(input: ReviewInput): Promise<ReviewFetchRe
       sampleNote: `[Demo Mode] Retrieved ${demoReviews.length} mock reviews for ${mockId}.`
     }
   }
-  if (!shopId || !productId) {
-    throw new Error("Could not detect the Loox store ID or product ID from the page. Make sure the URL is a public Shopify product page, or upload a Loox CSV export.")
+  if (!publicStoreId || !productId) {
+    throw new Error("Could not detect the Loox store ID from the page's Loox widget script tag. This can happen if the store hides Loox's widget loader behind a proxy/CDN rewrite, or if Loox isn't actually active on this product. Upload a Loox CSV export instead.")
   }
 
-  console.log(`[Loox] shopId=${shopId} productId=${productId}`)
+  console.log(`[Loox] publicStoreId=${publicStoreId} productId=${productId} shopId=${shopId || "unknown"}`)
 
   const maxPages = canopyReviewPageLimit(input.reviewPageLimit)
   const reviews = new Set<string>()
@@ -1680,25 +1684,28 @@ async function fetchLooxPublicReviews(input: ReviewInput): Promise<ReviewFetchRe
   try {
     while (pagesFetched < maxPages && previousPageAddedReviews && reviews.size < 500) {
       const params = new URLSearchParams({
-        shopId,
-        productId,
+        product_id: productId,
         page: String(pagesFetched + 1)
       })
-      const response = await fetch(`https://loox.io/app/loox/api/reviews?${params}`, {
-        headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl },
+      const response = await fetch(`https://storefront-api.loox.io/storefront/v1/store/${publicStoreId}/product-reviews?${params}`, {
+        headers: { "User-Agent": "Mozilla/5.0", "Referer": input.productUrl, "Origin": new URL(input.productUrl).origin },
         cache: "no-store"
       })
 
       console.log(`[Loox] response: ${response.status} page=${pagesFetched + 1}`)
-      if (!response.ok) throw new Error(`Loox API returned status ${response.status}. Upload a Loox CSV export instead.`)
+      if (!response.ok) throw new Error(`Loox Storefront API returned status ${response.status}. Loox's API may be blocking automated/server-side requests for this store. Upload a Loox CSV export instead.`)
 
     const payload = await response.json() as Record<string, unknown>
-    const reviewList = Array.isArray(payload.reviews) ? payload.reviews : []
-    if (typeof payload.totalReviews === "number") totalReviewsCount = payload.totalReviews
+    const reviewList = Array.isArray(payload.reviews) ? payload.reviews
+      : Array.isArray((payload as any).data) ? (payload as any).data
+      : Array.isArray((payload as any).items) ? (payload as any).items
+      : []
+    const totalCandidate = (payload as any).totalReviews ?? (payload as any).total ?? (payload as any).count
+    if (typeof totalCandidate === "number") totalReviewsCount = totalCandidate
 
     const previousCount = reviews.size
     for (const r of reviewList) {
-      const body = String((r as any).body || (r as any).reviewBody || "").trim()
+      const body = String((r as any).body || (r as any).reviewBody || (r as any).text || (r as any).comment || "").trim()
       if (!body) continue
       const rating = (r as any).rating ?? (r as any).score ?? ""
       const title = String((r as any).title || "").trim()
