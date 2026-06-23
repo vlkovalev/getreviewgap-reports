@@ -4,7 +4,7 @@ import { getStore } from "@/lib/scrapers/store"
 
 export default function SourcesPage() {
   return (
-    <DashboardShell title="Review sources" description="Configure where review data comes from. For the MVP, use demo data, pasted reviews, or a permitted Amazon review actor.">
+    <DashboardShell title="Advanced analysis sources" description="Optional setup for repeated competitor-review analysis. These sources describe where review data comes from; they are not customer review request destinations.">
       <SourcesClient initialSources={getStore().sources} />
     </DashboardShell>
   )

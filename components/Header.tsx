@@ -6,6 +6,7 @@ import { HeaderActions } from "@/components/HeaderActions"
 const links: Array<[string, string]> = [
   ["Home", "/"],
   ["My reports", "/dashboard/reports"],
+  ["Beta guide", "/beta-guide"],
   ["Pricing", "/pricing"],
   ["Resources", "/resources"],
   ["Contact", "/contact"]

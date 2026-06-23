@@ -18,11 +18,11 @@ const reviewDepths = [
 ] as const
 
 const shopifyReviewApps = [
-  { value: "judgeme", label: "Judge.me", helper: "Export reviews from Judge.me as CSV, then upload or paste them here." },
-  { value: "loox", label: "Loox", helper: "Use a Loox review export or copied review text from your approved source." },
-  { value: "yotpo", label: "Yotpo", helper: "Import a Yotpo CSV export or paste authorized review text." },
-  { value: "okendo", label: "Okendo", helper: "Use an Okendo export with review body, rating, and product fields." },
-  { value: "stamped", label: "Stamped", helper: "Upload a Stamped CSV/TXT export or paste review rows." },
+  { value: "judgeme", label: "Judge.me", helper: "Best path: export reviews from Judge.me as CSV, then upload or paste them here." },
+  { value: "loox", label: "Loox", helper: "Best path: use a Loox export or copied review text from your approved source." },
+  { value: "yotpo", label: "Yotpo", helper: "Best path: import a Yotpo CSV export or paste authorized review text." },
+  { value: "okendo", label: "Okendo", helper: "Best path: use an Okendo export with review body, rating, and product fields." },
+  { value: "stamped", label: "Stamped", helper: "Best path: upload a Stamped CSV/TXT export or paste review rows." },
   { value: "shopify-product-reviews", label: "Shopify Product Reviews", helper: "Use the review export from Shopify's legacy review app." },
   { value: "other", label: "Other / custom", helper: "Any CSV or TXT file works if it includes customer review text." }
 ] as const
@@ -142,6 +142,15 @@ export function ReportsClient({
       setStatus("You are out of report credits. Buy a single report, pack, or monthly credits to continue.")
       return
     }
+    const pastedText = pastedReviews.trim()
+    if ((reportType === "REVIEW_RATING" || reportType === "EXECUTIVE_SUMMARY") && !productUrl.trim() && !pastedText) {
+      setStatus("Add a product URL or paste/upload review text before generating. No credit will be used until the request passes this check.")
+      return
+    }
+    if (pastedText && !hasEnoughReviewText(pastedText)) {
+      setStatus("The pasted review text is too short for a reliable report. Add at least a few complete review sentences or upload a CSV/TXT export.")
+      return
+    }
     // Apps that support direct collection via a product URL
     const directCollectionApps = ["judgeme", "stamped", "loox", "yotpo", "okendo"]
     if (platform === "shopify" && !pastedReviews.trim()) {
@@ -177,7 +186,8 @@ export function ReportsClient({
           ? payload.details
           : JSON.stringify(payload.details)
         : null
-      setStatus(details ? `${payload.error ?? "Report failed"}: ${details}` : payload.error ?? "Report failed")
+      const baseMessage = details ? `${payload.error ?? "Report failed"}: ${details}` : payload.error ?? "Report failed"
+      setStatus(payload.creditRefunded ? `${baseMessage} Your credit was returned.` : baseMessage)
       trackClientEvent("report_generation_failed", { reportType, status: response.status })
       return
     }
@@ -236,8 +246,13 @@ export function ReportsClient({
       <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
         <h2 className="text-2xl font-black">Generate report</h2>
         <p className="mt-3 text-sm text-white/60">
-          Generate buyer-sentiment intelligence from Amazon reviews or Shopify/DTC review exports. Price, contact-data, and broad marketplace scraping are intentionally not offered as paid services.
+          Generate buyer-sentiment intelligence from Amazon reviews or authorized Shopify/DTC review exports. This product analyzes existing reviews; it does not send review requests to customers.
         </p>
+        <div className="mt-4 rounded-xl border border-cyan/20 bg-cyan/10 p-4 text-sm text-white/72">
+          <p className="font-black text-cyan">Private beta workflow</p>
+          <p className="mt-1">Best first test: paste an Amazon product URL. For Shopify, upload or paste an authorized CSV/TXT review export unless you are specifically testing a live connector.</p>
+          <Link href="/beta-guide" className="mt-3 inline-flex font-black text-cyan">Read the beta guide</Link>
+        </div>
         {initialProductUrl ? (
           <p className="mt-4 rounded-xl border border-lime/25 bg-lime/10 p-4 text-sm text-white/76">
             Product loaded from a saved report. Click generate below to create a new analysis with the current connector.
@@ -298,7 +313,7 @@ export function ReportsClient({
           {platform === "shopify" && !detectedApp && !detecting && productUrl && (
             <span className="text-xs text-white/40">Review app not auto-detected — select it manually below.</span>
           )}
-          <span className="text-xs text-white/45">{platform === "amazon" ? "Automatic Amazon collection uses the configured structured API; import a review export when a marketplace limits access." : "Paste the product URL and we'll detect the review app automatically."}</span>
+            <span className="text-xs text-white/45">{platform === "amazon" ? "Automatic Amazon collection uses the configured structured API; import a review export when a marketplace limits access." : "Paste the product URL and we'll detect the review app automatically."}</span>
         </label>
         {platform === "shopify" ? (
           <div className="mt-4 rounded-2xl border border-cyan/20 bg-cyan/10 p-4">
@@ -346,8 +361,8 @@ export function ReportsClient({
               </label>
             )}
             <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4 text-xs text-white/58">
-              <p className="font-bold text-white/78">CSV fallback</p>
-              <p className="mt-1">If direct collection fails, upload or paste a review export below. Columns needed: review text, rating, title.</p>
+              <p className="font-bold text-white/78">Recommended Shopify path</p>
+              <p className="mt-1">Upload or paste an authorized review export. Live connectors are beta checks and can fail when review apps or storefronts block server-side access.</p>
             </div>
           </div>
         ) : null}
@@ -453,6 +468,12 @@ export function ReportsClient({
       </section>
     </div>
   )
+}
+
+function hasEnoughReviewText(text: string) {
+  const normalized = text.replace(/\s+/g, " ").trim()
+  if (normalized.length < 120) return false
+  return normalized.split(" ").filter(Boolean).length >= 20
 }
 
 function ReportActionsMenu({

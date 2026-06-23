@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation"
 
 const links = [
   { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/sources", label: "Review sources" },
-  { href: "/dashboard/jobs", label: "Review batches" },
-  { href: "/dashboard/runs", label: "Run history" },
-  { href: "/dashboard/products", label: "Products reviewed" },
-  { href: "/dashboard/reports", label: "My reports" },
+  { href: "/dashboard/reports", label: "Generate report" },
   { href: "/dashboard/billing", label: "Billing" },
-  { href: "/dashboard/settings", label: "Settings" }
+  { href: "/dashboard/settings", label: "Settings" },
+  { href: "/dashboard/sources", label: "Advanced sources" },
+  { href: "/dashboard/jobs", label: "Advanced batches" },
+  { href: "/dashboard/runs", label: "Run history" },
+  { href: "/dashboard/products", label: "Products reviewed" }
 ]
 
 export function DashboardNav() {

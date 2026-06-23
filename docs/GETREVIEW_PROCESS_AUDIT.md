@@ -4,21 +4,32 @@ Date: 2026-06-23
 
 Evidence reviewed: application routes, dashboard components, Prisma schema, report-generation API, payment flows, compliance page, tests, and the attached audit prompt. No screen recording, external guide, Google review flow, SMS/WhatsApp provider setup, or real tester notes were provided.
 
+Corrected scope note: the supplied prompt described a review-generation/reputation-management product, but the actual product is a competitor review-intelligence and reporting tool. Customer review request, Google review, SMS, WhatsApp, reminder, and unsubscribe sections below are treated as not applicable unless the product is deliberately expanded later.
+
+Fixes applied after this audit:
+
+- Added a private beta guide that explains the actual competitor intelligence workflow.
+- Made "Generate report" the primary dashboard path.
+- Reworded sources/batches as advanced analysis tools, not review-request setup.
+- Removed the fake schedule field from advanced batches.
+- Added server-side report preflight checks before credit consumption for missing inputs, weak pasted-review text, and unsupported Shopify direct-source paths.
+- Improved report failure responses so refunded credits are explicit.
+
 ## 1. Executive Verdict
 
 | Area | Verdict |
 | --- | --- |
-| Overall Process Verdict | Not ready; major process gaps. |
-| Ready for Builder/Admin Testing? | Almost ready with minor fixes for the current review-intelligence app. Not ready for review-request builder/admin testing. |
-| Ready for Business User Testing? | Ready for private beta testing of Amazon/Shopify review-intelligence reports only. Not ready for customer review collection. |
-| Ready for Customer Review Collection? | Not ready; major process gaps. No customer review-request flow exists in the reviewed code. |
-| Ready for Client Demo? | Ready only if demo is framed as "private beta competitor review intelligence." Not ready if demo promises review generation/reputation management. |
-| Ready for Public Launch? | Not ready; important fixes required. Public launch should wait until auth, beta positioning, payment, report generation, and Shopify source claims remain stable after real testers. |
-| Biggest Process Risk | Product-positioning mismatch: the audit prompt describes a reputation/review-generation workflow, but the app implements competitor review-intelligence reports. |
-| Most Confusing Step | "Review sources" and "Review batches" sound like customer-review collection but actually describe competitor review data sources and analysis jobs. |
+| Overall Process Verdict | Almost ready with minor fixes for private beta; not ready for broad public launch. |
+| Ready for Builder/Admin Testing? | Ready for current competitor review-intelligence administration. |
+| Ready for Business User Testing? | Ready for controlled private beta with 3-5 Amazon sellers and selected Shopify export testers. |
+| Ready for Customer Review Collection? | Not applicable. The product does not collect public reviews from customers. |
+| Ready for Client Demo? | Ready if framed as "private beta competitor review intelligence." |
+| Ready for Public Launch? | Not ready; public launch should wait until real beta report quality, account recovery, and provider reliability are proven. |
+| Biggest Process Risk | Live review-source reliability: Amazon/Shopify providers can expose less written review text than users expect. |
+| Most Confusing Step | Advanced sources and batches can still look like setup prerequisites, even though Generate report is the main path. |
 | Most Technically Risky Step | Live third-party review retrieval from Amazon/Shopify review apps, because external platforms limit access and connectors can fail. |
-| Most Missing Step | Customer review request/campaign flow: business profile, review destination, templates, contacts, consent, preview, test send, live send, reminders, unsubscribe, and outcome tracking. |
-| Most Important Fix | Decide whether GetReview is a review-intelligence report app or a review-request/reputation app. Do not demo or market both as one finished product. |
+| Most Missing Step | Preflight and tester feedback depth: users need to know before spending a credit whether input quality is likely sufficient. Initial preflight is now implemented; source quality scoring should deepen next. |
+| Most Important Fix | Keep the beta positioned as competitor intelligence and collect structured report-quality feedback from real sellers. |
 | Confidence Level | High for code-level findings; medium for live UX because no screen recording or tester session was provided. |
 
 ## 2. Product and Process Assumptions
@@ -412,15 +423,13 @@ If a future reputation flow is built, add 5 customer/end-user testers to receive
 
 | Severity | Issue | Affected Role | Evidence | Impact | Suggested Fix | Owner |
 | --- | --- | --- | --- | --- | --- | --- |
-| Critical | Product mismatch with attached review-generation audit | Founder, users, testers | Code has reports; no request campaigns | Wrong demo expectations | Decide and document product scope | Product |
-| Critical | No customer review-request flow | Business/customer | No contact/campaign/template routes/models | Cannot collect reviews | Do not claim review collection; build module if needed | Product/Engineering |
-| Critical | No consent/opt-out system for messaging | Business/customer | No consent for contacts/messages | Compliance risk if messaging added | Build before email/SMS/WhatsApp | Compliance/Engineering |
-| High | Source/job flow unclear | Business user | Dashboard labels | Confusion/support | Reword and add onboarding | UX/Content |
-| High | No preflight before credit consumption | Business user | Report POST consumes before generate | Credit anxiety/support | Validate source/reviews before debit where possible | Engineering |
+| High | Live provider reliability can vary | Business user | Amazon/Shopify sources depend on external access | Failed reports/support | Keep import fallback, warnings, and provider health tests | Engineering/Product |
+| High | Source/job flow can distract first-time users | Business user | Dashboard includes advanced source/batch sections | Confusion/support | Done: reworded as advanced analysis tools and made Generate report primary | UX/Content |
+| High | Preflight before credit consumption was too thin | Business user | Report POST consumed before validating basic input quality | Credit anxiety/support | Done: missing/weak inputs and unsupported Shopify source paths now fail before credit use | Engineering |
 | High | Shopify live connector expectations may be overread | Business user | Review app dropdown | Failed reports | Mark connector modes and export fallback | Product/UX |
 | High | Account lifecycle incomplete | Business user | No reset/email change/delete | Support burden | Add reset, email change, data controls | Engineering |
 | Medium | Preferences local-only | Business user | `localStorage` | Defaults lost across devices | Persist per account | Engineering |
-| Medium | Schedule field not real scheduling | Business/admin | Jobs form text field | False expectation | Remove or implement scheduler | Product/Engineering |
+| Medium | Schedule field was not real scheduling | Business/admin | Jobs form text field | False expectation | Done: removed schedule field from the advanced batch form | Product/Engineering |
 | Medium | Admin vs user roles muddled | Internal/admin | `/admin` and `/dashboard` overlap | Operational confusion | Define roles and permissions | Product |
 | Low | Some copy still broad | Visitor | Marketing/resource pages | Positioning drift | Maintain beta copy checklist | Content |
 
@@ -632,39 +641,39 @@ This is not legal advice. Have counsel review the Terms, Privacy Policy, data so
 
 | Category | Score | Explanation |
 | --- | ---: | --- |
-| Process Clarity Score | 5/10 | Clear for reports after exploration, muddy because GetReview prompt suggests a different product. |
-| Step Practicality Score | 6/10 | Report generation is practical; source/job setup is less so. |
+| Process Clarity Score | 7/10 | Clearer after beta-guide and advanced-source wording fixes; still needs real tester feedback. |
+| Step Practicality Score | 7/10 | Generate report is now the obvious path; advanced setup remains optional. |
 | Technical Feasibility Score | 7/10 | Current report app is feasible; live connectors are risky. |
-| Builder/Admin UX Score | 4/10 | Admin/review-request builder flow is absent; current admin tools are internal/basic. |
-| Business User UX Score | 6/10 | A motivated beta user can generate reports; onboarding needs tightening. |
-| Customer Review Flow Score | 0/10 | No customer review request/collection flow exists. |
-| Data Validation Score | 6/10 | URL/schema validation exists; preflight and account lifecycle gaps remain. |
-| Review Link Reliability Score | 0/10 | Google/public review destination links are not part of current product. |
-| Consent/Compliance Readiness Score | 5/10 | Good analysis compliance page; no messaging consent system. |
-| Error Handling Score | 6/10 | Refund/error handling exists but needs stronger UI and preflight. |
-| Documentation Score | 3/10 | No complete user/beta guide observed. |
-| Demo Readiness Score | 6/10 | Ready only for tightly framed private beta report demo. |
+| Builder/Admin UX Score | 6/10 | Admin tools are basic, but the current product does not need a campaign builder. |
+| Business User UX Score | 7/10 | A beta user can follow the guide and generate a report; onboarding should be validated with testers. |
+| Customer Review Flow Score | N/A | Not part of the competitor review-intelligence product. |
+| Data Validation Score | 7/10 | URL/schema validation exists and basic preflight now blocks weak inputs before credit use. |
+| Review Link Reliability Score | N/A | Google/public review destination links are not part of current product. |
+| Consent/Compliance Readiness Score | 7/10 | Analysis compliance boundaries are documented; messaging consent is not applicable. |
+| Error Handling Score | 7/10 | Refund/error handling is clearer after preflight and returned-credit messaging. |
+| Documentation Score | 6/10 | Beta guide now exists; still needs screenshots and tester FAQ. |
+| Demo Readiness Score | 7/10 | Ready for a tightly framed private beta report demo. |
 | Launch Readiness Score | 4/10 | Not ready for public launch; important product/UX/support gaps remain. |
-| Overall Process Readiness Score | 5/10 | Private beta viable; reputation-management launch not viable. |
+| Overall Process Readiness Score | 7/10 | Private beta viable for competitor review intelligence; public launch still needs account recovery and real beta evidence. |
 
 ## 25. Final Recommendation
 
-Final Verdict: Keep GetReviewGap in private beta as an Amazon-first competitor review-intelligence tool. Do not present it as a review-request, Google review generation, or reputation-management product.
+Final Verdict: Keep GetReviewGap in private beta as an Amazon-first competitor review-intelligence tool, with Shopify supported through authorized exports/imports and selected live connector tests.
 
-Should GetReview be shown to builders/admins now?: Yes, only to internal/technical builders for the current report workflow. No, if they expect to configure customer review request campaigns.
+Should GetReview be shown to builders/admins now?: Yes, for current report workflow administration and beta QA.
 
 Should GetReview be shown to business users now?: Yes, to 3-5 Amazon sellers who understand it is a beta report tool. Avoid Shopify-heavy users unless they can provide exports or are explicitly testing connector limitations.
 
-Should GetReview be used with real customers now?: No, not for sending review requests. That system does not exist.
+Should GetReview be used with real customers now?: Yes, as a private beta reporting tool for selected seller/tester accounts. It should not be used or described as customer review-request software.
 
-What must be fixed first?: Product scope/copy, beta guide, source preflight, Shopify expectation management, password reset, and report error/refund UX.
+What must be fixed first?: Password reset/email verification, deeper source-quality preflight, structured beta feedback, and real seller report-quality validation.
 
 What should be tested first?: Amazon report generation with 3-5 real seller products, Shopify export/import report generation, PDF exports, payment-credit attachment, and no-review/provider failure recovery.
 
 What should be removed or simplified?: Hide or demote sources/jobs for first-time beta users; remove schedule wording until scheduling is real.
 
-What should be added immediately?: Guided first-report onboarding, no-credit sample report, preflight source check, beta feedback capture, and a short tester guide.
+What should be added immediately?: Beta feedback capture, no-credit sample report, deeper source-quality scoring, and account recovery.
 
-Biggest risk if presented too early: Users think it will help them collect more public customer reviews, then discover it only analyzes existing reviews. That destroys trust faster than a normal beta bug.
+Biggest risk if presented too early: Users over-trust weak-source reports or hit provider failures before the app clearly explains source coverage limits.
 
 Best next step: Run a controlled private beta with 3-5 Amazon sellers using the current gated production site, while tracking every failed report, confusing step, and support question in a single QA issue log.

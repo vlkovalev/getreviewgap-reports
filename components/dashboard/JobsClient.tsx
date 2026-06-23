@@ -8,10 +8,10 @@ export function JobsClient({ initialJobs, sources }: { initialJobs: ScrapeJob[];
   const [status, setStatus] = useState("")
 
   async function runJob(id: string) {
-    setStatus("Analyzing demo review data...")
+    setStatus("Analyzing competitor review data...")
     const response = await fetch(`/api/scraper/jobs/${id}/run`, { method: "POST" })
     const payload = await response.json()
-    setStatus(response.ok ? `Review batch completed: ${payload.run.status}` : payload.error)
+    setStatus(response.ok ? `Analysis batch completed: ${payload.run.status}` : payload.error)
   }
 
   async function createJob(formData: FormData) {
@@ -19,41 +19,37 @@ export function JobsClient({ initialJobs, sources }: { initialJobs: ScrapeJob[];
     const response = await fetch("/api/scraper/jobs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: formData.get("name"), sourceId: formData.get("sourceId"), targetUrls, schedule: formData.get("schedule") || undefined })
+      body: JSON.stringify({ name: formData.get("name"), sourceId: formData.get("sourceId"), targetUrls })
     })
     const payload = await response.json()
     if (response.ok) setJobs((current) => [payload.job, ...current])
-    setStatus(response.ok ? "Review batch created." : payload.error)
+    setStatus(response.ok ? "Analysis batch created." : payload.error)
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
       <form action={createJob} className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <h2 className="text-2xl font-black">Create review batch</h2>
-        <p className="mt-3 text-sm text-white/60">Add a few public Amazon product URLs you want to compare. In demo mode, no live third-party request is made.</p>
+        <h2 className="text-2xl font-black">Create analysis batch</h2>
+        <p className="mt-3 text-sm text-white/60">Add competitor product URLs you want to compare repeatedly. For a first beta test, use Generate report instead.</p>
         <label className="mt-5 block text-sm text-white/70">
           Batch name
           <input name="name" required placeholder="Competitor serum review analysis" className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
         </label>
         <label className="mt-3 block text-sm text-white/70">
-          Review source
+          Analysis source
           <select name="sourceId" required className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white">
             {sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}
           </select>
         </label>
         <label className="mt-3 block text-sm text-white/70">
-          Amazon product URLs
+          Competitor product URLs
           <textarea name="targetUrls" required placeholder={"https://www.amazon.com/dp/example-serum\nhttps://www.amazon.com/dp/example-cream"} rows={5} className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
         </label>
-        <label className="mt-3 block text-sm text-white/70">
-          Refresh schedule
-          <input name="schedule" placeholder="Manual for now" className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-        </label>
-        <button className="mt-4 w-full rounded-full bg-lime px-5 py-3 font-black text-black">Create review batch</button>
+        <button className="mt-4 w-full rounded-full bg-lime px-5 py-3 font-black text-black">Create analysis batch</button>
         {status ? <p className="mt-4 text-sm text-white/65">{status}</p> : null}
       </form>
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <h2 className="text-2xl font-black">Review batches</h2>
+        <h2 className="text-2xl font-black">Analysis batches</h2>
         <div className="mt-5 space-y-3">
           {jobs.map((job) => (
             <div key={job.id} className="rounded-xl border border-white/10 bg-black/30 p-4">

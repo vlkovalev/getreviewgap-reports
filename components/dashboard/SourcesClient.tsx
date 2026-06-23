@@ -22,40 +22,40 @@ export function SourcesClient({ initialSources }: { initialSources: ScraperSourc
     })
     const payload = await response.json()
     if (response.ok) setSources((current) => [payload.source, ...current])
-    setStatus(response.ok ? "Review source saved." : payload.error)
+    setStatus(response.ok ? "Analysis source saved." : payload.error)
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
       <form action={createSource} className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <h2 className="text-2xl font-black">Add review source</h2>
-        <p className="mt-3 text-sm text-white/60">Use this to describe where review data will come from. Demo mode is safest while validating the product.</p>
+        <h2 className="text-2xl font-black">Add analysis source</h2>
+        <p className="mt-3 text-sm text-white/60">Use this advanced setup to describe where competitor review data comes from. This is not a Google review link or customer request destination.</p>
         <label className="mt-5 block text-sm text-white/70">
           Source name
           <input suppressHydrationWarning name="name" required placeholder="Amazon skincare competitors" className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
         </label>
         <label className="mt-3 block text-sm text-white/70">
-          Website or marketplace
+          Competitor website or marketplace
           <input suppressHydrationWarning name="baseUrl" required type="url" placeholder="https://www.amazon.com" className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
         </label>
         <label className="mt-3 block text-sm text-white/70">
-          Collection method
+          Analysis method
           <select suppressHydrationWarning name="sourceType" className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white">
             <option value="demo-store">Demo data only</option>
-            <option value="generic-product-page">Approved adapter or API later</option>
+            <option value="generic-product-page">Approved adapter/API source</option>
           </select>
         </label>
         <label className="mt-3 block text-sm text-white/70">
           Minimum delay between requests
           <input suppressHydrationWarning name="rateLimitSeconds" type="number" min="1" max="120" defaultValue="5" className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
         </label>
-        <textarea suppressHydrationWarning name="robotsNote" placeholder="Compliance note, for example: use Apify actor or official API only where permitted." rows={3} className="mt-3 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-        <textarea suppressHydrationWarning name="notes" placeholder="Internal notes for this review source" rows={3} className="mt-3 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
-        <button className="mt-4 w-full rounded-full bg-lime px-5 py-3 font-black text-black">Save review source</button>
+        <textarea suppressHydrationWarning name="robotsNote" placeholder="Compliance note, for example: use an approved provider, export, or API only where permitted." rows={3} className="mt-3 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+        <textarea suppressHydrationWarning name="notes" placeholder="Internal notes for this analysis source" rows={3} className="mt-3 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+        <button className="mt-4 w-full rounded-full bg-lime px-5 py-3 font-black text-black">Save analysis source</button>
         {status ? <p className="mt-4 text-sm text-white/65">{status}</p> : null}
       </form>
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-        <h2 className="text-2xl font-black">Review sources</h2>
+        <h2 className="text-2xl font-black">Analysis sources</h2>
         <div className="mt-5 space-y-3">
           {sources.map((source) => (
             <div key={source.id} className="rounded-xl border border-white/10 bg-black/30 p-4">
