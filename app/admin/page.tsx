@@ -18,13 +18,25 @@ export default async function AdminPage() {
   let leadCount = 0
   let inquiryCount = 0
   let agentRunCount = 0
+  let betaFeedback: Array<{
+    id: string
+    createdAt: Date
+    actorId: string | null
+    entityId: string | null
+    metadata: unknown
+  }> = []
 
   if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("USER:PASSWORD")) {
     const db = getDb()
-    ;[leadCount, inquiryCount, agentRunCount] = await Promise.all([
+    ;[leadCount, inquiryCount, agentRunCount, betaFeedback] = await Promise.all([
       db.lead.count(),
       db.inquiry.count(),
-      db.agentRun.count()
+      db.agentRun.count(),
+      db.auditEvent.findMany({
+        where: { action: "beta_feedback_submitted" },
+        orderBy: { createdAt: "desc" },
+        take: 12
+      })
     ])
   }
 
@@ -74,6 +86,15 @@ export default async function AdminPage() {
           ))}
         </section>
         <section className="card mt-8 overflow-hidden">
+          <div className="border-b border-white/10 p-5">
+            <p className="font-black uppercase text-cyan">Beta feedback</p>
+            <h2 className="mt-2 text-2xl font-black">Recent report ratings</h2>
+          </div>
+          {betaFeedback.length ? betaFeedback.map((event) => <FeedbackRow key={event.id} event={event} />) : (
+            <div className="p-8 text-white/60">No beta feedback submitted yet.</div>
+          )}
+        </section>
+        <section className="card mt-8 overflow-hidden">
           <h2 className="border-b border-white/10 p-5 text-2xl font-black">Recent reports</h2>
           {reports.length ? reports.map((report) => (
             <div key={report.id} className="grid gap-3 border-b border-white/10 p-5 md:grid-cols-[1fr_.4fr_.4fr]">
@@ -115,5 +136,36 @@ function ReadinessCard({ check }: { check: ReadinessCheck }) {
       </div>
       <p className="mt-3 text-sm text-white/62">{check.detail}</p>
     </div>
+  )
+}
+
+function FeedbackRow({ event }: { event: { createdAt: Date; actorId: string | null; entityId: string | null; metadata: unknown } }) {
+  const metadata = (event.metadata ?? {}) as Record<string, unknown>
+  return (
+    <div className="grid gap-3 border-b border-white/10 p-5 lg:grid-cols-[.18fr_.22fr_1fr]">
+      <div>
+        <p className="text-sm text-white/50">Rating</p>
+        <p className="mt-1 text-3xl font-black text-lime">{String(metadata.rating ?? "-")}/5</p>
+      </div>
+      <div>
+        <p className="text-sm text-white/50">Report</p>
+        <p className="mt-1 break-all text-xs text-white/70">{event.entityId ?? "-"}</p>
+        <p className="mt-2 text-xs text-white/45">{event.createdAt.toLocaleString()}</p>
+      </div>
+      <div className="grid gap-2 text-sm">
+        <FeedbackText label="Useful" value={metadata.usefulness} />
+        <FeedbackText label="Confusing" value={metadata.confusing} />
+        <FeedbackText label="Missing" value={metadata.missing} />
+      </div>
+    </div>
+  )
+}
+
+function FeedbackText({ label, value }: { label: string; value: unknown }) {
+  return (
+    <p className="text-white/70">
+      <span className="font-black text-white">{label}: </span>
+      {String(value || "-")}
+    </p>
   )
 }

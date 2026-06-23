@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import type { IntelligenceReport, ReportType, ScraperSource } from "@/lib/scrapers/types"
 import { trackClientEvent } from "@/components/AnalyticsBeacon"
+import { scoreReportInputQuality } from "@/lib/report-input-quality"
 
 const reportTypes: Array<{ value: ReportType; label: string }> = [
   { value: "REVIEW_RATING", label: "Review and Rating" },
@@ -148,8 +149,9 @@ export function ReportsClient({
       setStatus("Add a product URL or paste/upload review text before generating. No credit will be used until the request passes this check.")
       return
     }
-    if (pastedText && !hasEnoughReviewText(pastedText)) {
-      setStatus("The pasted review text is too short for a reliable report. Add at least a few complete review sentences or upload a CSV/TXT export.")
+    const inputQuality = scoreReportInputQuality({ reportType, platform, productUrl, pastedReviews, reviewApp })
+    if (!inputQuality.creditSafe) {
+      setStatus(inputQuality.message)
       return
     }
     // Apps that support direct collection via a product URL
@@ -187,7 +189,8 @@ export function ReportsClient({
           ? payload.details
           : JSON.stringify(payload.details)
         : null
-      const baseMessage = details ? `${payload.error ?? "Report failed"}: ${details}` : payload.error ?? "Report failed"
+      const inputQualityMessage = payload.inputQuality?.message ? ` Source quality: ${payload.inputQuality.message}` : ""
+      const baseMessage = details ? `${payload.error ?? "Report failed"}: ${details}${inputQualityMessage}` : `${payload.error ?? "Report failed"}${inputQualityMessage}`
       setStatus(payload.creditRefunded ? `${baseMessage} Your credit was returned.` : baseMessage)
       trackClientEvent("report_generation_failed", { reportType, status: response.status })
       return
@@ -497,12 +500,6 @@ export function ReportsClient({
   )
 }
 
-function hasEnoughReviewText(text: string) {
-  const normalized = text.replace(/\s+/g, " ").trim()
-  if (normalized.length < 120) return false
-  return normalized.split(" ").filter(Boolean).length >= 20
-}
-
 function InputReadiness({
   platform,
   productUrl,
@@ -514,28 +511,27 @@ function InputReadiness({
   pastedReviews: string
   reviewApp: string
 }) {
-  const pastedText = pastedReviews.trim()
-  const wordCount = pastedText ? pastedText.replace(/\s+/g, " ").split(" ").filter(Boolean).length : 0
-  const estimatedReviews = pastedText ? Math.max(1, pastedText.split(/\n+|(?:^|\s)review(?:\s+\d+)?:/i).filter((item) => item.trim().length > 30).length) : 0
-  const hasUrl = Boolean(productUrl.trim())
-  const directShopifyApps = new Set(["judgeme", "stamped", "loox", "yotpo", "okendo"])
-  const ready = pastedText ? hasEnoughReviewText(pastedText) : hasUrl && (platform === "amazon" || directShopifyApps.has(reviewApp))
-  const tone = ready ? "border-lime/25 bg-lime/10 text-lime" : "border-yellow-300/25 bg-yellow-300/10 text-yellow-100"
-  const message = pastedText
-    ? ready
-      ? `Import looks usable: about ${wordCount} words across roughly ${estimatedReviews} review row${estimatedReviews === 1 ? "" : "s"}.`
-      : `Import is too thin: ${wordCount} words found. Add more complete review text before spending a credit.`
-    : hasUrl
-      ? platform === "shopify"
-        ? directShopifyApps.has(reviewApp)
-          ? "Live Shopify connector test is possible, but an authorized export is still more reliable for beta reports."
-          : "This Shopify source needs pasted review text or a CSV/TXT export before a credit can be used."
-        : "Amazon URL is ready for provider preflight. If Amazon exposes too few written reviews, your credit will be returned."
-      : "Add a product URL or paste/upload review text before generating. No credit is used until this check passes."
+  const quality = scoreReportInputQuality({
+    reportType: "REVIEW_RATING",
+    platform,
+    productUrl,
+    pastedReviews,
+    reviewApp
+  })
+  const tone = quality.creditSafe
+    ? quality.level === "warning"
+      ? "border-yellow-300/25 bg-yellow-300/10 text-yellow-100"
+      : "border-lime/25 bg-lime/10 text-lime"
+    : "border-coral/25 bg-coral/10 text-coral"
+  const label = quality.level === "strong" ? "Strong" : quality.level === "usable" ? "Usable" : quality.level === "warning" ? "Beta check" : "Needs input"
 
   return (
     <div className={`rounded-xl border p-3 text-xs ${tone}`}>
-      <span className="font-black uppercase">Input readiness: </span>{message}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span><span className="font-black uppercase">Source quality: </span>{label}</span>
+        <span className="font-black">{quality.score}/100</span>
+      </div>
+      <p className="mt-1">{quality.message}</p>
     </div>
   )
 }

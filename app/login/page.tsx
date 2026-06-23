@@ -3,7 +3,7 @@ import Link from "next/link"
 
 export const metadata: Metadata = { title: "Sign in", description: "Sign in to your ReviewGap account.", robots: { index: false, follow: false } }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; signedIn?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; signedIn?: string; reset?: string }> }) {
   const params = await searchParams
   return (
     <main className="px-5 py-20">
@@ -20,6 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h2 className="text-2xl font-black">Sign in</h2>
           {params.error ? <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">Check your email and password, then try again.</p> : null}
           {params.signedIn ? <p className="mt-4 rounded-xl border border-lime/30 bg-lime/10 p-3 text-sm text-lime">You are signed in. Choose where to go next.</p> : null}
+          {params.reset ? <p className="mt-4 rounded-xl border border-lime/30 bg-lime/10 p-3 text-sm text-lime">Password updated. Sign in with your new password.</p> : null}
           <form action="/api/auth/login" method="post" className="mt-6 grid gap-4">
             <input type="hidden" name="mode" value="login" />
             <input type="hidden" name="redirectTo" value="/login?signedIn=1" />
@@ -35,6 +36,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </form>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/signup" className="font-bold text-lime">Create account</Link>
+            <Link href="/forgot-password" className="font-bold text-white/70">Forgot password?</Link>
             <Link href="/dashboard/reports" className="font-bold text-white/70">Go to my reports</Link>
           </div>
         </section>

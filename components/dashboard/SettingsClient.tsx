@@ -308,6 +308,9 @@ export function SettingsClient({ customer }: { customer: Customer | null }) {
               <a href="/login" className="btn-secondary mt-4">Sign in to account</a>
             </div>
           )}
+          <p className="mt-4 text-sm text-white/55">
+            Locked out? <a href="/forgot-password" className="font-bold text-lime">Send a password reset link</a>.
+          </p>
 
           <div className="mt-4">
             {passwordStatus.type === "success" && (

@@ -27,3 +27,7 @@ export function leadConfirmationHtml(name: string) {
 export function inquiryConfirmationHtml(name: string) {
   return `<p>Hi ${name},</p><p>Thanks for contacting ReviewGap. We received your inquiry and will reply soon.</p>`
 }
+
+export function passwordResetHtml(resetUrl: string) {
+  return `<p>Hi,</p><p>Use the link below to reset your ReviewGap password. This link expires in 30 minutes.</p><p><a href="${resetUrl}">Reset your password</a></p><p>If you did not request this, you can ignore this email.</p>`
+}
