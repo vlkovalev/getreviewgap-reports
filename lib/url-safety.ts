@@ -36,7 +36,10 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<void> {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error("Only http/https URLs are allowed")
   }
-  const hostname = parsed.hostname.toLowerCase()
+  let hostname = parsed.hostname.toLowerCase()
+  if (hostname.startsWith("[") && hostname.endsWith("]")) {
+    hostname = hostname.slice(1, -1) // strip IPv6 literal brackets, e.g. "[::1]" -> "::1"
+  }
   if (BLOCKED_HOSTNAMES.has(hostname) || isPrivateIp(hostname)) {
     throw new Error("URL resolves to a blocked address")
   }
