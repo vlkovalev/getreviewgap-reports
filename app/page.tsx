@@ -86,19 +86,65 @@ export default function HomePage() {
               <Link href="/compliance" className="btn-secondary">Compliance</Link>
             </div>
           </div>
-          <div className="card p-6 shadow-soft">
-            <div className="rounded-3xl border border-white/10 bg-white/8 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-black text-lime">Competitor report</p>
-                <span className="rounded-full bg-yellow-300 px-3 py-1 text-xs font-black text-ink">NEEDS REVIEW</span>
+          <div className="card p-6 md:p-8 shadow-2xl bg-slate-950/80 border border-white/10 backdrop-blur-md">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <p className="text-xs font-black uppercase text-white/40 tracking-wider">Reports &gt; Glow Serum Audit</p>
+                <h3 className="text-xl font-black mt-1 text-white">Review Intelligence Brief</h3>
               </div>
-              <h2 className="mt-5 text-3xl font-black">Glow Serum Sentiment</h2>
-              <p className="mt-3 text-white/66">Positive sentiment clusters around texture and glow. Negative sentiment repeats around leaking pumps and size/value expectations.</p>
-              <div className="mt-6 grid gap-3">
-                {["Top complaint: leaking pump", "Buyer phrase: smaller than expected", "Ad hook: glow without sticky residue"].map((item) => (
-                  <div key={item} className="rounded-2xl bg-white/8 p-4 text-sm text-white/76">{item}</div>
-                ))}
+              <div className="flex gap-2">
+                <span className="rounded-full border border-lime/40 bg-lime/15 px-2.5 py-1 text-xs font-black text-lime uppercase">Amazon</span>
+                <span className="rounded-full border border-cyan/40 bg-cyan/15 px-2.5 py-1 text-xs font-black text-cyan uppercase">High Confidence</span>
               </div>
+            </div>
+
+            {/* Metrics Row */}
+            <div className="mt-4 grid grid-cols-3 gap-2 border-b border-white/5 pb-4 text-center">
+              <div className="rounded-xl bg-white/5 p-2">
+                <p className="text-[10px] uppercase text-white/50">Analyzed Reviews</p>
+                <p className="text-lg font-black text-white mt-0.5">245</p>
+              </div>
+              <div className="rounded-xl bg-white/5 p-2">
+                <p className="text-[10px] uppercase text-white/50">Total Ratings</p>
+                <p className="text-lg font-black text-white mt-0.5">1,280</p>
+              </div>
+              <div className="rounded-xl bg-white/5 p-2">
+                <p className="text-[10px] uppercase text-white/50">Scan Depth</p>
+                <p className="text-lg font-black text-lime mt-0.5">Deep</p>
+              </div>
+            </div>
+
+            {/* Executive Summary */}
+            <div className="mt-4 text-left">
+              <p className="text-xs font-black uppercase text-lime tracking-wider">Executive Summary</p>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">
+                Positive sentiment clusters around <span className="text-lime font-semibold">skin hydration and natural glow</span>. However, a major bottleneck exists around packaging failures, specifically <span className="text-red-400 font-semibold">leaking pumps</span> causing product loss during shipping.
+              </p>
+            </div>
+
+            {/* Complaints vs Compliments */}
+            <div className="mt-5 grid gap-3 md:grid-cols-2 text-left">
+              <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-4">
+                <p className="text-xs font-black uppercase text-red-300 tracking-wider">Top Friction</p>
+                <p className="font-bold text-sm text-red-100 mt-2">Leaking pump seals</p>
+                <p className="text-xs text-red-100/60 mt-1">"The pump leaks from the side of the cap when travelling."</p>
+              </div>
+              <div className="rounded-2xl border border-lime/20 bg-lime/5 p-4">
+                <p className="text-xs font-black uppercase text-lime tracking-wider">Top Compliment</p>
+                <p className="font-bold text-sm text-lime mt-2">Non-sticky hydration</p>
+                <p className="text-xs text-lime/60 mt-1">"Absorbs instantly without leaving a sticky or greasy film."</p>
+              </div>
+            </div>
+
+            {/* Next Action */}
+            <div className="mt-4 rounded-2xl border border-cyan/20 bg-cyan/5 p-4 text-left">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-cyan/25 px-2 py-0.5 text-[10px] font-black text-cyan uppercase">Next Action</span>
+                <p className="text-xs font-black text-cyan uppercase tracking-wider text-cyan">Product &amp; Copy move</p>
+              </div>
+              <p className="text-sm text-cyan/90 mt-2 font-medium">
+                Redesign bottle seals for travel safety, and lead marketing with "Hydration without the stickiness" hooks.
+              </p>
             </div>
           </div>
         </div>
