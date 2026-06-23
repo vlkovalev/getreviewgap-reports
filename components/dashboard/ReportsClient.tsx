@@ -60,6 +60,7 @@ export function ReportsClient({
   const [pastedReviews, setPastedReviews] = useState("")
   const [importedFileName, setImportedFileName] = useState("")
   const [status, setStatus] = useState("")
+  const [sampleBusy, setSampleBusy] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [busyReportId, setBusyReportId] = useState("")
   const canGenerate = signedIn && creditCount > 0
@@ -204,6 +205,26 @@ export function ReportsClient({
     })
   }
 
+  async function createSampleReport() {
+    if (!signedIn) {
+      setStatus("Sign in to create a no-credit sample report.")
+      return
+    }
+    setSampleBusy(true)
+    setStatus("Creating sample report...")
+    const response = await fetch("/api/scraper/reports/sample", { method: "POST" })
+    const payload = await response.json().catch(() => ({}))
+    setSampleBusy(false)
+    if (!response.ok) {
+      setStatus(payload.error ?? "Could not create sample report.")
+      return
+    }
+    setReports((current) => current.some((report) => report.id === payload.report.id) ? current : [payload.report, ...current])
+    if (typeof payload.credits === "number") setCreditCount(payload.credits)
+    setStatus(payload.reused ? "Sample report already exists. Open it below; no credit was used." : "Sample report created. Open it below; no credit was used.")
+    trackClientEvent("sample_report_created", { reused: Boolean(payload.reused) })
+  }
+
   async function setArchived(report: IntelligenceReport, action: "archive" | "restore") {
     setBusyReportId(report.id)
     const response = await fetch(`/api/scraper/reports/${report.id}`, {
@@ -251,7 +272,12 @@ export function ReportsClient({
         <div className="mt-4 rounded-xl border border-cyan/20 bg-cyan/10 p-4 text-sm text-white/72">
           <p className="font-black text-cyan">Private beta workflow</p>
           <p className="mt-1">Best first test: paste an Amazon product URL. For Shopify, upload or paste an authorized CSV/TXT review export unless you are specifically testing a live connector.</p>
-          <Link href="/beta-guide" className="mt-3 inline-flex font-black text-cyan">Read the beta guide</Link>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link href="/beta-guide" className="inline-flex font-black text-cyan">Read the beta guide</Link>
+            <button type="button" onClick={createSampleReport} disabled={sampleBusy || !signedIn} className="font-black text-lime disabled:text-white/35">
+              {sampleBusy ? "Creating sample..." : "Create no-credit sample report"}
+            </button>
+          </div>
         </div>
         {initialProductUrl ? (
           <p className="mt-4 rounded-xl border border-lime/25 bg-lime/10 p-4 text-sm text-white/76">
@@ -379,6 +405,7 @@ export function ReportsClient({
         <label className="mt-4 grid gap-2 text-sm">
           <span className="text-white/70">{platform === "shopify" ? "Shopify review text or CSV rows" : "Paste reviews, optional"}</span>
           <textarea value={pastedReviews} onChange={(event) => setPastedReviews(event.target.value)} rows={5} placeholder={platform === "shopify" ? "Paste exported review rows here. Example: Great quality and fast shipping, 5 stars, Glow Serum" : "Paste one review per line, or let Amazon collection fetch available reviews."} className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white" />
+          <InputReadiness platform={platform} productUrl={productUrl} pastedReviews={pastedReviews} reviewApp={reviewApp} />
           <div className="rounded-xl border border-dashed border-white/15 bg-black/25 p-4">
             <label className="flex cursor-pointer flex-wrap items-center justify-between gap-3">
               <span>
@@ -474,6 +501,43 @@ function hasEnoughReviewText(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim()
   if (normalized.length < 120) return false
   return normalized.split(" ").filter(Boolean).length >= 20
+}
+
+function InputReadiness({
+  platform,
+  productUrl,
+  pastedReviews,
+  reviewApp
+}: {
+  platform: "amazon" | "shopify"
+  productUrl: string
+  pastedReviews: string
+  reviewApp: string
+}) {
+  const pastedText = pastedReviews.trim()
+  const wordCount = pastedText ? pastedText.replace(/\s+/g, " ").split(" ").filter(Boolean).length : 0
+  const estimatedReviews = pastedText ? Math.max(1, pastedText.split(/\n+|(?:^|\s)review(?:\s+\d+)?:/i).filter((item) => item.trim().length > 30).length) : 0
+  const hasUrl = Boolean(productUrl.trim())
+  const directShopifyApps = new Set(["judgeme", "stamped", "loox", "yotpo", "okendo"])
+  const ready = pastedText ? hasEnoughReviewText(pastedText) : hasUrl && (platform === "amazon" || directShopifyApps.has(reviewApp))
+  const tone = ready ? "border-lime/25 bg-lime/10 text-lime" : "border-yellow-300/25 bg-yellow-300/10 text-yellow-100"
+  const message = pastedText
+    ? ready
+      ? `Import looks usable: about ${wordCount} words across roughly ${estimatedReviews} review row${estimatedReviews === 1 ? "" : "s"}.`
+      : `Import is too thin: ${wordCount} words found. Add more complete review text before spending a credit.`
+    : hasUrl
+      ? platform === "shopify"
+        ? directShopifyApps.has(reviewApp)
+          ? "Live Shopify connector test is possible, but an authorized export is still more reliable for beta reports."
+          : "This Shopify source needs pasted review text or a CSV/TXT export before a credit can be used."
+        : "Amazon URL is ready for provider preflight. If Amazon exposes too few written reviews, your credit will be returned."
+      : "Add a product URL or paste/upload review text before generating. No credit is used until this check passes."
+
+  return (
+    <div className={`rounded-xl border p-3 text-xs ${tone}`}>
+      <span className="font-black uppercase">Input readiness: </span>{message}
+    </div>
+  )
 }
 
 function ReportActionsMenu({

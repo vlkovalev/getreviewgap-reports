@@ -14,6 +14,9 @@ Fixes applied after this audit:
 - Removed the fake schedule field from advanced batches.
 - Added server-side report preflight checks before credit consumption for missing inputs, weak pasted-review text, and unsupported Shopify direct-source paths.
 - Improved report failure responses so refunded credits are explicit.
+- Added no-credit static sample reports for signed-in beta testers.
+- Added report-level beta feedback capture backed by audit events.
+- Added input-readiness hints in the report generator.
 
 ## 1. Executive Verdict
 
@@ -28,8 +31,8 @@ Fixes applied after this audit:
 | Biggest Process Risk | Live review-source reliability: Amazon/Shopify providers can expose less written review text than users expect. |
 | Most Confusing Step | Advanced sources and batches can still look like setup prerequisites, even though Generate report is the main path. |
 | Most Technically Risky Step | Live third-party review retrieval from Amazon/Shopify review apps, because external platforms limit access and connectors can fail. |
-| Most Missing Step | Preflight and tester feedback depth: users need to know before spending a credit whether input quality is likely sufficient. Initial preflight is now implemented; source quality scoring should deepen next. |
-| Most Important Fix | Keep the beta positioned as competitor intelligence and collect structured report-quality feedback from real sellers. |
+| Most Missing Step | Account recovery and deeper source-quality scoring. Basic preflight, sample reports, and structured report feedback are now implemented. |
+| Most Important Fix | Keep the beta positioned as competitor intelligence and validate report quality with real sellers before public launch. |
 | Confidence Level | High for code-level findings; medium for live UX because no screen recording or tester session was provided. |
 
 ## 2. Product and Process Assumptions
@@ -425,7 +428,7 @@ If a future reputation flow is built, add 5 customer/end-user testers to receive
 | --- | --- | --- | --- | --- | --- | --- |
 | High | Live provider reliability can vary | Business user | Amazon/Shopify sources depend on external access | Failed reports/support | Keep import fallback, warnings, and provider health tests | Engineering/Product |
 | High | Source/job flow can distract first-time users | Business user | Dashboard includes advanced source/batch sections | Confusion/support | Done: reworded as advanced analysis tools and made Generate report primary | UX/Content |
-| High | Preflight before credit consumption was too thin | Business user | Report POST consumed before validating basic input quality | Credit anxiety/support | Done: missing/weak inputs and unsupported Shopify source paths now fail before credit use | Engineering |
+| High | Preflight before credit consumption was too thin | Business user | Report POST consumed before validating basic input quality | Credit anxiety/support | Done: missing/weak inputs and unsupported Shopify source paths now fail before credit use; generator also shows input-readiness hints | Engineering |
 | High | Shopify live connector expectations may be overread | Business user | Review app dropdown | Failed reports | Mark connector modes and export fallback | Product/UX |
 | High | Account lifecycle incomplete | Business user | No reset/email change/delete | Support burden | Add reset, email change, data controls | Engineering |
 | Medium | Preferences local-only | Business user | `localStorage` | Defaults lost across devices | Persist per account | Engineering |
@@ -612,7 +615,7 @@ This is not legal advice. Have counsel review the Terms, Privacy Policy, data so
 | Immediate | Make Shopify export/import-first | Shopify reports | Avoids Loox/connector overpromise | UI says live connectors are beta; export path is primary. |
 | Immediate | Keep private beta gate active | Access | Avoids public exposure | Public URL requires beta auth. |
 | Short-Term | Add password reset/email verification | Account | Reduces support/trust issues | Users can recover accounts. |
-| Short-Term | Add report feedback capture | Beta | Improves product quality | Each beta report can be rated/commented. |
+| Short-Term | Add report feedback capture | Beta | Improves product quality | Done: each report page can be rated/commented. |
 | Short-Term | Move sources/jobs to advanced | Dashboard | Simplifies UX | First-run path is Generate Report. |
 | Short-Term | Add payment/admin reconciliation view | Billing | Prevents support chaos | Admin can see provider order -> credits. |
 | Medium-Term | Durable report job queue/status | Report generation | Handles slow providers/AI | Users see progress and can return later. |
@@ -666,13 +669,13 @@ Should GetReview be shown to business users now?: Yes, to 3-5 Amazon sellers who
 
 Should GetReview be used with real customers now?: Yes, as a private beta reporting tool for selected seller/tester accounts. It should not be used or described as customer review-request software.
 
-What must be fixed first?: Password reset/email verification, deeper source-quality preflight, structured beta feedback, and real seller report-quality validation.
+What must be fixed first?: Password reset/email verification, deeper source-quality scoring, and real seller report-quality validation.
 
 What should be tested first?: Amazon report generation with 3-5 real seller products, Shopify export/import report generation, PDF exports, payment-credit attachment, and no-review/provider failure recovery.
 
 What should be removed or simplified?: Hide or demote sources/jobs for first-time beta users; remove schedule wording until scheduling is real.
 
-What should be added immediately?: Beta feedback capture, no-credit sample report, deeper source-quality scoring, and account recovery.
+What should be added immediately?: Account recovery, deeper source-quality scoring, and a beta feedback review dashboard.
 
 Biggest risk if presented too early: Users over-trust weak-source reports or hit provider failures before the app clearly explains source coverage limits.
 

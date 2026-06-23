@@ -5,6 +5,7 @@ import { getStore } from "@/lib/scrapers/store"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
 import type { IntelligenceReport } from "@/lib/scrapers/types"
+import { BetaFeedbackForm } from "@/components/dashboard/BetaFeedbackForm"
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -169,6 +170,8 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           <p className="mt-2">{cleanText(report.summary.warning)}</p>
         </section>
       ) : null}
+
+      <BetaFeedbackForm reportId={report.id} />
 
       {insight ? (
         <>

@@ -8,6 +8,10 @@ export const metadata: Metadata = {
 
 const steps = [
   {
+    title: "Open the sample first",
+    body: "Create the no-credit sample report from the report generator to inspect the report layout, exports, and feedback form before using a paid credit."
+  },
+  {
     title: "Start with Amazon",
     body: "Paste a real Amazon product URL from a competitor product with enough written reviews. Amazon is the primary private-beta workflow."
   },
@@ -64,9 +68,9 @@ export default function BetaGuidePage() {
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="text-2xl font-black">What to test first</h2>
           <div className="mt-5 grid gap-3 text-white/70">
-            <p>1. Generate one Amazon report from a product you know well.</p>
-            <p>2. Export the report as PDF and CSV.</p>
-            <p>3. Check whether the top complaints, buyer phrases, and product gaps match what you see in the real market.</p>
+            <p>1. Create the no-credit sample report and export it as PDF and CSV.</p>
+            <p>2. Generate one Amazon report from a product you know well.</p>
+            <p>3. Use the beta feedback form on the report page to rate usefulness, confusion, and missing evidence.</p>
             <p>4. For Shopify, use an authorized review export before testing live connector detection.</p>
           </div>
           <Link href="/dashboard/reports" className="btn-primary mt-6">Generate a beta report</Link>
