@@ -115,7 +115,7 @@ async function generateReviewIntelligenceReport(type: ReportType, filters: Repor
   const marketplace = platform === "shopify" ? "Shopify / DTC store" : amazonMarketplaceLabel(productUrl)
   const reviewResult = await fetchAmazonReviews({
     productUrl: cleanProductUrl,
-    productName: initialProductName,
+    productName: filters.productName,
     competitorName: filters.competitorName,
     pastedReviews: filters.pastedReviews,
     reviewApp: filters.reviewApp,
@@ -398,7 +398,7 @@ function buildPdfLines(report: IntelligenceReport) {
         `${index + 1}. ${stringifyPdfValue(row.theme ?? row.productName ?? row.title ?? row.source ?? "Report row")}`,
         ...Object.entries(row).filter(([, value]) => value !== "" && value !== null && value !== undefined).slice(0, 5).map(([key, value]) => `   ${key}: ${stringifyPdfValue(value)}`)
       ])
-    ].flatMap((line) => splitPdfLine(String(line)))
+    ].flatMap((line) => splitPdfLine(closeUnclosedBrackets(String(line))))
   }
 
   // Otherwise, it is a Watchlist/Catalog Report!
@@ -582,7 +582,7 @@ function pdfText(text: string) {
 }
 
 function pdfDraw(text: string, x: number, y: number, size: number, font: "F1" | "F2", color: string) {
-  return `BT ${color} rg /${font} ${size} Tf ${x} ${y} Td ${pdfText(closeUnclosedBrackets(text))} ET`
+  return `BT ${color} rg /${font} ${size} Tf ${x} ${y} Td ${pdfText(text)} ET`
 }
 
 function isPdfSectionHeading(line: string) {

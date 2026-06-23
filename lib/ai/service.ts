@@ -1131,7 +1131,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
         const pctStr = ` (${percentage}%)`
         const subPatternsStr = Array.isArray(item.sub_patterns) && item.sub_patterns.length ? ` Sub-patterns: ${item.sub_patterns.join(", ")}.` : ""
         const quotesStr = Array.isArray(item.verbatim_quotes) && item.verbatim_quotes.length
-          ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}★, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
+          ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}/5, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
           : ""
         const temporalStr = item.temporal_signal ? ` Temporal shift noted: ${item.temporal_signal}.` : ""
 
@@ -1154,7 +1154,7 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
         const pctStr = ` (${percentage}%)`
         const subPatternsStr = Array.isArray(item.sub_patterns) && item.sub_patterns.length ? ` Sub-patterns: ${item.sub_patterns.join(", ")}.` : ""
         const quotesStr = Array.isArray(item.verbatim_quotes) && item.verbatim_quotes.length
-          ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}★, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
+          ? ` Verbatim quotes: ${item.verbatim_quotes.map((q: any) => `"${q.text}" (${q.rating}/5, ${q.date}${q.verified ? ', Verified' : ''})`).join(" | ")}`
           : ""
 
         return {
