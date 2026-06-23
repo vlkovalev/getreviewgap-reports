@@ -1,10 +1,12 @@
 import { DashboardNav } from "@/components/dashboard/DashboardNav"
+import { requireAdmin } from "@/lib/admin-session"
 
-export function DashboardShell({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+export async function DashboardShell({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  const isAdmin = await requireAdmin()
   return (
     <main className="px-5 py-10">
       <div className="mx-auto max-w-7xl">
-        <DashboardNav />
+        <DashboardNav isAdmin={isAdmin} />
         <div className="mb-8">
           <p className="font-black uppercase text-lime">ReviewGap</p>
           <h1 className="mt-3 text-4xl font-black md:text-6xl">{title}</h1>

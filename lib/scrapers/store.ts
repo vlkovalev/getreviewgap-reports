@@ -56,3 +56,31 @@ export function addReport(input: { userId?: string; customerId?: string; reportT
   store.reports.unshift(report)
   return report
 }
+
+export function addReportWithStatus(input: { userId?: string; customerId?: string; reportType: ReportType; title: string; filters: ReportFilters; status: IntelligenceReport["status"]; summary?: Record<string, unknown>; data?: Record<string, unknown> }) {
+  const store = getStore()
+  const now = new Date().toISOString()
+  const report: IntelligenceReport = {
+    id: crypto.randomUUID(),
+    generatedAt: input.status === "COMPLETED" ? now : undefined,
+    createdAt: now,
+    updatedAt: now,
+    summary: input.summary ?? {},
+    data: input.data ?? {},
+    ...input
+  }
+  store.reports.unshift(report)
+  return report
+}
+
+export function updateMemoryReport(id: string, updates: Partial<IntelligenceReport>) {
+  const store = getStore()
+  const report = store.reports.find((r) => r.id === id)
+  if (report) {
+    Object.assign(report, updates)
+    report.updatedAt = new Date().toISOString()
+    return report
+  }
+  return null
+}
+

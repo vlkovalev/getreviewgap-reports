@@ -1,8 +1,10 @@
 import { average, isValidHttpUrl, percent, toCsv } from "@/lib/scrapers/parser-utils"
-import { addReport, getStore } from "@/lib/scrapers/store"
+import { addReport, getStore, addReportWithStatus, updateMemoryReport } from "@/lib/scrapers/store"
 import type { IntelligenceReport, ProductRecord, ProductSnapshot, ReportFilters, ReportType } from "@/lib/scrapers/types"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
 import { amazonMarketplaceLabel, canonicalAmazonProductUrl, fetchAmazonReviews, generateReviewInsight } from "@/lib/ai/service"
+import { addCredits } from "@/lib/customer-store"
+
 
 const reportLabels: Record<ReportType, string> = {
   PRICE_MONITORING: "Price Monitoring Report",
@@ -86,6 +88,181 @@ async function persistIntelligenceReport(reportInput: ReportInput): Promise<Inte
   }
 
   return addReport(reportInput)
+}
+
+export async function generateReportAsync(type: ReportType, filters: ReportFilters = {}, customerId: string) {
+  const isReviewReport = (type === "REVIEW_RATING" || type === "EXECUTIVE_SUMMARY") && (filters.productUrl || filters.pastedReviews)
+
+  if (!isReviewReport) {
+    return generateReport(type, filters, customerId)
+  }
+
+  const platform = filters.platform ?? "amazon"
+  const productUrl = filters.productUrl || (platform === "shopify" ? "https://shopify.com" : "https://www.amazon.com/dp/demo")
+  const cleanProductUrl = platform === "amazon" ? canonicalAmazonProductUrl(productUrl) : productUrl
+  const productName = filters.productName || inferProductName(productUrl, platform)
+
+  const title = `${type === "EXECUTIVE_SUMMARY" ? "Executive Review Brief" : "Review Intelligence Brief"} - ${productName}`
+
+  let report: IntelligenceReport
+
+  if (hasRealDatabaseUrl()) {
+    const created = await getDb().intelligenceReport.create({
+      data: {
+        customerId,
+        reportType: type,
+        title,
+        status: "GENERATING",
+        filters: { ...filters, productUrl: cleanProductUrl, productName },
+        summary: {},
+        data: {}
+      }
+    })
+    report = mapPrismaIntelligenceReport(created)
+  } else {
+    report = addReportWithStatus({
+      customerId,
+      reportType: type,
+      title,
+      status: "GENERATING",
+      filters: { ...filters, productUrl: cleanProductUrl, productName }
+    })
+  }
+
+  // Background worker task
+  (async () => {
+    try {
+      const marketplace = platform === "shopify" ? "Shopify / DTC store" : amazonMarketplaceLabel(cleanProductUrl)
+      const reviewResult = await fetchAmazonReviews({
+        productUrl: cleanProductUrl,
+        productName,
+        competitorName: filters.competitorName,
+        pastedReviews: filters.pastedReviews,
+        reviewApp: filters.reviewApp,
+        platform,
+        marketplace,
+        reviewPageLimit: filters.reviewPageLimit
+      })
+
+      if ((reviewResult.source === "apify" || reviewResult.source === "canopy") && reviewResult.reviews.length === 0) {
+        throw new NoReviewDataError(reviewResult.warning || "No review text was returned for this product. Try another product URL or paste reviews manually.")
+      }
+      const targetReviewCount = Number(reviewResult.targetReviewCount ?? 0)
+      const minReviewsRequired = 20
+      if (platform === "amazon" && !filters.pastedReviews && targetReviewCount >= 100 && reviewResult.reviews.length < minReviewsRequired) {
+        throw new NoReviewDataError(`Only ${reviewResult.reviews.length} unique written reviews were retrieved. This report requires at least ${minReviewsRequired} written reviews to ensure directional patterns. Try a product whose written reviews are exposed by the connected providers.`)
+      }
+
+      const finalProductName = filters.productName || reviewResult.productName || productName
+      const { insight, provider, model } = await generateReviewInsight({
+        productUrl: cleanProductUrl,
+        productName: finalProductName,
+        competitorName: filters.competitorName,
+        pastedReviews: filters.pastedReviews,
+        reviewApp: filters.reviewApp,
+        platform,
+        marketplace,
+        reviewPageLimit: filters.reviewPageLimit
+      }, reviewResult.reviews)
+
+      const insightRows = [
+        ...insight.topComplaints.map((item) => ({ section: "Top complaint", theme: item.theme, evidence: item.evidence, severity: item.severity, recommendation: item.productImplication })),
+        ...insight.topCompliments.map((item) => ({ section: "Top compliment", theme: item.theme, evidence: item.evidence, severity: "", recommendation: item.marketingImplication })),
+        ...insight.productImprovementIdeas.map((item) => ({ section: "Product idea", theme: item.idea, evidence: item.whyItMatters, severity: item.confidence, recommendation: item.whyItMatters })),
+        ...insight.adHooks.map((hook) => ({ section: "Ad hook", theme: hook, evidence: "", severity: "", recommendation: hook }))
+      ]
+      const rows = insightRows.length ? insightRows : emptyReviewRows(reviewResult.warning)
+
+      const summary = {
+        productName: finalProductName,
+        productUrl: cleanProductUrl,
+        platform,
+        marketplace,
+        asin: reviewResult.asin ?? "",
+        competitorName: filters.competitorName ?? "",
+        reviewApp: filters.reviewApp ?? "",
+        source: reviewResult.source,
+        provider,
+        model,
+        reviewCount: reviewResult.reviews.length,
+        targetReviewCount: reviewResult.targetReviewCount ?? "",
+        reviewDepth: reviewDepthLabel(filters.reviewPageLimit),
+        reviewPageLimit: filters.reviewPageLimit ?? "",
+        pagesFetched: reviewResult.pagesFetched ?? "",
+        basePagesFetched: reviewResult.basePagesFetched ?? "",
+        ratingFilterPagesFetched: reviewResult.ratingFilterPagesFetched ?? "",
+        ratingFiltersUsed: reviewResult.ratingFiltersUsed ?? [],
+        fallbackReviewsAdded: reviewResult.fallbackReviewsAdded ?? "",
+        yepApiReviewsAdded: reviewResult.yepApiReviewsAdded ?? "",
+        yepApiPagesFetched: reviewResult.yepApiPagesFetched ?? "",
+        availableReviewCount: reviewResult.availableReviewCount ?? "",
+        marketplaceRatingCount: reviewResult.marketplaceRatingCount ?? "",
+        sampleNote: reviewResult.sampleNote ?? "",
+        warning: reviewResult.warning ?? "",
+        executiveSummary: insight.executiveSummary,
+        topComplaints: insight.topComplaints.slice(0, 5),
+        topCompliments: insight.topCompliments.slice(0, 5),
+        buyerLanguage: insight.buyerLanguage.slice(0, 12),
+        assumptions: insight.assumptions,
+        dataQuality: insight.dataQuality
+      }
+
+      const data = {
+        rows,
+        insight,
+        source: reviewResult.source,
+        warning: reviewResult.warning ?? ""
+      }
+
+      const updatedTitle = `${type === "EXECUTIVE_SUMMARY" ? "Executive Review Brief" : "Review Intelligence Brief"} - ${finalProductName}`
+
+      if (hasRealDatabaseUrl()) {
+        await getDb().intelligenceReport.update({
+          where: { id: report.id },
+          data: {
+            status: "COMPLETED",
+            title: updatedTitle,
+            summary,
+            data,
+            generatedAt: new Date()
+          }
+        })
+      } else {
+        updateMemoryReport(report.id, {
+          status: "COMPLETED",
+          title: updatedTitle,
+          summary,
+          data,
+          generatedAt: new Date().toISOString()
+        })
+      }
+    } catch (err) {
+      console.error(`Background report generation failed for ID ${report.id}:`, err)
+      const message = err instanceof Error ? err.message : "Unknown report generation error"
+
+      if (hasRealDatabaseUrl()) {
+        await getDb().intelligenceReport.update({
+          where: { id: report.id },
+          data: {
+            status: "FAILED",
+            errorMessage: message
+          }
+        })
+      } else {
+        updateMemoryReport(report.id, {
+          status: "FAILED",
+          errorMessage: message
+        })
+      }
+
+      // Refund credit!
+      await addCredits(customerId, 1, `report_failed_refund:${report.id}`).catch((refundErr) => {
+        console.error(`Failed to refund credit for customer ${customerId}:`, refundErr)
+      })
+    }
+  })()
+
+  return report
 }
 
 export async function generateReport(type: ReportType, filters: ReportFilters = {}, customerId?: string) {

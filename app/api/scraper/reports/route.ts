@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { generateReport, listReportTypes, NoReviewDataError } from "@/lib/reports/report-engine"
+import { generateReportAsync, listReportTypes, NoReviewDataError } from "@/lib/reports/report-engine"
 import { getStore } from "@/lib/scrapers/store"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { addCredits, consumeCredit } from "@/lib/customer-store"
@@ -56,10 +56,11 @@ export async function POST(request: Request) {
     const debitedCustomer = await consumeCredit(customer.id)
     if (!debitedCustomer) return NextResponse.json({ error: "You are out of report credits. Choose a plan or bundle from Billing." }, { status: 402 })
     consumedCustomerId = customer.id
-    const report = await generateReport(reportType, { sourceId, dateFrom, dateTo, platform, productUrl: productUrl || undefined, productName: productName || undefined, competitorName: competitorName || undefined, pastedReviews: pastedReviews || undefined, reviewApp, reviewPageLimit }, customer.id)
+    const report = await generateReportAsync(reportType, { sourceId, dateFrom, dateTo, platform, productUrl: productUrl || undefined, productName: productName || undefined, competitorName: competitorName || undefined, pastedReviews: pastedReviews || undefined, reviewApp, reviewPageLimit }, customer.id)
     return NextResponse.json({ report, credits: debitedCustomer.credits, inputQuality }, { status: 201 })
   } catch (error) {
     if (consumedCustomerId) await addCredits(consumedCustomerId, 1, "report_generation_refund").catch(() => null)
+
     console.error("Report generation failed", error)
     if (error instanceof NoReviewDataError) {
       return NextResponse.json({ error: "No reviews found. Your credit has been returned.", details: error.message, creditRefunded: Boolean(consumedCustomerId) }, { status: 422 })

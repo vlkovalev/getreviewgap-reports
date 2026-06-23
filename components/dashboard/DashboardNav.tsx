@@ -14,12 +14,19 @@ const links = [
   { href: "/dashboard/products", label: "Products reviewed" }
 ]
 
-export function DashboardNav() {
+export function DashboardNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname()
+
+  const visibleLinks = links.filter((link) => {
+    if (["/dashboard/sources", "/dashboard/jobs", "/dashboard/runs", "/dashboard/products"].includes(link.href)) {
+      return isAdmin
+    }
+    return true
+  })
 
   return (
     <nav className="mb-8 flex flex-wrap gap-2">
-      {links.map((link) => {
+      {visibleLinks.map((link) => {
         const active = link.href === "/dashboard" ? pathname === "/dashboard" : pathname === link.href || pathname.startsWith(`${link.href}/`)
         return (
           <Link

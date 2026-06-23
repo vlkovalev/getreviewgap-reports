@@ -6,6 +6,7 @@ import { getCurrentCustomer } from "@/lib/customer-session"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
 import type { IntelligenceReport } from "@/lib/scrapers/types"
 import { BetaFeedbackForm } from "@/components/dashboard/BetaFeedbackForm"
+import { ReportStatusPoller } from "@/components/dashboard/ReportStatusPoller"
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,6 +26,14 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
     return (
       <DashboardShell title="Report not found" description="Generate a new report from the reports page.">
         <Link href="/dashboard/reports" className="rounded-full bg-lime px-5 py-3 font-black text-black">Back to reports</Link>
+      </DashboardShell>
+    )
+  }
+
+  if (report.status !== "COMPLETED") {
+    return (
+      <DashboardShell title="Analysis in progress" description="Your review intelligence report status and details.">
+        <ReportStatusPoller reportId={report.id} />
       </DashboardShell>
     )
   }

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import type { IntelligenceReport, ReportType, ScraperSource } from "@/lib/scrapers/types"
 import { trackClientEvent } from "@/components/AnalyticsBeacon"
 import { scoreReportInputQuality } from "@/lib/report-input-quality"
@@ -45,6 +46,7 @@ export function ReportsClient({
   initialProductName?: string
   initialPlatform?: "amazon" | "shopify"
 }) {
+  const router = useRouter()
   const [reports, setReports] = useState(initialReports)
   const [creditCount, setCreditCount] = useState(credits)
   const [reportType, setReportType] = useState<ReportType>("REVIEW_RATING")
@@ -197,7 +199,10 @@ export function ReportsClient({
     }
     setReports((current) => [payload.report, ...current])
     if (typeof payload.credits === "number") setCreditCount(payload.credits)
-    setStatus("Report generated. Open it or export it below.")
+    setStatus("Report generation started. Redirecting...")
+    if (payload.report?.id) {
+      router.push(`/dashboard/reports/${payload.report.id}`)
+    }
     trackClientEvent("report_generated", {
       reportType,
       source: payload.report?.summary?.source ?? "stored",
@@ -224,7 +229,10 @@ export function ReportsClient({
     }
     setReports((current) => current.some((report) => report.id === payload.report.id) ? current : [payload.report, ...current])
     if (typeof payload.credits === "number") setCreditCount(payload.credits)
-    setStatus(payload.reused ? "Sample report already exists. Open it below; no credit was used." : "Sample report created. Open it below; no credit was used.")
+    setStatus(payload.reused ? "Opening existing sample report..." : "Opening sample report...")
+    if (payload.report?.id) {
+      router.push(`/dashboard/reports/${payload.report.id}`)
+    }
     trackClientEvent("sample_report_created", { reused: Boolean(payload.reused) })
   }
 
