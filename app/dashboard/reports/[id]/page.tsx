@@ -102,7 +102,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           </div>
 
           {isSingleProductReport ? (
-            <div className="mt-7 grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+            <div className="mt-7 grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7">
               <Metric label="Written reviews" value={String(reviewCount)} />
               <Metric label="Marketplace ratings" value={marketplaceRatingCount ? marketplaceRatingCount.toLocaleString("en-US") : "-"} />
               <Metric label="Depth" value={String(report.summary?.reviewDepth ?? "Default")} />
@@ -582,13 +582,13 @@ function Metric({ label, value, tone = "white" }: { label: string; value: string
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/45 hover:border-white/20 transition-all duration-300 p-4 flex items-start gap-3 shadow-lg hover:shadow-black/50">
-      <div className="p-2 rounded-xl bg-white/[0.04] border border-white/5 mt-0.5 shrink-0">
+    <div className="rounded-2xl border border-white/10 bg-black/45 hover:border-white/20 transition-all duration-300 p-5 flex flex-col gap-4 shadow-lg hover:shadow-black/50">
+      <div className="w-fit p-2 rounded-xl bg-white/[0.04] border border-white/5 shrink-0">
         {getIcon(label)}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-black uppercase text-white/40 tracking-wider">{label}</p>
-        <p className={`mt-1.5 break-words text-xl font-black ${color}`}>{value}</p>
+      <div className="min-w-0">
+        <p className="text-xs font-black uppercase text-white/40 tracking-wider leading-tight">{label}</p>
+        <p className={`mt-2 break-words text-xl font-black ${color}`}>{value}</p>
       </div>
     </div>
   )
