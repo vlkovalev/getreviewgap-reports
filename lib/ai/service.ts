@@ -1061,22 +1061,31 @@ export async function generateReviewInsight(input: ReviewInput, reviews: string[
 
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini"
   const prompt = reviewInsightPrompt(input, reviews)
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: `${prompt.role}\nObjective: ${prompt.objective}\nQuality rules:\n${prompt.qualityRules.map((rule, idx) => `${idx + 1}. ${rule}`).join("\n")}\n\nRequired JSON Output Schema:\n${JSON.stringify(prompt.outputSchema, null, 2)}` },
-        { role: "user", content: prompt.userMessage }
-      ]
+  let response: Response
+  try {
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: `${prompt.role}\nObjective: ${prompt.objective}\nQuality rules:\n${prompt.qualityRules.map((rule, idx) => `${idx + 1}. ${rule}`).join("\n")}\n\nRequired JSON Output Schema:\n${JSON.stringify(prompt.outputSchema, null, 2)}` },
+          { role: "user", content: prompt.userMessage }
+        ]
+      }),
+      signal: AbortSignal.timeout(60000)
     })
-  })
+  } catch (error: any) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw new Error("OpenAI request timed out after 60 seconds. Try again, or use a shorter review sample.")
+    }
+    throw error
+  }
 
   if (!response.ok) {
     throw new Error(`OpenAI request failed with status ${response.status}`)
