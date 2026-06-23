@@ -31,7 +31,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Site-wide gate for private beta. No-op until SITE_GATE_USER/SITE_GATE_PASSWORD are set.
-  if (!siteGatePasses(request)) {
+  // The homepage stays public so visitors don't hit a Basic Auth prompt before signing up.
+  if (pathname !== "/" && !siteGatePasses(request)) {
     return new NextResponse("Authentication required.", {
       status: 401,
       headers: { "WWW-Authenticate": 'Basic realm="ReviewGap private beta"' }
