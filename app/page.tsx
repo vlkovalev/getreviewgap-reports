@@ -5,8 +5,8 @@ import { FAQSection } from "@/components/FAQSection"
 import { faqs } from "@/lib/content"
 
 export const metadata: Metadata = {
-  title: "AI Competitor Review Intelligence for Shopify & Amazon Sellers",
-  description: "ReviewGap turns competitor reviews into AI-powered reports. Find complaints, buyer language, and product gaps in minutes. From $5 per report."
+  title: "Amazon Review Intelligence Private Beta",
+  description: "ReviewGap turns authorized competitor reviews and customer feedback into AI-powered reports. Private beta access is focused on Amazon sellers first."
 }
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://reviewgap.com"
@@ -19,7 +19,7 @@ const jsonLd = {
       "@id": `${siteUrl}/#organization`,
       name: "ReviewGap",
       url: siteUrl,
-      description: "AI-powered competitor review intelligence for Shopify brands and Amazon sellers."
+      description: "AI-powered competitor review intelligence for Amazon sellers, with Shopify/DTC review exports supported during beta."
     },
     {
       "@type": "WebSite",
@@ -47,7 +47,7 @@ const benefits = [
 ]
 
 const steps = [
-  ["Choose a product", "Paste an Amazon product URL, or use exported Shopify review text from your store or approved review app."],
+  ["Choose a product", "Paste an Amazon product URL, or import authorized Shopify/DTC review text from your store or review app export."],
   ["Generate insights", "AI groups sentiment, repeated complaints, rating signals, buyer phrases, and product gaps."],
   ["Use the report", "Export a concise report for product, listing, CRO, and advertising decisions."]
 ]
@@ -73,15 +73,15 @@ export default function HomePage() {
       <section className="grid-bg px-5 py-20 md:py-28">
         <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1fr_.9fr]">
           <div>
-            <p className="font-black uppercase text-lime">Reviews, ratings, and sentiment intelligence</p>
+            <p className="font-black uppercase text-lime">Private beta for Amazon sellers</p>
             <h1 className="mt-5 max-w-4xl text-5xl font-black leading-[.95] md:text-7xl">
               Find what customers wish competitors fixed.
             </h1>
             <p className="mt-6 max-w-2xl text-xl text-white/72">
-              ReviewGap turns authorized review sources or pasted customer feedback into affordable AI reports for Shopify brands, Amazon sellers, and agencies.
+              ReviewGap turns authorized review sources or pasted customer feedback into affordable AI reports for Amazon sellers first. Shopify/DTC teams can use imported review exports while live connector coverage is being validated.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/dashboard/reports" className="btn-primary">Run a sample report</Link>
+              <Link href="/dashboard/reports" className="btn-primary">Run a beta report</Link>
               <Link href="/pricing" className="btn-secondary">See plans</Link>
               <Link href="/compliance" className="btn-secondary">Compliance</Link>
             </div>
@@ -158,10 +158,10 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2">
           <div>
             <p className="font-black uppercase text-coral">For who</p>
-            <h2 className="mt-3 text-4xl font-black md:text-6xl">Built for teams who need insights, not another giant dashboard.</h2>
+            <h2 className="mt-3 text-4xl font-black md:text-6xl">Built for focused seller feedback loops, not another giant dashboard.</h2>
           </div>
           <div className="grid gap-3">
-            {["Amazon sellers validating product improvements", "Shopify brands researching competitor weaknesses", "Agencies preparing listing copy and ad angles", "DTC teams monitoring ratings and sentiment changes"].map((item) => (
+            {["Amazon sellers validating product improvements", "Small brands comparing competitor complaints", "Agencies preparing listing copy and ad angles", "Beta testers with authorized review exports"].map((item) => (
               <div key={item} className="rounded-2xl border border-white/10 bg-white/7 p-4 font-bold">{item}</div>
             ))}
           </div>

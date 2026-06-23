@@ -1,6 +1,6 @@
 export const site = {
   name: "ReviewGap",
-  description: "AI-powered competitor review intelligence for Shopify brands and Amazon sellers. Find complaints, buyer language, and product gaps in minutes."
+  description: "AI-powered competitor review intelligence for Amazon sellers and authorized Shopify/DTC review exports. Find complaints, buyer language, and product gaps in minutes."
 }
 
 export const faqs = [
@@ -14,7 +14,7 @@ export const faqs = [
   },
   {
     question: "Who is this for?",
-    answer: "Shopify brands, Amazon sellers, DTC operators, and agencies that need quick competitor review reports before improving a product, listing, offer, or ad angle."
+    answer: "The private beta is focused on Amazon sellers first. Shopify brands, DTC operators, and agencies can use authorized review exports or pasted review text while live Shopify connector coverage is validated."
   },
   {
     question: "Is this a replacement for deep customer research?",
@@ -174,4 +174,3 @@ By checking our [pricing page](/pricing), you can pick a plan that fits your tes
 Stop guessing what will make your audience click. The answers are already written in their reviews. By translating raw buyer language into sharp, authentic ad copy, you can drive down your customer acquisition costs and build a creative pipeline that practically writes itself.`
   }
 ]
-

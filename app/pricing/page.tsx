@@ -5,7 +5,7 @@ import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { paidPlans, type PlanId } from "@/lib/plans"
 
-export const metadata: Metadata = { title: "Pricing", description: "Affordable review intelligence pricing for Shopify brands and Amazon sellers." }
+export const metadata: Metadata = { title: "Pricing", description: "Private beta pricing for Amazon review intelligence and authorized Shopify/DTC review imports." }
 
 const oneTimePlans: PlanId[] = ["one_report", "five_pack", "twenty_pack"]
 const monthlyPlans: PlanId[] = ["micro", "starter", "growth"]

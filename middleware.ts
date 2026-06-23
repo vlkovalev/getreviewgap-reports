@@ -4,12 +4,38 @@ import { verifySession } from "./lib/session-crypto"
 
 const CUSTOMER_COOKIE = "reviewgap_customer"
 
+function siteGatePasses(request: NextRequest): boolean {
+  const user = process.env.SITE_GATE_USER
+  const password = process.env.SITE_GATE_PASSWORD
+  if (!user || !password) return true // gate is off until both env vars are set
+
+  const header = request.headers.get("authorization")
+  if (!header?.startsWith("Basic ")) return false
+  let decoded: string
+  try {
+    decoded = atob(header.slice(6))
+  } catch {
+    return false
+  }
+  const separatorIndex = decoded.indexOf(":")
+  if (separatorIndex === -1) return false
+  return decoded.slice(0, separatorIndex) === user && decoded.slice(separatorIndex + 1) === password
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Exempt Stripe webhooks
   if (pathname === "/api/stripe/webhook") {
     return NextResponse.next()
+  }
+
+  // Site-wide gate for private beta. No-op until SITE_GATE_USER/SITE_GATE_PASSWORD are set.
+  if (!siteGatePasses(request)) {
+    return new NextResponse("Authentication required.", {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="ReviewGap private beta"' }
+    })
   }
 
   // Determine if path is protected
@@ -43,9 +69,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/api/scraper/:path*",
-    "/api/stripe/:path*",
-    "/api/auth/change-password",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|api/stripe/webhook).*)",
   ],
 }
