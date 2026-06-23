@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client"
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 
 export function getDb() {
+  if (process.env.NODE_ENV === "production" && !hasRealDatabaseUrl()) {
+    throw new Error("DATABASE_URL must be set to a real database in production")
+  }
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = new PrismaClient()
   }
@@ -12,10 +15,6 @@ export function getDb() {
 export function hasRealDatabaseUrl() {
   const url = process.env.DATABASE_URL
   return Boolean(url && !url.includes("USER:PASSWORD") && !url.includes("HOST:5432"))
-}
-
-if (process.env.NODE_ENV === "production" && !hasRealDatabaseUrl()) {
-  throw new Error("DATABASE_URL must be set to a real database in production")
 }
 
 export async function withDbRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
