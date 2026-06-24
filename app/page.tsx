@@ -93,6 +93,7 @@ export default function HomePage() {
                 <h3 className="text-xl font-black mt-1 text-white">Review Intelligence Brief</h3>
               </div>
               <div className="flex gap-2">
+                <span className="rounded-full border border-yellow-300/40 bg-yellow-300/15 px-2.5 py-1 text-xs font-black text-yellow-200 uppercase">Example report</span>
                 <span className="rounded-full border border-lime/40 bg-lime/15 px-2.5 py-1 text-xs font-black text-lime uppercase">Amazon</span>
                 <span className="rounded-full border border-cyan/40 bg-cyan/15 px-2.5 py-1 text-xs font-black text-cyan uppercase">High Confidence</span>
               </div>
@@ -146,6 +147,10 @@ export default function HomePage() {
                 Redesign bottle seals for travel safety, and lead marketing with "Hydration without the stickiness" hooks.
               </p>
             </div>
+
+            <Link href="/sample-report" className="mt-5 block text-center text-sm font-black text-white/60 underline-offset-4 hover:text-white hover:underline">
+              View the full example report &rarr;
+            </Link>
           </div>
         </div>
       </section>
