@@ -4,24 +4,6 @@ import { verifySession } from "./lib/session-crypto"
 
 const CUSTOMER_COOKIE = "reviewgap_customer"
 
-function siteGatePasses(request: NextRequest): boolean {
-  const user = process.env.SITE_GATE_USER
-  const password = process.env.SITE_GATE_PASSWORD
-  if (!user || !password) return true // gate is off until both env vars are set
-
-  const header = request.headers.get("authorization")
-  if (!header?.startsWith("Basic ")) return false
-  let decoded: string
-  try {
-    decoded = atob(header.slice(6))
-  } catch {
-    return false
-  }
-  const separatorIndex = decoded.indexOf(":")
-  if (separatorIndex === -1) return false
-  return decoded.slice(0, separatorIndex) === user && decoded.slice(separatorIndex + 1) === password
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -36,15 +18,6 @@ export async function middleware(request: NextRequest) {
   const isStripeApi = pathname.startsWith("/api/stripe")
   const isChangePasswordApi = pathname.startsWith("/api/auth/change-password")
   const isGated = isDashboard || isScraperApi || isStripeApi || isChangePasswordApi
-
-  // Site-wide gate for private beta. No-op until SITE_GATE_USER/SITE_GATE_PASSWORD are set.
-  // Marketing/static pages stay public; only the dashboard and product/payment APIs require it.
-  if (isGated && !siteGatePasses(request)) {
-    return new NextResponse("Authentication required.", {
-      status: 401,
-      headers: { "WWW-Authenticate": 'Basic realm="ReviewGap private beta"' }
-    })
-  }
 
   if (isGated) {
     const token = request.cookies.get(CUSTOMER_COOKIE)?.value
