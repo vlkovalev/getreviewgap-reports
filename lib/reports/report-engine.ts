@@ -135,7 +135,7 @@ export async function generateReportAsync(type: ReportType, filters: ReportFilte
       const marketplace = platform === "shopify" ? "Shopify / DTC store" : amazonMarketplaceLabel(cleanProductUrl)
       const reviewResult = await fetchAmazonReviews({
         productUrl: cleanProductUrl,
-        productName,
+        productName: filters.productName,
         competitorName: filters.competitorName,
         pastedReviews: filters.pastedReviews,
         reviewApp: filters.reviewApp,
