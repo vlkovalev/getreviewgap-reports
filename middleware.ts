@@ -30,22 +30,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Determine if path is protected
+  const isDashboard = pathname.startsWith("/dashboard")
+  const isScraperApi = pathname.startsWith("/api/scraper")
+  const isStripeApi = pathname.startsWith("/api/stripe")
+  const isChangePasswordApi = pathname.startsWith("/api/auth/change-password")
+  const isGated = isDashboard || isScraperApi || isStripeApi || isChangePasswordApi
+
   // Site-wide gate for private beta. No-op until SITE_GATE_USER/SITE_GATE_PASSWORD are set.
-  // The homepage stays public so visitors don't hit a Basic Auth prompt before signing up.
-  if (pathname !== "/" && !siteGatePasses(request)) {
+  // Marketing/static pages stay public; only the dashboard and product/payment APIs require it.
+  if (isGated && !siteGatePasses(request)) {
     return new NextResponse("Authentication required.", {
       status: 401,
       headers: { "WWW-Authenticate": 'Basic realm="ReviewGap private beta"' }
     })
   }
 
-  // Determine if path is protected
-  const isDashboard = pathname.startsWith("/dashboard")
-  const isScraperApi = pathname.startsWith("/api/scraper")
-  const isStripeApi = pathname.startsWith("/api/stripe")
-  const isChangePasswordApi = pathname.startsWith("/api/auth/change-password")
-
-  if (isDashboard || isScraperApi || isStripeApi || isChangePasswordApi) {
+  if (isGated) {
     const token = request.cookies.get(CUSTOMER_COOKIE)?.value
     const customerId = await verifySession(token)
 
