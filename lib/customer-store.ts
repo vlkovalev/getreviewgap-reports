@@ -7,6 +7,7 @@ export type Customer = {
   password?: string
   credits: number
   createdAt: string
+  stripeCustomerId?: string | null
 }
 
 export type CreditLedgerItem = {
@@ -57,12 +58,13 @@ function memoryPurchases() {
   return memory.reviewIntelCustomerPurchases
 }
 
-function toCustomer(record: { id: string; email: string; credits: number; createdAt: Date | string }): Customer {
+function toCustomer(record: { id: string; email: string; credits: number; createdAt: Date | string; stripeCustomerId?: string | null }): Customer {
   return {
     id: record.id,
     email: record.email,
     credits: record.credits,
-    createdAt: typeof record.createdAt === "string" ? record.createdAt : record.createdAt.toISOString()
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : record.createdAt.toISOString(),
+    stripeCustomerId: record.stripeCustomerId ?? null
   }
 }
 
@@ -159,6 +161,19 @@ export async function consumeCredit(customerId: string, referenceId?: string): P
     createdAt: new Date().toISOString()
   })
   return customer
+}
+
+export async function setStripeCustomerId(customerId: string, stripeCustomerId: string) {
+  if (hasRealDatabaseUrl()) {
+    const db = getDb()
+    const customer = await withDbRetry(() => db.customerAccount.findUnique({ where: { id: customerId } }))
+    if (!customer || customer.stripeCustomerId) return
+    await withDbRetry(() => db.customerAccount.update({ where: { id: customerId }, data: { stripeCustomerId } }))
+    return
+  }
+
+  const customer = memoryCustomers().find((item) => item.id === customerId)
+  if (customer && !customer.stripeCustomerId) customer.stripeCustomerId = stripeCustomerId
 }
 
 export async function addCredits(customerId: string, credits: number, reason = "purchase", referenceId?: string) {

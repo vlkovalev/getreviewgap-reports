@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { DashboardShell } from "@/components/dashboard/DashboardShell"
+import { ManageSubscriptionButton } from "@/components/ManageSubscriptionButton"
 import { getCurrentCustomer } from "@/lib/customer-session"
 import { getCustomerCreditLedger, getCustomerPurchases } from "@/lib/customer-store"
 import { getPaidPlan } from "@/lib/plans"
@@ -34,7 +35,12 @@ export default async function BillingPage() {
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
         <h2 className="text-2xl font-black">Choose or change plan</h2>
         <p className="mt-3 text-white/65">Use pricing to buy a single report, a pay-as-you-go pack, or a monthly credit plan with rollover.</p>
-        <Link href="/pricing" className="btn-primary mt-6">View pricing</Link>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/pricing" className="btn-primary">View pricing</Link>
+          {customer?.stripeCustomerId ? (
+            <ManageSubscriptionButton />
+          ) : null}
+        </div>
       </section>
 
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">

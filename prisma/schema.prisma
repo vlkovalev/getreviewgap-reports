@@ -233,15 +233,16 @@ model Purchase {
 }
 
 model CustomerAccount {
-  id           String              @id @default(cuid())
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  email        String              @unique
-  passwordHash String
-  credits      Int                 @default(0)
-  reports      IntelligenceReport[]
-  transactions CreditTransaction[]
-  purchases    CustomerPurchase[]
+  id               String              @id @default(cuid())
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  email            String              @unique
+  passwordHash     String
+  credits          Int                 @default(0)
+  stripeCustomerId String?
+  reports          IntelligenceReport[]
+  transactions     CreditTransaction[]
+  purchases        CustomerPurchase[]
 
   @@index([createdAt])
 }

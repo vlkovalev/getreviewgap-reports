@@ -1,13 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
-import { addCreditsOnce, findCustomerById } from "@/lib/customer-store"
+import { addCreditsOnce, findCustomerById, setStripeCustomerId } from "@/lib/customer-store"
 import { getPaidPlan, getPlanCredits } from "@/lib/plans"
 
 type StripeCheckoutSessionCompleted = {
   id: string
   amount_total?: number | null
   currency?: string | null
+  customer?: string | null
   customer_email?: string | null
   client_reference_id?: string | null
   metadata?: {
@@ -68,6 +69,8 @@ async function handleCheckoutSessionCompleted(session: StripeCheckoutSessionComp
 
   const customer = await findCustomerById(customerId)
   if (!customer) return
+
+  if (session.customer) await setStripeCustomerId(customer.id, session.customer)
 
   const credits = getPlanCredits(plan.id)
   await addCreditsOnce(customer.id, credits, "stripe_checkout", session.id)

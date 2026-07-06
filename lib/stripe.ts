@@ -44,6 +44,28 @@ export async function createStripeCheckoutSession(planId: string, customerId?: s
   return data
 }
 
+export async function createStripeBillingPortalSession(stripeCustomerId: string) {
+  const secretKey = cleanEnvSecret(process.env.STRIPE_SECRET_KEY)
+  if (!secretKey) throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY.")
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  const params = new URLSearchParams()
+  params.set("customer", stripeCustomerId)
+  params.set("return_url", `${siteUrl}/dashboard/billing`)
+
+  const response = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${secretKey}`,
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: params,
+    cache: "no-store"
+  })
+  const data = await response.json() as { url?: string; error?: { message?: string } }
+  if (!response.ok || !data.url) throw new Error(data.error?.message ?? `Stripe billing portal failed: ${response.status}`)
+  return data
+}
+
 function cleanEnvSecret(value: string | undefined) {
   return value?.trim().replace(/^["']|["']$/g, "")
 }
