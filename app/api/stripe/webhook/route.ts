@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { getDb, hasRealDatabaseUrl } from "@/lib/db"
 import { addCreditsOnce, findCustomerById, setStripeCustomerId } from "@/lib/customer-store"
 import { getPaidPlan, getPlanCredits } from "@/lib/plans"
+import { shouldCreditInvoicePaid } from "@/lib/stripe-webhook"
 
 type StripeCheckoutSessionCompleted = {
   id: string
@@ -20,6 +21,7 @@ type StripeCheckoutSessionCompleted = {
 type StripeInvoicePaid = {
   id: string
   amount_paid?: number | null
+  billing_reason?: string | null
   currency?: string | null
   parent?: { subscription_details?: { metadata?: { plan_id?: string; customer_id?: string } | null } | null } | null
   subscription_details?: { metadata?: { plan_id?: string; customer_id?: string } | null } | null
@@ -98,6 +100,7 @@ async function handleCheckoutSessionCompleted(session: StripeCheckoutSessionComp
 
 async function handleInvoicePaid(invoice: StripeInvoicePaid | undefined) {
   if (!invoice?.id) return
+  if (!shouldCreditInvoicePaid(invoice)) return
   const metadata = invoice.parent?.subscription_details?.metadata ?? invoice.subscription_details?.metadata ?? invoice.metadata
   const plan = getPaidPlan(metadata?.plan_id)
   const customerId = metadata?.customer_id
